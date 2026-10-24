@@ -1,0 +1,34 @@
+{
+  "name": "allstudio",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "dev": "bun --filter @allstudio/playground dev",
+    "dev:fixture": "bun --filter @allstudio/nextjs-site-fixture dev",
+    "build": "bun --filter @allstudio/playground build && bun --filter @allstudio/nextjs-site-fixture build",
+    "typecheck": "bun --filter @allstudio/project typecheck && bun --filter @allstudio/editor typecheck && bun --filter @allstudio/playground typecheck && bun --filter @allstudio/nextjs-site-fixture typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "validate:public-boundary": "bun scripts/validate-public-boundary.ts"
+  },
+  "packageManager": "bun@1.3.14",
+  "devDependencies": {
+    "@biomejs/biome": "2.4.2",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5",
+    "vitest": "^3.2.4"
+  },
+  "trustedDependencies": [
+    "sharp",
+    "unrs-resolver"
+  ]
+}

@@ -1,0 +1,26 @@
+export default function Home() {
+  return (
+    <main className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-6 px-6 py-24">
+      <p className="text-sm tracking-[0.2em] uppercase text-zinc-500">
+        allstudio fixture
+      </p>
+      <h1
+        id="hero-heading"
+        className="max-w-xl text-5xl leading-tight font-semibold tracking-tight text-zinc-950"
+      >
+        Aurora Atelier
+      </h1>
+      <p className="max-w-xl text-lg leading-8 text-zinc-600">
+        A supported Next.js, React, and Tailwind CSS site used to validate
+        allstudio source editing. This page is a real fixture, not a product
+        demo.
+      </p>
+      <button
+        type="button"
+        className="w-fit rounded-full bg-zinc-950 px-5 py-3 text-sm text-white"
+      >
+        Start a project
+      </button>
+    </main>
+  );
+}
