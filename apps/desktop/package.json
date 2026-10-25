@@ -1,0 +1,28 @@
+{
+  "name": "@allstudio/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "allstudio local desktop editor",
+  "author": "allstudio contributors",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite build && electron-vite preview",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "package": "electron-builder --dir --config electron-builder.yml"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@allstudio/editor": "workspace:*",
+    "@allstudio/project": "workspace:*",
+    "@vitejs/plugin-react": "^5.0.4",
+    "electron": "45.0.0",
+    "electron-vite": "6.0.0",
+    "electron-builder": "26.18.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vite": "^7.1.7"
+  }
+}

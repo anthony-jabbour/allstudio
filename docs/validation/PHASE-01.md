@@ -1,14 +1,14 @@
 # Phase 01 — Validation report
 
-**Status:** ALL GATE TESTS EVIDENCED — READY FOR FOUNDER PASS DECISION (not marked PASS; only the founder can)  
+**Status:** PASS\
 **Slices:** (1) source mapper in `@allstudio/editor`; (2) browser preview → select → text edit → JSX write → live refresh; (3) three fixtures, heading/button/layout, text + className edits, format-preserving writes (below)  
-**Founder decision:** ADR-0002 option A (2026-10-24)  
-**This report does not mark the phase PASS.**
+**Founder decision:** ADR-0002 option A (2026-10-24); Phase 1 PASS (founder, 2026-10-25) on `main` @ `5f29824` (PRs #2–#8)\
+**Approved by:** founder (2026-10-25). Agents do not self-approve later phases.
 
 ## Phase 1 gate closure (2026-10-25)
 
-Every RoadMap.md Phase 1 gate test now has executed evidence. The founder
-decides PASS.
+Every RoadMap.md Phase 1 gate test has executed evidence. Founder marked
+the phase PASS on 2026-10-25.
 
 | Gate test (RoadMap.md Phase 1) | Evidence | Where |
 |---|---|---|
@@ -53,7 +53,7 @@ two scripts to regenerate them.
 ## Slice 3 — Three fixtures, text + class edits, format-preserving writes (2026-10-25)
 
 **Branch:** `claude/fervent-tesla-7bsghy` (restarted from `main` @ `c178a2a`)  
-**Status:** READY FOR HUMAN VALIDATION. Not PASS. Phase 0 is not PASS either.
+**Status at delivery:** READY FOR HUMAN VALIDATION; superseded by founder Phase 0 and Phase 1 **PASS** on 2026-10-25 (see header).
 
 ### User-observable outcome
 
@@ -260,14 +260,14 @@ Current: always-select, unchanged in this slice as instructed.
 | No-op, hash conflicts, edits affecting unrelated nodes | unit + E2E (one changed line per edit, inside the element) |
 | Independent source diff review + recording/trace of one interaction | see "Phase 1 gate closure" above |
 
-Recommendation: **READY FOR HUMAN VALIDATION**. The phase is not PASS until the founder approves it.
+Recommendation at merge: **READY FOR HUMAN VALIDATION**. Founder later marked the phase **PASS** on 2026-10-25 (see header). Phase 0 is also founder **PASS** (2026-10-25), via ADR-0002 option A.
 
 ---
 
 ## Slice 2 — First visual editing loop (2026-10-25)
 
 **Branch:** `claude/fervent-tesla-7bsghy` (from `main` @ `7bbd292`)  
-**Status:** READY FOR HUMAN VALIDATION. Not PASS.
+**Status at delivery:** READY FOR HUMAN VALIDATION; superseded by founder Phase 1 **PASS** on 2026-10-25 (see header).
 
 ### User-observable outcome
 
@@ -535,7 +535,7 @@ Not applicable. Extraction from public Apache-2.0 source already inspected in Ph
 - Editor shell scaffold tests still pass.
 - No Electron, no iframe, no CodeSandbox.
 
-## Not done (Phase 1 remaining)
+## Historical parser-slice remaining work (superseded by later slices above)
 
 - Live preview / DOM selection
 - Three representative fixtures
@@ -547,4 +547,4 @@ Not applicable. Extraction from public Apache-2.0 source already inspected in Ph
 
 ## Gate recommendation
 
-**IN PROGRESS** — parser slice is test-backed. Phase 1 gate is not met. **Not PASS.**
+**Historical parser-slice recommendation:** IN PROGRESS at that delivery. Later slices closed the gate; founder marked Phase 1 **PASS** on 2026-10-25 (see header).

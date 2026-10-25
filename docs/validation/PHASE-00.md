@@ -1,6 +1,6 @@
 # Phase 00 — Validation report
 
-**Status:** IN PROGRESS (founder approved Phase 0 exit option A on 2026-10-24; not PASS)  
+**Status:** PASS (founder, 2026-10-25; approved exit option A from ADR-0002)\
 **Scope:** Phase 0 Onlook research and reproduction preparation  
 **allstudio branch:** `research/phase-0-onlook`  
 **allstudio HEAD at branch creation:** `022b3524f08bd662fb83a5c763d300597e6a7cac`  
@@ -8,8 +8,8 @@
 **Verified baseline SHA:** `423e2e924366419e418ee049093872d535eea41a`  
 **Research clone (outside both product Git repos):** `/Users/jabbo/AllStudio/research/onlook`  
 **Environment:** macOS Darwin 27.0.0, Bun 1.3.14, Node v22.22.3, Docker 29.8.1 (daemon running)  
-**Reviewer:** not yet assigned (human founder review required)  
-**This report does not mark the phase PASS.**
+**Gate approval:** founder, 2026-10-25 (reconfirmed in the local Phase 2 implementation chat)\
+**Approval provenance:** PASS records the founder’s explicit decision; it does not claim additional tests were executed.
 
 ## User-observable outcome
 
@@ -320,7 +320,7 @@ The visual loop cannot be shown in unmodified Onlook without CodeSandbox and Ope
 
 **`data-oid` persistence:** Phase 1 uses in-source `data-oid` during editing (Onlook-like). Stripping on production export is deferred.
 
-Agents still must not mark this phase PASS.
+Founder marked Phase 0 **PASS** on 2026-10-25 via option A. Agents do not self-approve subsequent gates.
 
 ---
 
@@ -384,7 +384,7 @@ See blockers table. Remaining product decisions: Bun version (already listed in 
 
 ## Gate recommendation
 
-**IN PROGRESS** — founder accepted option A on 2026-10-24 (`ADR-0002`). Isolated source mapping is evidenced; unmodified Onlook visual E2E remains blocked. **Not PASS.**
+**PASS — founder approved 2026-10-25**, via the documented blocker plus parser spike (`ADR-0002` option A). Unmodified Onlook visual E2E remains unexecuted; approval does not change that evidence limitation.
 
 ---
 
@@ -399,4 +399,4 @@ See blockers table. Remaining product decisions: Bun version (already listed in 
 **Real-world proof:** JSX diff on the Aurora Atelier fixture heading, without preview.  
 **Negative/security/regression checks:** ancestor-oid false positive; Penpal origin gap; NodeFs no-op; env secret requirements.  
 **Not run, failures, and risks:** Onlook `bun dev`, db:push, iframe E2E, parser typecheck isolation, Electron.  
-**Gate recommendation:** IN PROGRESS / READY FOR HUMAN VALIDATION of the spike — **not PASS**
+**Gate decision:** PASS — founder, 2026-10-25, via ADR-0002 option A. Tests above are historical evidence, not a new run.

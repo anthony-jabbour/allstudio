@@ -16,7 +16,8 @@
       "!**/build",
       "!**/coverage",
       "!**/next-env.d.ts",
-      "!**/*.tsbuildinfo"
+      "!**/*.tsbuildinfo",
+      "!**/out"
     ]
   },
   "formatter": {
