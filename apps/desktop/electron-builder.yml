@@ -13,4 +13,5 @@ mac:
   identity: null
   category: public.app-category.developer-tools
 linux:
+  executableName: allstudio
   category: Development
