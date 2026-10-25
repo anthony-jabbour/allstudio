@@ -15,6 +15,7 @@ export {
 export type { EditorShellProps } from "./shell/editor-shell.tsx";
 export { EDITOR_STATUS, EditorShell } from "./shell/editor-shell.tsx";
 export type {
+  ClassEditRequest,
   LocateElementResult,
   SourceEditFailure,
   SourceEditFailureReason,
@@ -31,8 +32,11 @@ export type {
   DescribeElementResult,
   DiffHunk,
   DiffLine,
+  ElementClassName,
   ElementEdit,
+  ElementEditResult,
   ElementTextContent,
+  InstrumentOptions,
   InstrumentResult,
   LineDiff,
   LocateSourceOptions,
@@ -43,6 +47,8 @@ export type {
 export {
   createLineDiff,
   describeElement,
+  editElementClassName,
+  editElementText,
   formatLineDiff,
   instrumentSource,
   listOids,

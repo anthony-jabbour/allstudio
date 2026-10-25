@@ -12,6 +12,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
+  type ClassEditRequest,
   type SourceEditFailureReason,
   sourceEditFailure,
   type TextEditRequest,
@@ -23,11 +24,13 @@ export const SESSION_HEADER = "x-allstudio-session";
 
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_TEXT_LENGTH = 500;
+const MAX_CLASS_LENGTH = 1000;
 const OID_PATTERN = /^[a-z0-9\-._:]{1,64}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 export interface WorkspaceApiOptions {
-  workspace: DevWorkspace;
+  /** One adapter per fixture id; ids appear in the URL path. */
+  workspaces: ReadonlyMap<string, DevWorkspace>;
   editorOrigin: string;
   sessionToken: string;
 }
@@ -145,8 +148,27 @@ export function parseTextEditBody(body: unknown): TextEditRequest | null {
   return { path, oid, expectedSha256, text };
 }
 
+export function parseClassEditBody(body: unknown): ClassEditRequest | null {
+  if (!hasExactKeys(body, ["path", "oid", "expectedSha256", "className"])) {
+    return null;
+  }
+  const { path, oid, expectedSha256, className } = body;
+  if (
+    typeof path !== "string" ||
+    typeof oid !== "string" ||
+    !OID_PATTERN.test(oid) ||
+    typeof expectedSha256 !== "string" ||
+    !SHA256_PATTERN.test(expectedSha256) ||
+    typeof className !== "string" ||
+    className.length > MAX_CLASS_LENGTH
+  ) {
+    return null;
+  }
+  return { path, oid, expectedSha256, className };
+}
+
 export function createWorkspaceApiMiddleware(options: WorkspaceApiOptions) {
-  const { workspace } = options;
+  const { workspaces } = options;
   return async (req: IncomingMessage, res: ServerResponse, next: Next) => {
     const url = req.url ?? "";
     if (!url.startsWith(WORKSPACE_API_PREFIX)) {
@@ -158,7 +180,15 @@ export function createWorkspaceApiMiddleware(options: WorkspaceApiOptions) {
         fail(res, "unauthorized");
         return;
       }
-      const action = url.slice(WORKSPACE_API_PREFIX.length);
+      // `/__allstudio/workspace/<fixture id>/<action>`
+      const [id, action, ...rest] = url
+        .slice(WORKSPACE_API_PREFIX.length)
+        .split("/");
+      const workspace = id ? workspaces.get(id) : undefined;
+      if (!workspace || rest.length > 0) {
+        fail(res, "invalid-request");
+        return;
+      }
       const body = await readJson(req);
       if (action === "locate") {
         const parsed = parseLocateBody(body);
@@ -180,6 +210,19 @@ export function createWorkspaceApiMiddleware(options: WorkspaceApiOptions) {
           action === "apply-text"
             ? await workspace.applyTextEdit(parsed)
             : await workspace.previewTextEdit(parsed);
+        send(res, result.ok ? 200 : (STATUS[result.reason] ?? 422), result);
+        return;
+      }
+      if (action === "preview-class" || action === "apply-class") {
+        const parsed = parseClassEditBody(body);
+        if (!parsed) {
+          fail(res, "invalid-request");
+          return;
+        }
+        const result =
+          action === "apply-class"
+            ? await workspace.applyClassEdit(parsed)
+            : await workspace.previewClassEdit(parsed);
         send(res, result.ok ? 200 : (STATUS[result.reason] ?? 422), result);
         return;
       }

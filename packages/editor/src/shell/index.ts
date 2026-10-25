@@ -7,6 +7,7 @@ export type {
   PreviewMessageRejection,
 } from "../preview-bridge/protocol.ts";
 export type {
+  ClassEditRequest,
   LocateElementResult,
   SourceEditFailure,
   SourceEditFailureReason,

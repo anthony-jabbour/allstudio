@@ -2,7 +2,7 @@
  * Creates the playground's editable copy of a fixture project.
  *
  * Edits never touch `examples/`: the fixture is copied into a git-ignored
- * workspace, its `src/app` JSX is instrumented with `data-oid`, and the
+ * workspace, its `src/` JSX is instrumented with `data-oid`, and the
  * preview bridge is installed through Next.js `instrumentation-client.ts`
  * (a new file, so no fixture source is rewritten for the bridge).
  */
@@ -52,6 +52,21 @@ async function exists(path: string): Promise<boolean> {
   );
 }
 
+/** `.tsx`/`.jsx` files under `dir` as POSIX paths, not following symlinks. */
+async function listJsxFiles(dir: string, prefix = ""): Promise<string[]> {
+  const files: string[] = [];
+  const entries = await readdir(join(dir, prefix), { withFileTypes: true });
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      files.push(...(await listJsxFiles(dir, relative)));
+    } else if (entry.isFile() && /\.(tsx|jsx)$/.test(entry.name)) {
+      files.push(relative);
+    }
+  }
+  return files;
+}
+
 export async function prepareWorkspace(
   options: PrepareWorkspaceOptions,
 ): Promise<PreparedWorkspace> {
@@ -80,19 +95,20 @@ export async function prepareWorkspace(
     await symlink(fixtureModules, join(workspaceDir, "node_modules"), "dir");
   }
 
+  // Instrument every JSX file under src/ (pages and components) by inserting
+  // data-oid attributes in place, so the copy differs from the fixture only
+  // by those attributes.
   const instrumentedFiles: string[] = [];
-  const appDir = join(workspaceDir, "src", "app");
-  for (const name of (await readdir(appDir)).sort()) {
-    if (!name.endsWith(".tsx")) {
-      continue;
-    }
-    const file = join(appDir, name);
-    const result = instrumentSource(await readFile(file, "utf8"));
+  for (const relative of await listJsxFiles(join(workspaceDir, "src"))) {
+    const file = join(workspaceDir, "src", relative);
+    const result = instrumentSource(await readFile(file, "utf8"), {
+      preserveFormatting: true,
+    });
     if (!result.ok) {
       throw new Error(`Could not instrument ${file}: ${result.reason}`);
     }
     await writeFile(file, result.content, "utf8");
-    instrumentedFiles.push(`src/app/${name}`);
+    instrumentedFiles.push(`src/${relative}`);
   }
 
   await writeFile(

@@ -9,6 +9,7 @@ import { DevWorkspace } from "../dev/dev-workspace.ts";
 import { prepareWorkspace } from "../dev/prepare-workspace.ts";
 import {
   createWorkspaceApiMiddleware,
+  parseClassEditBody,
   parseTextEditBody,
   SESSION_HEADER,
 } from "../dev/workspace-api.ts";
@@ -34,7 +35,7 @@ beforeAll(async () => {
     editorOrigin: EDITOR_ORIGIN,
   });
   const middleware = createWorkspaceApiMiddleware({
-    workspace: await DevWorkspace.open(workspaceDir),
+    workspaces: new Map([["fixture", await DevWorkspace.open(workspaceDir)]]),
     editorOrigin: EDITOR_ORIGIN,
     sessionToken: TOKEN,
   });
@@ -65,7 +66,7 @@ async function post(
   body: unknown,
   headers: Record<string, string> = goodHeaders,
 ) {
-  const res = await fetch(`${base}/__allstudio/workspace/${action}`, {
+  const res = await fetch(`${base}/__allstudio/workspace/fixture/${action}`, {
     method: "POST",
     headers,
     body: typeof body === "string" ? body : JSON.stringify(body),
@@ -106,7 +107,7 @@ describe("workspace API guard", () => {
   });
 
   it("rejects GET requests", async () => {
-    const res = await fetch(`${base}/__allstudio/workspace/locate`, {
+    const res = await fetch(`${base}/__allstudio/workspace/fixture/locate`, {
       headers: goodHeaders,
     });
     expect(res.status).toBe(403);
@@ -198,5 +199,90 @@ describe("workspace API guard", () => {
       text: "",
     };
     expect(parseTextEditBody(body)).toEqual(body);
+  });
+
+  it.each([
+    [
+      "extra keys",
+      {
+        path: "src/app/page.tsx",
+        oid: "abcdefg",
+        expectedSha256: "0".repeat(64),
+        className: "x",
+        text: "y",
+      },
+    ],
+    [
+      "text instead of className",
+      {
+        path: "src/app/page.tsx",
+        oid: "abcdefg",
+        expectedSha256: "0".repeat(64),
+        text: "x",
+      },
+    ],
+    [
+      "non-string className",
+      {
+        path: "src/app/page.tsx",
+        oid: "abcdefg",
+        expectedSha256: "0".repeat(64),
+        className: 1,
+      },
+    ],
+    [
+      "long className",
+      {
+        path: "src/app/page.tsx",
+        oid: "abcdefg",
+        expectedSha256: "0".repeat(64),
+        className: "x".repeat(1001),
+      },
+    ],
+  ])("rejects invalid class bodies: %s", async (_label, body) => {
+    const result = await post("apply-class", body);
+    expect(result).toMatchObject({
+      status: 400,
+      body: { ok: false, reason: "invalid-request" },
+    });
+  });
+
+  it("parses a valid class body", () => {
+    const body = {
+      path: "src/app/page.tsx",
+      oid: "abc",
+      expectedSha256: "b".repeat(64),
+      className: "",
+    };
+    expect(parseClassEditBody(body)).toEqual(body);
+  });
+
+  it.each([
+    ["an unknown fixture", "/__allstudio/workspace/other/locate"],
+    ["no fixture", "/__allstudio/workspace/locate"],
+    ["an extra path segment", "/__allstudio/workspace/fixture/locate/x"],
+    ["an unknown action", "/__allstudio/workspace/fixture/write-file"],
+  ])("rejects %s", async (_label, path) => {
+    const res = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers: goodHeaders,
+      body: JSON.stringify({ oid: "abcdefg" }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ reason: "invalid-request" });
+  });
+
+  it("routes class edits to the fixture workspace", async () => {
+    const result = await post("preview-class", {
+      path: "src/app/page.tsx",
+      oid: "zzzzzzz",
+      expectedSha256: "0".repeat(64),
+      className: "px-4",
+    });
+    // The real file hash never matches zeros: the request reached the adapter.
+    expect(result).toMatchObject({
+      status: 409,
+      body: { reason: "stale-file" },
+    });
   });
 });
