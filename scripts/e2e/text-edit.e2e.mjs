@@ -426,12 +426,21 @@ try {
 
   // --- Aurora: button text, heading classes, layout classes ----------------
   await select(preview.locator("main button"), "src/app/page.tsx:18–23");
+  const unsavedClasses = `${await classInput.inputValue()} unsaved-draft`;
+  await classInput.fill(unsavedClasses);
   await applyEdit({
     file: pageFile,
     kind: "text",
     value: "Start a new project",
     label: "aurora-button-text",
   });
+  assert.equal(
+    await classInput.inputValue(),
+    unsavedClasses,
+    "applying text keeps the unsaved classes draft",
+  );
+  assert.ok(!(await readFile(pageFile, "utf8")).includes("unsaved-draft"));
+  record("applying one field keeps the other field's unsaved draft");
   await selectHeading();
   const colorBefore = await preview
     .locator("#hero-heading")

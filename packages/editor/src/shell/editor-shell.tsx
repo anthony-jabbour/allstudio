@@ -111,7 +111,11 @@ function SourceElementEditor({
   const selection = useRef(0);
 
   const locate = useCallback(
-    async (oid: string, keepStatus = false) => {
+    /**
+     * `refresh` re-reads location and hash after a confirmed save without
+     * touching the drafts, so an unsaved edit in the other field survives.
+     */
+    async (oid: string, mode: "select" | "refresh" = "select") => {
       const id = ++request.current;
       const result = await workspace.locate(oid);
       if (id !== request.current) {
@@ -124,11 +128,11 @@ function SourceElementEditor({
       }
       const { element } = result;
       setSource(element);
-      setDraft(element.text.ok ? element.text.text : "");
-      setClassDraft(
-        element.className.ok ? (element.className.value ?? "") : "",
-      );
-      if (!keepStatus) {
+      if (mode === "select") {
+        setDraft(element.text.ok ? element.text.text : "");
+        setClassDraft(
+          element.className.ok ? (element.className.value ?? "") : "",
+        );
         setStatus(null);
       }
     },
@@ -175,7 +179,7 @@ function SourceElementEditor({
           kind: "success",
           text: `Saved to ${source?.path ?? "source"} and the preview shows the new ${KIND_LABEL[pending.kind]}.`,
         });
-        void locate(oid, true);
+        void locate(oid, "refresh");
       }
     },
   });
