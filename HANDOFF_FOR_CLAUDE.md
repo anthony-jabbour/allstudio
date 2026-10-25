@@ -44,7 +44,7 @@ Run from this repository root (`allstudio/`). Observed on 2026-10-24:
 | `bun run build` | exit 0; playground Vite 7.3.7 + fixture Next.js 16.4.3 |
 | `bun run dev` | playground listening at http://localhost:5173 |
 
-Re-run on 2026-10-25 (Linux, Bun 1.4.4) for Phase 1 gate closure: `bun run test` 192 passed (9 files); typecheck, lint, boundary and build (playground + 3 fixtures) all exit 0. `ALLSTUDIO_RESET_WORKSPACE=1 bun run dev` serves the playground on :5173 and fixture previews on :3101/:3102/:3103. `node scripts/e2e/text-edit.e2e.mjs` 34 checks passed (trace + webm recording; needs a Playwright install outside the repo). With the dev server stopped, `node scripts/e2e/build-edited-workspaces.mjs` builds every edited copy.
+Re-run on 2026-10-25 (Linux, Bun 1.4.4) for Phase 1 gate closure: `bun run test` 193 passed (9 files); typecheck, lint, boundary and build (playground + 3 fixtures) all exit 0. `ALLSTUDIO_RESET_WORKSPACE=1 bun run dev` serves the playground on :5173 and fixture previews on :3101/:3102/:3103. `node scripts/e2e/text-edit.e2e.mjs` 34 checks passed (trace + webm recording; needs a Playwright install outside the repo). With the dev server stopped, `node scripts/e2e/build-edited-workspaces.mjs` builds every edited copy.
 
 ## Blockers
 

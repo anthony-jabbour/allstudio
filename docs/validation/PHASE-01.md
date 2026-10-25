@@ -23,7 +23,7 @@ decides PASS.
 
 | Command | Exit | Result |
 |---|---|---|
-| `bun run test` | 0 | 192 passed (9 files) |
+| `bun run test` | 0 | 193 passed (9 files) |
 | `bun run typecheck` / `lint` / `validate:public-boundary` / `build` | 0 | all packages; build covers the playground and the 3 fixtures |
 | `ALLSTUDIO_RESET_WORKSPACE=1 bun run dev` + `node scripts/e2e/text-edit.e2e.mjs <out>` | 0 | **34 checks passed**; `trace.zip` (31 MB) and `page@….webm` (4 MB) recorded |
 | `node scripts/e2e/build-edited-workspaces.mjs` (dev server stopped) | 0 | `aurora-atelier`, `lumen-notes`, `harbor-studio`: `next build` ok (about 8 s each); built HTML contains the edits |
