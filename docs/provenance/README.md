@@ -27,7 +27,7 @@ Destination package: `@allstudio/editor`
 | `packages/parser/src/helpers.ts` | `packages/editor/src/source-mapper/fragments.ts` | Fragment helper only |
 | `packages/parser/src/ids.ts` | `packages/editor/src/source-mapper/ids.ts` | No branch-oid map; local uniqueness only |
 | `packages/parser/src/code-edit/style.ts` | `packages/editor/src/source-mapper/style.ts` | Refuse expression `className`; `tailwind-merge` only |
-| `packages/parser/src/code-edit/text.ts` | `packages/editor/src/source-mapper/text.ts` | Single-line text only |
+| `packages/parser/src/code-edit/text.ts` | `packages/editor/src/source-mapper/text.ts` | Single-line text only (multiline refused); refuses expression/element children instead of editing the first `JSXText` |
 | `packages/parser/src/template-node/map.ts` + `helpers.ts` | `packages/editor/src/source-mapper/locations.ts` | `SourceLocation` only; dynamic/core types omitted |
 | `packages/utility/src/id.ts` (charset only) | `packages/editor/src/source-mapper/oid.ts` | `crypto.getRandomValues` instead of nanoid |
 | `packages/constants/src/editor.ts` (`DATA_ONLOOK_ID`) | `packages/editor/src/source-mapper/types.ts` (`DATA_OID_ATTRIBUTE`) | Attribute name still `data-oid` |

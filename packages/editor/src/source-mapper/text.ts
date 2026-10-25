@@ -4,6 +4,8 @@
  * Commit: 423e2e924366419e418ee049093872d535eea41a
  * Source: packages/parser/src/code-edit/text.ts
  * Modifications: single-line text only for this slice; newline/<br> handling omitted.
+ * Refuses elements whose children are not purely static text (expressions,
+ * nested elements) instead of editing the first JSXText child.
  * Copyright 2024 On Off, Inc.
  */
 import { type T, t } from "./babel.ts";
@@ -27,7 +29,11 @@ const HTML_VOID_ELEMENTS = new Set([
   "wbr",
 ]);
 
-export type TextEditResult = "ok" | "unsupported-void-element";
+export type TextEditResult =
+  | "ok"
+  | "unsupported-void-element"
+  | "unsupported-dynamic-children"
+  | "unsupported-multiline-text";
 
 function isHtmlVoidElement(node: T.JSXElement): boolean {
   const name = node.openingElement.name;
@@ -53,12 +59,19 @@ function openSelfClosingElement(node: T.JSXElement): void {
   );
 }
 
-function isReplaceableTextChild(
-  child: T.JSXElement["children"][number],
-): boolean {
+type JsxChild = T.JSXElement["children"][number];
+
+function isReplaceableTextChild(child: JsxChild): boolean {
   return (
     t.isJSXText(child) ||
     (t.isJSXExpressionContainer(child) && t.isStringLiteral(child.expression))
+  );
+}
+
+function isJsxComment(child: JsxChild): boolean {
+  return (
+    t.isJSXExpressionContainer(child) &&
+    t.isJSXEmptyExpression(child.expression)
   );
 }
 
@@ -69,13 +82,24 @@ export function updateNodeTextContent(
   if (isHtmlVoidElement(node)) {
     return "unsupported-void-element";
   }
+  if (textContent.includes("\n")) {
+    return "unsupported-multiline-text";
+  }
+  if (
+    !node.children.every(
+      (child) => isReplaceableTextChild(child) || isJsxComment(child),
+    )
+  ) {
+    return "unsupported-dynamic-children";
+  }
   openSelfClosingElement(node);
   const nextChild = childForText(textContent);
-  const replaceIndex = node.children.findIndex(isReplaceableTextChild);
-  if (replaceIndex >= 0) {
-    node.children[replaceIndex] = nextChild;
-    return "ok";
-  }
-  node.children.unshift(nextChild);
+  // Every child is static text or a comment: keep comments, collapse text into one child.
+  const insertAt = Math.max(0, node.children.findIndex(isReplaceableTextChild));
+  node.children = [
+    ...node.children.slice(0, insertAt).filter(isJsxComment),
+    nextChild,
+    ...node.children.slice(insertAt).filter(isJsxComment),
+  ];
   return "ok";
 }

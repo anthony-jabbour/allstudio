@@ -42,6 +42,8 @@ Observed 2026-10-24 from `allstudio/`:
 | `bun run lint` | exit 0 |
 | `bun run validate:public-boundary` | exit 0; 83 files scanned |
 
+Independent re-run on merged `main` `cf4bcd5` (2026-10-25, Claude Code): 20 tests passed (11 source-mapper), 81 files scanned, build exit 0. After the fail-closed text/oid fixes: **26 passed (17 source-mapper)**. See `docs/validation/PHASE-00-AUDIT.md`.
+
 ## Real-world proof
 
 `packages/editor/tests/source-mapper.test.ts` reads `examples/nextjs-site-fixture/src/app/page.tsx` and asserts:
@@ -50,6 +52,8 @@ Observed 2026-10-24 from `allstudio/`:
 - generated text `Aurora Atelier — edited`
 - `text-emerald-700` replaces `text-zinc-950`
 - `clsx("px-3")` className edits return `unsupported-className-expression`
+- text edits on `Hello {name}!`, `{name}`, or elements with nested children return `unsupported-dynamic-children` (previously returned `ok` and corrupted the source)
+- multiline text returns `unsupported-multiline-text`; duplicate oids return `oid-ambiguous`
 - invalid source returns `parse-failed`
 - unknown oid returns `oid-not-found`
 
@@ -78,7 +82,7 @@ Not applicable. Extraction from public Apache-2.0 source already inspected in Ph
 
 - Live preview / DOM selection
 - Three representative fixtures
-- Conditional/expression text refusal
+- Conditional/expression text: refusal implemented; semantic-preserving edits not implemented
 - Formatting preservation / Prettier
 - Hash conflict (`expectedSha256`)
 - Insert/move/remove structure edits

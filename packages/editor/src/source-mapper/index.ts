@@ -63,7 +63,21 @@ export function previewPatch(
     return { ok: false, reason: "parse-failed" };
   }
 
-  let found = false;
+  let matches = 0;
+  traverse(ast, {
+    JSXOpeningElement(path: NodePath<T.JSXOpeningElement>) {
+      if (getOidFromJsxElement(path.node) === edit.oid) {
+        matches += 1;
+      }
+    },
+  });
+  if (matches === 0) {
+    return { ok: false, reason: "oid-not-found" };
+  }
+  if (matches > 1) {
+    return { ok: false, reason: "oid-ambiguous" };
+  }
+
   let classResult: ReturnType<typeof tryAddClassToNode> = "ok";
   let textResult: ReturnType<typeof updateNodeTextContent> = "ok";
 
@@ -73,7 +87,6 @@ export function previewPatch(
       if (currentOid !== edit.oid) {
         return;
       }
-      found = true;
       if (edit.className) {
         classResult = tryAddClassToNode(path.node, edit.className);
         if (classResult !== "ok") {
@@ -88,14 +101,11 @@ export function previewPatch(
     },
   });
 
-  if (!found) {
-    return { ok: false, reason: "oid-not-found" };
-  }
   if (classResult !== "ok") {
     return { ok: false, reason: "unsupported-className-expression" };
   }
   if (textResult !== "ok") {
-    return { ok: false, reason: "unsupported-void-element" };
+    return { ok: false, reason: textResult };
   }
 
   return {
