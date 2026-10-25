@@ -673,6 +673,8 @@ try {
   record("no file under examples/ changed");
 } finally {
   await context.tracing.stop({ path: join(outDir, "trace.zip") });
+  // Closing the context is what finalizes the .webm recording.
+  await context.close();
   await browser.close();
 }
 console.log(
