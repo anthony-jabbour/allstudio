@@ -1,6 +1,6 @@
 # Phase 00 — Validation report
 
-**Status:** IN PROGRESS  
+**Status:** IN PROGRESS (founder approved Phase 0 exit option A on 2026-10-24; not PASS)  
 **Scope:** Phase 0 Onlook research and reproduction preparation  
 **allstudio branch:** `research/phase-0-onlook`  
 **allstudio HEAD at branch creation:** `022b3524f08bd662fb83a5c763d300597e6a7cac`  
@@ -312,33 +312,15 @@ Additional concerns: iframe script from jsDelivr in tests; Penpal `*`; PostHog/G
 
 ---
 
-## Decision requested
+## Founder decisions
 
-The required visual loop (select rendered element → preview refresh) **cannot** be shown in unmodified Onlook without CodeSandbox and OpenRouter credentials. The isolated parser spike **can** locate the fixture heading and emit a real JSX diff.
+**Phase 0 exit (2026-10-24):** option **A**. Recorded in `docs/decisions/ADR-0002-phase-0-exit.md`.
 
-```text
-Decision needed: Phase 0 exit criterion
-Why it matters: whether Claude Code may start Phase 1 parser extraction now, or must first run the hosted Onlook UI
-What is known: NodeFs is a stub; SessionManager hardcodes CodeSandbox; parser tests 93/93; fixture spike edited h1 text and className; no iframe E2E
-Options:
-  A: Accept the documented blocker + parser spike as Phase 0 exit. Begin Phase 1 extraction into @allstudio/editor. Full Onlook UI remains optional later.
-  B: Keep Phase 0 open until a founder-authorized CodeSandbox (or other sandbox) run shows the iframe select→edit→preview loop.
-My recommendation: A, because RoadMap.md Phase 0 exit allows “documented upstream blocker plus a successful isolated parser/source-edit spike,” and EditorEngine cannot run locally anyway. The spike already exercises the code allstudio needs first.
-Blocked work: Phase 1 file extraction, and any Onlook `bun dev` that needs paid API keys.
-```
+The visual loop cannot be shown in unmodified Onlook without CodeSandbox and OpenRouter credentials. The isolated parser spike locates the fixture heading and emits a JSX diff. Phase 1 extraction into `@allstudio/editor` may begin. Full Onlook UI remains optional later.
 
-Second product choice (do not implement until answered):
+**`data-oid` persistence:** Phase 1 uses in-source `data-oid` during editing (Onlook-like). Stripping on production export is deferred.
 
-```text
-Decision needed: persist data-oid in user source vs sidecar index stripped on export
-Why it matters: Onlook writes data-oid into JSX; that is how DOM maps to AST. Export/production cleanliness vs mapping fidelity.
-What is known: CodeFileSystem.processJsxFile always injects oids on write; removeIdsFromAst exists for stripping.
-Options:
-  A: Keep in-source data-oid during editing; strip on production export (Onlook-like).
-  B: Sidecar index only; never write data-oid into the user’s committed source.
-My recommendation: A for Phase 1 (smallest faithful extraction, already tested). Revisit B if export cleanliness becomes a gate.
-Blocked work: none until Phase 1 starts.
-```
+Agents still must not mark this phase PASS.
 
 ---
 
@@ -398,18 +380,18 @@ None. Phase 0 is the first gate.
 
 ## Known limitations and unresolved defects
 
-See blockers table. Remaining product decisions: Phase 0 exit (A vs B), oid persistence, Bun version (already listed in HANDOFF).
+See blockers table. Remaining product decisions: Bun version (already listed in HANDOFF); `data-oid` strip-on-export deferred.
 
 ## Gate recommendation
 
-**IN PROGRESS** — isolated source mapping is evidenced; unmodified Onlook visual E2E is blocked. **READY FOR HUMAN VALIDATION** of whether option A satisfies Phase 0 exit. **Not PASS.**
+**IN PROGRESS** — founder accepted option A on 2026-10-24 (`ADR-0002`). Isolated source mapping is evidenced; unmodified Onlook visual E2E remains blocked. **Not PASS.**
 
 ---
 
 ## Delivery record
 
 **Roadmap phase / acceptance criterion:** Phase 0 — reproduce Onlook baseline or document blocker + parser spike  
-**Founder approvals or unresolved decisions:** Phase 0 exit A vs B; `data-oid` persistence; Bun 1.3.1 vs 1.3.14 (pre-existing)  
+**Founder approvals or unresolved decisions:** Phase 0 exit **A** (2026-10-24). `data-oid` in-source during edit (Phase 1 default). Bun 1.3.1 vs 1.3.14 still provisional.  
 **OSS candidates:** `onlook-dev/onlook` https://github.com/onlook-dev/onlook — 27,003 stars on 2026-10-25, Apache-2.0, already the approved upstream. No new library proposed.  
 **REA:** not applicable; public source inspected. Not available for this task’s needs.  
 **Files changed and visible result:** this report only in allstudio. Research clone + untracked experiment script outside product repos.  

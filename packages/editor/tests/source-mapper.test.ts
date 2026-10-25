@@ -1,0 +1,126 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { instrumentSource, locateSource, previewPatch } from "../src/index.ts";
+
+const fixturePath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../examples/nextjs-site-fixture/src/app/page.tsx",
+);
+const fixture = readFileSync(fixturePath, "utf8");
+
+function oidNear(content: string, marker: string): string {
+  const index = content.indexOf(marker);
+  expect(index).toBeGreaterThan(-1);
+  const window = content.slice(index, index + 400);
+  const match = window.match(/data-oid="([^"]+)"/);
+  expect(match?.[1]).toBeTruthy();
+  return match?.[1] ?? "";
+}
+
+describe("source mapper", () => {
+  it("injects data-oid attributes into the Next.js fixture", () => {
+    const result = instrumentSource(fixture);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.content).toContain('data-oid="');
+    expect(result.locations.length).toBeGreaterThanOrEqual(5);
+    const heading = result.locations.find(
+      (location) => location.start.line === 7,
+    );
+    expect(heading?.component).toBe("Home");
+  });
+
+  it("resolves the hero heading oid to its source location", () => {
+    const instrumented = instrumentSource(fixture);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = oidNear(instrumented.content, 'id="hero-heading"');
+    const located = locateSource(instrumented.content, oid, {
+      filename: "src/app/page.tsx",
+    });
+    expect(located).not.toBeNull();
+    expect(located?.oid).toBe(oid);
+    expect(located?.component).toBe("Home");
+    expect(located?.path).toBe("src/app/page.tsx");
+    expect(located?.start.line).toBe(7);
+  });
+
+  it("previews a heading text and className patch as a JSX diff", () => {
+    const instrumented = instrumentSource(fixture);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = oidNear(instrumented.content, 'id="hero-heading"');
+    const patched = previewPatch(instrumented.content, {
+      oid,
+      textContent: "Aurora Atelier — edited",
+      className: "text-emerald-700",
+    });
+    expect(patched.ok).toBe(true);
+    if (!patched.ok) {
+      return;
+    }
+    expect(patched.original).toContain("Aurora Atelier");
+    expect(patched.generated).toContain("Aurora Atelier — edited");
+    expect(patched.generated).toContain("text-emerald-700");
+    expect(patched.generated).not.toContain("text-zinc-950");
+    expect(patched.generated).toContain('id="hero-heading"');
+  });
+
+  it("refuses className edits on expression attributes without rewriting", () => {
+    const source = `export function Button() {
+  return <button className={clsx("px-3")} type="button">Go</button>;
+}
+`;
+    const instrumented = instrumentSource(source);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = instrumented.locations[0]?.oid;
+    expect(oid).toBeTruthy();
+    const patched = previewPatch(instrumented.content, {
+      oid: oid ?? "",
+      className: "px-4",
+    });
+    expect(patched.ok).toBe(false);
+    if (patched.ok) {
+      return;
+    }
+    expect(patched.reason).toBe("unsupported-className-expression");
+    expect(instrumented.content).toContain('className={clsx("px-3")}');
+  });
+
+  it("returns parse-failed for invalid source", () => {
+    const result = instrumentSource("export default function ( {");
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.reason).toBe("parse-failed");
+  });
+
+  it("returns oid-not-found when the element is missing", () => {
+    const instrumented = instrumentSource(fixture);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const patched = previewPatch(instrumented.content, {
+      oid: "missing-oid",
+      textContent: "nope",
+    });
+    expect(patched.ok).toBe(false);
+    if (patched.ok) {
+      return;
+    }
+    expect(patched.reason).toBe("oid-not-found");
+  });
+});
