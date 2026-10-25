@@ -1,6 +1,10 @@
 import {
+  chmod,
+  link,
   mkdtemp,
+  readdir,
   readFile,
+  rename,
   rm,
   stat,
   symlink,
@@ -370,6 +374,68 @@ describe("DevWorkspace text edits", () => {
     });
     expect(result).toMatchObject({ ok: false, reason: "invalid-patch" });
     expect(await readFile(pageFile, "utf8")).toBe(before);
+  });
+});
+
+describe("DevWorkspace atomic write", () => {
+  it("keeps the file's permission bits", async () => {
+    await chmod(pageFile, 0o640);
+    const workspace = await DevWorkspace.open(workspaceDir);
+    const { oid, element } = await heading(workspace);
+    const result = await workspace.applyTextEdit({
+      path: element.path,
+      oid,
+      expectedSha256: element.sha256,
+      text: "Mode kept",
+    });
+    expect(result).toMatchObject({ ok: true, written: true });
+    expect((await stat(pageFile)).mode & 0o777).toBe(0o640);
+  });
+
+  it("refuses to edit a hard-linked file", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    const { oid, element } = await heading(workspace);
+    const second = join(tmp, "second-link.tsx");
+    await link(pageFile, second);
+    const before = await readFile(pageFile, "utf8");
+    const result = await workspace.applyTextEdit({
+      path: element.path,
+      oid,
+      expectedSha256: element.sha256,
+      text: "Breaks the link",
+    });
+    expect(result).toMatchObject({ ok: false, reason: "path-rejected" });
+    expect(await readFile(pageFile, "utf8")).toBe(before);
+    expect(await readFile(second, "utf8")).toBe(before);
+  });
+
+  it("rejects the write when a directory becomes a symlink before the rename", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    const { oid, element } = await heading(workspace);
+    const before = await readFile(pageFile, "utf8");
+    // The second resolve is the re-check right before the rename; swap the
+    // directory for a symlink just before it runs.
+    const resolve = workspace.resolve.bind(workspace);
+    let calls = 0;
+    workspace.resolve = async (path: unknown) => {
+      if (++calls === 2) {
+        const app = join(workspaceDir, "src/app");
+        await rename(app, join(workspaceDir, "src/app-real"));
+        await symlink(join(workspaceDir, "src/app-real"), app, "dir");
+      }
+      return resolve(path);
+    };
+    const result = await workspace.applyTextEdit({
+      path: element.path,
+      oid,
+      expectedSha256: element.sha256,
+      text: "Redirected",
+    });
+    expect(result).toMatchObject({ ok: false, reason: "path-rejected" });
+    const real = join(workspaceDir, "src/app-real");
+    expect(await readFile(join(real, "page.tsx"), "utf8")).toBe(before);
+    const leftovers = (await readdir(real)).filter((n) => n.endsWith(".tmp"));
+    expect(leftovers).toEqual([]);
   });
 });
 
