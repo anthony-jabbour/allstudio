@@ -65,6 +65,7 @@ export function previewPatch(
 
   let found = false;
   let classResult: ReturnType<typeof tryAddClassToNode> = "ok";
+  let textResult: ReturnType<typeof updateNodeTextContent> = "ok";
 
   traverse(ast, {
     JSXElement(path: NodePath<T.JSXElement>) {
@@ -81,7 +82,7 @@ export function previewPatch(
         }
       }
       if (edit.textContent !== undefined) {
-        updateNodeTextContent(path.node, edit.textContent);
+        textResult = updateNodeTextContent(path.node, edit.textContent);
       }
       path.stop();
     },
@@ -92,6 +93,9 @@ export function previewPatch(
   }
   if (classResult !== "ok") {
     return { ok: false, reason: "unsupported-className-expression" };
+  }
+  if (textResult !== "ok") {
+    return { ok: false, reason: "unsupported-void-element" };
   }
 
   return {

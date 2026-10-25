@@ -204,6 +204,31 @@ describe("source mapper", () => {
     expect(instrumented.content).toContain('className="px-2"');
   });
 
+  it("refuses text edits on native HTML void elements", () => {
+    const source = `export function Field() {
+  return <input type="text" />;
+}
+`;
+    const instrumented = instrumentSource(source);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = instrumented.locations[0]?.oid;
+    expect(oid).toBeTruthy();
+    const patched = previewPatch(instrumented.content, {
+      oid: oid ?? "",
+      textContent: "hello",
+    });
+    expect(patched.ok).toBe(false);
+    if (patched.ok) {
+      return;
+    }
+    expect(patched.reason).toBe("unsupported-void-element");
+    expect(instrumented.content).toMatch(/<input[^>]*\/>/);
+    expect(instrumented.content).not.toContain("</input>");
+  });
+
   it("keeps the enclosing component name across array and object destructuring", () => {
     const source = `function Home() {
   const [value] = useState("");

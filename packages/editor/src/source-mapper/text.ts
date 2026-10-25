@@ -10,6 +10,30 @@ import { type T, t } from "./babel.ts";
 
 const JSX_TEXT_BREAKERS = /[<>{}&]/;
 
+const HTML_VOID_ELEMENTS = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+]);
+
+export type TextEditResult = "ok" | "unsupported-void-element";
+
+function isHtmlVoidElement(node: T.JSXElement): boolean {
+  const name = node.openingElement.name;
+  return t.isJSXIdentifier(name) && HTML_VOID_ELEMENTS.has(name.name);
+}
+
 function childForText(
   textContent: string,
 ): T.JSXText | T.JSXExpressionContainer {
@@ -41,13 +65,17 @@ function isReplaceableTextChild(
 export function updateNodeTextContent(
   node: T.JSXElement,
   textContent: string,
-): void {
+): TextEditResult {
+  if (isHtmlVoidElement(node)) {
+    return "unsupported-void-element";
+  }
   openSelfClosingElement(node);
   const nextChild = childForText(textContent);
   const replaceIndex = node.children.findIndex(isReplaceableTextChild);
   if (replaceIndex >= 0) {
     node.children[replaceIndex] = nextChild;
-    return;
+    return "ok";
   }
   node.children.unshift(nextChild);
+  return "ok";
 }

@@ -26,7 +26,8 @@ export interface ElementEdit {
 export type SourceMapperError =
   | "parse-failed"
   | "oid-not-found"
-  | "unsupported-className-expression";
+  | "unsupported-className-expression"
+  | "unsupported-void-element";
 
 export type InstrumentResult =
   | { ok: true; content: string; locations: SourceLocation[] }
