@@ -20,22 +20,41 @@ function insertClassName(
   );
 }
 
+function hasJsxSpread(
+  attributes: T.JSXOpeningElement["attributes"],
+  fromIndex = 0,
+): boolean {
+  return attributes
+    .slice(fromIndex)
+    .some((attr) => t.isJSXSpreadAttribute(attr));
+}
+
 export function tryAddClassToNode(
   node: T.JSXElement,
   className: string,
 ): ClassEditResult {
   const openingElement = node.openingElement;
-  const classNameAttr = openingElement.attributes.find(
+  const classNameIndex = openingElement.attributes.findIndex(
     (attr): attr is T.JSXAttribute =>
       t.isJSXAttribute(attr) && attr.name.name === "className",
   );
+  const classNameAttr =
+    classNameIndex >= 0
+      ? (openingElement.attributes[classNameIndex] as T.JSXAttribute)
+      : undefined;
 
   if (!classNameAttr) {
+    if (hasJsxSpread(openingElement.attributes)) {
+      return "unsupported-className-expression";
+    }
     insertClassName(openingElement, className);
     return "ok";
   }
 
   if (classNameAttr.value && t.isStringLiteral(classNameAttr.value)) {
+    if (hasJsxSpread(openingElement.attributes, classNameIndex + 1)) {
+      return "unsupported-className-expression";
+    }
     classNameAttr.value.value = twMerge(classNameAttr.value.value, className);
     return "ok";
   }

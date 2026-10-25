@@ -8,14 +8,46 @@
  */
 import { type T, t } from "./babel.ts";
 
+const JSX_TEXT_BREAKERS = /[<>{}&]/;
+
+function childForText(
+  textContent: string,
+): T.JSXText | T.JSXExpressionContainer {
+  if (JSX_TEXT_BREAKERS.test(textContent)) {
+    return t.jsxExpressionContainer(t.stringLiteral(textContent));
+  }
+  return t.jsxText(textContent);
+}
+
+function openSelfClosingElement(node: T.JSXElement): void {
+  if (!node.openingElement.selfClosing) {
+    return;
+  }
+  node.openingElement.selfClosing = false;
+  node.closingElement = t.jsxClosingElement(
+    t.cloneNode(node.openingElement.name, false),
+  );
+}
+
+function isReplaceableTextChild(
+  child: T.JSXElement["children"][number],
+): boolean {
+  return (
+    t.isJSXText(child) ||
+    (t.isJSXExpressionContainer(child) && t.isStringLiteral(child.expression))
+  );
+}
+
 export function updateNodeTextContent(
   node: T.JSXElement,
   textContent: string,
 ): void {
-  const textNode = node.children.find((child) => t.isJSXText(child));
-  if (textNode && t.isJSXText(textNode)) {
-    textNode.value = textContent;
+  openSelfClosingElement(node);
+  const nextChild = childForText(textContent);
+  const replaceIndex = node.children.findIndex(isReplaceableTextChild);
+  if (replaceIndex >= 0) {
+    node.children[replaceIndex] = nextChild;
     return;
   }
-  node.children.unshift(t.jsxText(textContent));
+  node.children.unshift(nextChild);
 }

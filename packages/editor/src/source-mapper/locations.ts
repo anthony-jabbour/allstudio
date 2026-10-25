@@ -29,16 +29,20 @@ export function createSourceLocations(
       enter(path: NodePath<T.FunctionDeclaration>) {
         pushComponentName(componentStack, path.node.id?.name);
       },
-      exit() {
-        componentStack.pop();
+      exit(path: NodePath<T.FunctionDeclaration>) {
+        if (path.node.id?.name) {
+          componentStack.pop();
+        }
       },
     },
     ClassDeclaration: {
       enter(path: NodePath<T.ClassDeclaration>) {
         pushComponentName(componentStack, path.node.id?.name);
       },
-      exit() {
-        componentStack.pop();
+      exit(path: NodePath<T.ClassDeclaration>) {
+        if (path.node.id?.name) {
+          componentStack.pop();
+        }
       },
     },
     VariableDeclaration: {
@@ -48,8 +52,11 @@ export function createSourceLocations(
           componentStack.push(id.name);
         }
       },
-      exit() {
-        componentStack.pop();
+      exit(path: NodePath<T.VariableDeclaration>) {
+        const id = path.node.declarations[0]?.id;
+        if (id && t.isIdentifier(id)) {
+          componentStack.pop();
+        }
       },
     },
     JSXElement(path: NodePath<T.JSXElement>) {

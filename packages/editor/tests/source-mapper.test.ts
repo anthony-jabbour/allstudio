@@ -123,4 +123,107 @@ describe("source mapper", () => {
     }
     expect(patched.reason).toBe("oid-not-found");
   });
+
+  it("writes special text as a string expression that round-trips", () => {
+    const source = `export function Price() {
+  return <p>old</p>;
+}
+`;
+    const instrumented = instrumentSource(source);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = instrumented.locations[0]?.oid;
+    expect(oid).toBeTruthy();
+    const patched = previewPatch(instrumented.content, {
+      oid: oid ?? "",
+      textContent: "Price < {name}",
+    });
+    expect(patched.ok).toBe(true);
+    if (!patched.ok) {
+      return;
+    }
+    const reparsed = instrumentSource(patched.generated);
+    expect(reparsed.ok).toBe(true);
+    if (!reparsed.ok) {
+      return;
+    }
+    expect(patched.generated).toContain('"Price < {name}"');
+    expect(patched.generated).not.toContain(">Price < {name}<");
+    const located = locateSource(patched.generated, oid ?? "");
+    expect(located).not.toBeNull();
+  });
+
+  it("opens a self-closing element before inserting text", () => {
+    const source = `export function Box() {
+  return <div />;
+}
+`;
+    const instrumented = instrumentSource(source);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = instrumented.locations[0]?.oid;
+    expect(oid).toBeTruthy();
+    const patched = previewPatch(instrumented.content, {
+      oid: oid ?? "",
+      textContent: "hello",
+    });
+    expect(patched.ok).toBe(true);
+    if (!patched.ok) {
+      return;
+    }
+    expect(patched.generated).toContain("hello");
+    expect(patched.generated).toContain("</div>");
+    expect(patched.generated).not.toMatch(/<div[^>]*\/>/);
+  });
+
+  it("refuses className edits when a later spread can override them", () => {
+    const source = `export function Card() {
+  return <div className="px-2" {...{ className: "px-8" }} />;
+}
+`;
+    const instrumented = instrumentSource(source);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = instrumented.locations[0]?.oid;
+    expect(oid).toBeTruthy();
+    const patched = previewPatch(instrumented.content, {
+      oid: oid ?? "",
+      className: "px-4",
+    });
+    expect(patched.ok).toBe(false);
+    if (patched.ok) {
+      return;
+    }
+    expect(patched.reason).toBe("unsupported-className-expression");
+    expect(instrumented.content).toContain('className="px-2"');
+  });
+
+  it("keeps the enclosing component name across array and object destructuring", () => {
+    const source = `function Home() {
+  const [value] = useState("");
+  return <div />;
+}
+
+function Card() {
+  const { title } = props;
+  return <span />;
+}
+`;
+    const instrumented = instrumentSource(source);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    expect(instrumented.locations[0]?.component).toBe("Home");
+    expect(instrumented.locations[1]?.component).toBe("Card");
+    const homeOid = instrumented.locations[0]?.oid ?? "";
+    const located = locateSource(instrumented.content, homeOid);
+    expect(located?.component).toBe("Home");
+  });
 });
