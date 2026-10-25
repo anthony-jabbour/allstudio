@@ -1,9 +1,221 @@
 # Phase 01 — Validation report
 
 **Status:** IN PROGRESS  
-**Slices:** (1) source mapper in `@allstudio/editor`; (2) browser preview → select → text edit → JSX write → live refresh (below)  
+**Slices:** (1) source mapper in `@allstudio/editor`; (2) browser preview → select → text edit → JSX write → live refresh; (3) three fixtures, heading/button/layout, text + className edits, format-preserving writes (below)  
 **Founder decision:** ADR-0002 option A (2026-10-24)  
 **This report does not mark the phase PASS.**
+
+## Slice 3 — Three fixtures, text + class edits, format-preserving writes (2026-10-25)
+
+**Branch:** `claude/fervent-tesla-7bsghy` (restarted from `main` @ `c178a2a`)  
+**Status:** READY FOR HUMAN VALIDATION. Not PASS. Phase 0 is not PASS either.
+
+### User-observable outcome
+
+`bun install && ALLSTUDIO_RESET_WORKSPACE=1 bun run dev` → open
+<http://localhost:5173>. A **Fixture** picker switches between three running
+Next.js projects (each a git-ignored copy with its own `next dev`):
+
+| Fixture | `examples/` dir | Preview | What it exercises |
+|---|---|---|---|
+| Aurora Atelier | `nextjs-site-fixture` | :3101 | landing page (unchanged from slice 2) |
+| Lumen Notes | `nested-components-fixture` | :3102 | components across files, a component reused twice (`NavLink`), a `.map()` list (`NoteCard`), a ternary, a `&&` conditional, expression text |
+| Harbor Studio | `tailwind-variants-fixture` | :3103 | `sm:`/`md:`/`lg:`, `hover:`/`focus-visible:`, `dark:` variants, a `cn()` helper, a template-literal `className`, `components/` + `lib/` |
+
+Click a heading, a button, or a layout element: the panel shows the real
+source file and line range (for a nested component, its own file, e.g.
+`src/components/new-note-button.tsx:3–9 in NewNoteButton`). Two controls:
+**Text** (Preview text patch / Apply text) and **Classes** (Preview class
+patch / Apply classes). Apply writes the JSX file; Next.js hot reload updates
+the preview; the editor confirms the preview shows the new text or classes.
+
+### What changed
+
+| Area | Change |
+|---|---|
+| Source mapper | New `splice.ts`: edits replace only the bytes of the edited node, located by the Babel AST. `editElementText` (splices one text child, string-literal child, empty or self-closing element; keeps the indentation of multi-line text), `editElementClassName` (replaces the whole static string, keeps the quote style, empty removes the attribute), `instrumentSource(content, { preserveFormatting: true })` (inserts `data-oid` after the last attribute and changes nothing else). `describeElement` now also returns the static `className` (`readClassName`). |
+| Fail-closed fallback | Text shapes that cannot be spliced (JSX comments mixed with text, several text parts) fall back to `previewPatch`; if the regenerated file differs anywhere outside the element, the edit is refused with `unconfined-patch`. Class edits never regenerate. |
+| Workspace contract | `SourceEditWorkspace` gains `previewClassEdit` / `applyClassEdit` (`ClassEditRequest`); `SourceElementInfo` gains `className`. |
+| Dev adapter | `DevWorkspace` shares one path for text and class edits: path confinement → sha256 precondition → semantic no-op → splice → validation (parses, oid resolves once, value matches, no `data-oid` lost) → per-file serialized write with a second hash check → temp file + rename. |
+| HTTP API | Routes are per fixture: `/__allstudio/workspace/<fixture>/{locate,preview-text,apply-text,preview-class,apply-class}`; class bodies have exact keys and ≤ 1000 chars; unknown fixture, action, or extra path segment → 400. |
+| Workspace preparation | Instruments every `src/**/*.tsx|jsx` (pages and components) with the format-preserving inserter. The copy differs from `examples/` only by ` data-oid="…"` attributes (tested per file). |
+| Preview bridge | Snapshot carries the rendered `class` attribute (≤ 2000 chars, validated) so class edits can be confirmed in the preview. |
+| UI | `EditorShell` gets the Classes field and its two buttons and a per-field note explaining why a field is disabled. The playground adds a fixture picker. |
+
+### Formatting preservation (slice 2 limitation addressed)
+
+Slice 2 regenerated the whole file with Babel `retainLines`. The new text
+landed on the opening-tag line, and the old text lines became blank lines.
+The workspace copy was also reformatted when it was instrumented. Now:
+
+```diff
+--- a/src/components/new-note-button.tsx
++++ b/src/components/new-note-button.tsx
+@@ -6,5 +6,5 @@
+       className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white" data-oid=":d:821u"
+     >
+-      New note
++      Write a note
+     </button>
+   );
+```
+
+```diff
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -9,5 +9,5 @@
+       <section
+         id="hero"
+-        className="mx-auto grid max-w-5xl gap-8 px-6 py-20 md:grid-cols-2 md:items-center lg:py-28" data-oid="5uq-ji-"
++        className="mx-auto grid max-w-5xl gap-8 px-6 py-20 md:grid-cols-3 md:items-center lg:py-28" data-oid="5uq-ji-"
+       >
+         <div className="flex flex-col gap-6" data-oid="lg:jp5f">
+```
+
+In the E2E run every one of the 10 Apply operations changed exactly one line
+of the file, and that line was inside the selected element's range. This is
+byte splicing, not Prettier: no formatter dependency was added, and nothing
+is reformatted.
+
+Remaining transformations:
+- The only change to a workspace copy at preparation time is the inserted
+  ` data-oid="…"` attributes. They stay in the source while editing
+  (ADR-0002); stripping them on export is still open.
+- A text edit whose element mixes JSX comments with text, or has several
+  static text parts, is refused (`unconfined-patch`) unless Babel
+  regeneration happens to stay inside the element.
+- Text containing `< > { } &`, or with leading or trailing spaces, is written
+  as `{"…"}`.
+
+### Commands executed (2026-10-25, Linux container, Bun 1.4.4, Node 22.22.0)
+
+| Command | Exit | Observed |
+|---|---|---|
+| `bun install` | 0 | `bun.lock` gains only the two new workspace entries; `Checked 152 installs across 257 packages (no changes)`, no new external packages |
+| `bun run test` | 0 | Vitest 3.2.7 — 9 files, **187 passed** (source-edit 42, fixtures 33, dev-workspace 29, workspace-api 29, source-mapper 24, preview-bridge 20, manifest 5, editor-shell 3, public-boundary 2) |
+| `bun run typecheck` | 0 | project, editor, playground, and the 3 fixtures `Exited with code 0` |
+| `bun run lint` | 0 | `Checked 81 files … No fixes applied.` |
+| `bun run validate:public-boundary` | 0 | `Public boundary check passed (132 files scanned).` (count includes git-ignored `next-env.d.ts` files generated by `next dev`/`next build`) |
+| `bun run build` | 0 | playground (JS 236.51 kB) + `next build` of all 3 fixtures |
+| `ALLSTUDIO_RESET_WORKSPACE=1 bun run dev` + `node scripts/e2e/text-edit.e2e.mjs <out>` | 0 | Playwright/Chromium, **31 checks passed**, run twice on fresh workspaces, dev-server log had 0 errors/warnings; `trace.zip`, 5 screenshots, and 10 per-edit `.diff` files captured |
+
+### Browser evidence (31 checks)
+
+```text
+PASS select heading resolves JSX source — src/app/page.tsx:7–12
+PASS patch preview shows diff without writing
+PASS apply writes JSX file and preview updates — … (preview refreshed 842 ms after Apply)
+PASS no-op edit does not rewrite the file
+PASS old draft is cleared while a new selection is looked up
+PASS external change since selection reports a conflict
+PASS dynamic {children} element is refused
+PASS DOM oid missing from source is refused
+PASS ambiguous rendered oid is refused
+PASS forged preview messages are rejected
+PASS workspace API rejects unauthorized paths, tokens and the preview origin
+PASS aurora-button-text — src/app/page.tsx:18–23; lines changed 22; preview 843 ms
+PASS aurora-heading-classes — src/app/page.tsx:7–12; lines changed 9; preview 858 ms
+PASS new Tailwind class is compiled and rendered — lab(2.51107 0.242703 -0.886115) → lab(44.4871 -41.0396 11.0361)
+PASS aurora-layout-classes — src/app/page.tsx:3–24; lines changed 3; preview 859 ms
+PASS examples/ fixture file is unchanged
+PASS lumen-heading-text — src/app/page.tsx:12–17; lines changed 16; preview 869 ms
+PASS lumen-nested-button-text — src/components/new-note-button.tsx:3–9; lines changed 8; preview 399 ms
+PASS lumen-layout-classes — src/app/page.tsx:11–36; lines changed 11; preview 343 ms
+PASS lumen-ternary-branch-text — src/app/page.tsx:25–30; lines changed 29; preview 355 ms
+PASS ternary condition and other branch are preserved
+PASS reused component (NavLink) is refused — renders 2 times
+PASS .map() list item is refused — renders 3 times
+PASS expression text is refused — {notes.length} notes in this workspace
+PASS harbor-heading-text — src/app/page.tsx:14–19; lines changed 18; preview 1376 ms
+PASS harbor-variant-classes — src/app/page.tsx:24–30; lines changed 27; preview 841 ms
+PASS harbor-layout-responsive-classes — src/app/page.tsx:9–50; lines changed 11; preview 856 ms
+PASS responsive variant edit changes the rendered grid — 2 → 3 columns
+PASS template-literal className is refused, its static text stays editable
+PASS footer text with {year} is refused
+PASS no file under examples/ changed
+31 checks passed.
+```
+
+The trace and screenshots are not committed (binary, about 3 MB). Rerun the
+script against fresh workspaces to regenerate them. It is not idempotent on
+an already-edited workspace (it asserts the original classes).
+
+### Dynamic and conditional markup
+
+| Markup | Behavior | Evidence |
+|---|---|---|
+| Ternary branch `{isSynced ? (<span>Synced</span>) : (<span>Offline</span>)}` | text edit of the static branch **preserves semantics**; condition and other branch byte-identical | unit + fixtures + E2E |
+| `{visible && (<p>…</p>)}` | text edit **preserves semantics**; condition kept | unit + fixtures |
+| `{notes.length} notes…`, `© {year} Harbor Studio`, `{children}`, `{note.title}` | refused: `unsupported-dynamic-children` | unit + fixtures + E2E |
+| `.map()` item, component rendered twice | refused in the editor before any request (`renders N times`) | E2E |
+| `className={cn(…)}`, template-literal `className`, spread after/without `className` | refused: `unsupported-className-expression`; static text of the same element stays editable | unit + fixtures + E2E |
+| Class value with `" ' { } < > \` or a line break | refused: `unsupported-className-value` | unit |
+
+Every refusal is checked to leave the file content and mtime unchanged.
+
+### Negative / security / regression
+
+All slice 2 checks still pass (no-op, stale hash, `oid-ambiguous`,
+`oid-not-found`, path escapes including symlinks, token/Origin/Sec-Fetch-Site
+guards, forged preview messages, selection race, concurrent applies). New in
+this slice:
+- class no-op does not rewrite the file;
+- a class edit made with a hash taken before a text edit reports `stale-file`;
+- unknown fixture id, unknown action, and extra path segments return 400;
+- the editor page learns only fixture id, name, and preview URL (no
+  filesystem paths);
+- `examples/` is unchanged after the full E2E run (sha256 of every file).
+
+### OSS / reuse
+
+No new packages. The two fixtures reuse the existing dependency versions
+(`next` 16.4.3, `react` 19.3.0, Tailwind 4). Splicing uses the Babel parser
+already in the source mapper. Prettier or a recast-style printer would be a
+new dependency and was not evaluated for adoption; the splice approach made
+one unnecessary for this slice.
+
+### REA
+
+Not applicable. No reference product was observed.
+
+### Choices made in this slice (open to founder override)
+
+- **Classes field = full replacement of the static `className` string** (what
+  you see is exactly what is written; empty removes the attribute). The
+  alternative is Onlook's merge semantics (`tailwind-merge` of added classes),
+  which cannot remove a class. `previewPatch` still has the merge path.
+- **Fixture picker** in the playground (developer harness only), with all
+  three previews started together. This uses about three Next.js dev
+  processes of memory.
+
+### Founder decisions still open
+
+```text
+BLOCKED — FOUNDER DECISION (does not block this slice)
+Decision needed: add Playwright as a devDependency and a CI E2E job (A), or keep the E2E manual (B)?
+Why it matters: the 31 browser checks run only when someone runs the script.
+Recommendation: A. microsoft/playwright is Apache-2.0; its star count was not re-verified in this session and must be recorded before adoption.
+Blocked work: CI E2E job. Playwright was not added.
+```
+
+```text
+Decision needed: select vs interact toggle in the preview.
+Current: always-select, unchanged in this slice as instructed.
+```
+
+### Phase 1 gate status after this slice
+
+| Gate test (RoadMap.md Phase 1) | Status |
+|---|---|
+| At least three representative runnable fixtures | 3 fixtures; dev, typecheck and `next build` pass for each |
+| Select heading/button/layout; expected file and lines change; preview reflects it | E2E for all three element types in all three fixtures |
+| Dynamic/conditional markup preserved or clearly refused without corruption | see table above |
+| No-op, hash conflicts, edits affecting unrelated nodes | unit + E2E (one changed line per edit, inside the element) |
+| Independent source diff review + recording/trace of one interaction | trace captured; independent review **pending** (Greptile requested on the PR); founder validation **pending** |
+
+Recommendation: **READY FOR HUMAN VALIDATION**. The phase is not PASS until the founder approves it.
+
+---
 
 ## Slice 2 — First visual editing loop (2026-10-25)
 
