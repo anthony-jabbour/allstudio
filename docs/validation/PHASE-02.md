@@ -133,3 +133,15 @@ Fresh independent reviewer: no actionable S0 findings. It independently ran the 
 Initial formatter runs accidentally scanned generated `out/` bundles, reporting third-party generated-code lint errors. Added `!**/out` to Biome and rebuilt clean outputs; targeted source formatting and subsequent repository lint passed. No generated bundles are committed.
 
 S0 recommendation: READY FOR REVIEW. Phase 2: INCOMPLETE; gate tests 1–4 and the complete packaged project workflow of gate 5 remain unrun. Adding a Linux CI job does not claim its hosted run passed.
+
+## Subsequent native and instrumentation spikes
+
+Founder approved the original native helper after candidate research; see `docs/research/phase-02-native-files.md`. Seven native tests pass, including prepared-write cancellation, the independent reviewer's temp-substitution/mode regressions and parent-swap cleanup. The helper remains unexposed and unpackaged; adapter/journal/watch/IPC integration is not implemented. Descriptor-relative operations are not atomic compare-and-swap against all external writers.
+
+Preview-only spike: three mapper-backed unit checks pass for deterministic IDs, text/class edits projected back to uninstrumented source, and refusal of instrumentation that would rewrite source. `NEXT_TELEMETRY_DISABLED=1 node scripts/spikes/preview-next.mjs` rendered seven stable IDs through real Next.js 16.4.3 compilation in a disposable repository-owned fixture copy. Original source/config and copied source hashes stayed unchanged. Only the copied config explicitly integrates the loader; no real user source/config was changed.
+
+The initial public custom-server `conf` experiment returned HTTP 200 without invoking the loader. Installed Next source confirmed that path ignores `conf`; it is not counted as integration success. A pending founder decision asks whether real projects may receive an explicit consented, backed-up config integration. Production preview integration is BLOCKED — FOUNDER DECISION; no undocumented monkey-patching selected.
+
+The isolated Next custom-server process retained resources after close; the spike logs this and exits its own process after a bounded three-second deadline. This is not production process-lifecycle proof.
+
+Final working-tree regression run: `bun run test` passed 209 tests (12 files); typecheck, lint and public-boundary checks passed. Native-only PR scope was separately verified with 206 tests excluding the later three preview-spike tests. All three Next.js fixtures and the playground built successfully earlier in the session. S0 hosted quality and Linux development/packaged smoke passed after one executable-name CI repair; see `PHASE-02-S0-CI.md`. These results do not close the complete Phase 2 gate.
