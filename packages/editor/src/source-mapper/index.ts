@@ -270,6 +270,17 @@ export function editElementClassName(
           : spliced.reason,
     };
   }
+  // JSX decodes HTML entities in attribute strings (`&amp;` → `&`): refuse a
+  // value that would not read back exactly as written.
+  const written = describeElement(spliced.generated, oid);
+  const expected = className === "" ? null : className;
+  if (
+    !written.ok ||
+    !written.className.ok ||
+    written.className.value !== expected
+  ) {
+    return { ok: false, reason: "unsupported-className-value" };
+  }
   return {
     ok: true,
     original: content,
