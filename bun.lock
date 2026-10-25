@@ -30,8 +30,42 @@
         "vite": "^7.1.7",
       },
     },
+    "examples/nested-components-fixture": {
+      "name": "@allstudio/nested-components-fixture",
+      "version": "0.1.0",
+      "dependencies": {
+        "next": "16.4.3",
+        "react": "19.3.0",
+        "react-dom": "19.3.0",
+      },
+      "devDependencies": {
+        "@tailwindcss/turbopack": "^4",
+        "@types/node": "^20",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "tailwindcss": "^4",
+        "typescript": "^5",
+      },
+    },
     "examples/nextjs-site-fixture": {
       "name": "@allstudio/nextjs-site-fixture",
+      "version": "0.1.0",
+      "dependencies": {
+        "next": "16.4.3",
+        "react": "19.3.0",
+        "react-dom": "19.3.0",
+      },
+      "devDependencies": {
+        "@tailwindcss/turbopack": "^4",
+        "@types/node": "^20",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "tailwindcss": "^4",
+        "typescript": "^5",
+      },
+    },
+    "examples/tailwind-variants-fixture": {
+      "name": "@allstudio/tailwind-variants-fixture",
       "version": "0.1.0",
       "dependencies": {
         "next": "16.4.3",
@@ -86,11 +120,15 @@
 
     "@allstudio/editor": ["@allstudio/editor@workspace:packages/editor"],
 
+    "@allstudio/nested-components-fixture": ["@allstudio/nested-components-fixture@workspace:examples/nested-components-fixture"],
+
     "@allstudio/nextjs-site-fixture": ["@allstudio/nextjs-site-fixture@workspace:examples/nextjs-site-fixture"],
 
     "@allstudio/playground": ["@allstudio/playground@workspace:apps/playground"],
 
     "@allstudio/project": ["@allstudio/project@workspace:packages/project"],
+
+    "@allstudio/tailwind-variants-fixture": ["@allstudio/tailwind-variants-fixture@workspace:examples/tailwind-variants-fixture"],
 
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
 
