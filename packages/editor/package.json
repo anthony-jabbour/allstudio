@@ -11,13 +11,18 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@allstudio/project": "workspace:*"
+    "@allstudio/project": "workspace:*",
+    "@babel/standalone": "^7.27.0",
+    "@babel/types": "^7.27.0",
+    "tailwind-merge": "^3.2.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@types/babel__standalone": "^7.1.9",
+    "@types/babel__traverse": "^7.28.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "react": "19.3.0",
