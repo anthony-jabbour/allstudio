@@ -1,7 +1,11 @@
-// End-to-end check of the Phase 1 text-edit slice in a real browser.
+// End-to-end check of the Phase 1 source-edit slices in a real browser:
+// three fixtures; heading/button/layout selection; text and className edits;
+// refusals; preview-bridge and workspace-API guards.
 //
 // Prerequisites:
-//   1. `bun run dev` is running (playground on :5173, workspace preview on :3101).
+//   1. `bun run dev` is running (playground on :5173, fixture previews on
+//      :3101 Aurora Atelier, :3102 Lumen Notes, :3103 Harbor Studio).
+//      Start from fresh copies with ALLSTUDIO_RESET_WORKSPACE=1.
 //   2. Playwright with Chromium can be imported. It is NOT a repository
 //      dependency (adding it needs founder approval); use a global install.
 //
@@ -9,7 +13,7 @@
 // Writes trace.zip and screenshots into output-dir (default: ./e2e-output).
 import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,10 +22,8 @@ import { fileURLToPath } from "node:url";
 const { chromium } = createRequire(import.meta.url)("playwright");
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const pageFile = join(
-  repoRoot,
-  "apps/playground/.workspace/nextjs-site-fixture/src/app/page.tsx",
-);
+const workspaceRoot = join(repoRoot, "apps/playground/.workspace");
+const pageFile = join(workspaceRoot, "aurora-atelier/src/app/page.tsx");
 const fixtureFile = join(
   repoRoot,
   "examples/nextjs-site-fixture/src/app/page.tsx",
@@ -36,7 +38,28 @@ function record(name, detail = "") {
   console.log(`PASS ${name}${detail ? ` — ${detail}` : ""}`);
 }
 
+/** sha256 of every source file under examples/ (no node_modules/.next). */
+async function snapshotExamples() {
+  const hashes = {};
+  const walk = async (dir) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (["node_modules", ".next"].includes(entry.name)) {
+        continue;
+      }
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+      } else if (entry.isFile() && !entry.name.endsWith(".tsbuildinfo")) {
+        hashes[path.slice(repoRoot.length + 1)] = sha(await readFile(path));
+      }
+    }
+  };
+  await walk(join(repoRoot, "examples"));
+  return hashes;
+}
+
 await mkdir(outDir, { recursive: true });
+const examplesBefore = await snapshotExamples();
 const fixtureBefore = await readFile(fixtureFile, "utf8");
 const browser = await chromium.launch();
 const context = await browser.newContext({
@@ -45,7 +68,101 @@ const context = await browser.newContext({
 await context.tracing.start({ screenshots: true, snapshots: true });
 const page = await context.newPage();
 const preview = page.frameLocator('iframe[title="Project preview"]');
-const textInput = page.getByLabel("Text");
+const textInput = page.getByLabel("Text", { exact: true });
+const classInput = page.getByLabel("Classes", { exact: true });
+const button = (name) => page.getByRole("button", { name, exact: true });
+
+/**
+ * A point inside `locator` whose topmost element is the element itself
+ * (not a child), so layout containers can be clicked directly.
+ */
+async function ownPoint(locator) {
+  return locator.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    for (let y = 1; y < rect.height; y += 4) {
+      for (let x = 1; x < rect.width; x += 8) {
+        if (document.elementFromPoint(rect.left + x, rect.top + y) === el) {
+          return { x, y };
+        }
+      }
+    }
+    return null;
+  });
+}
+
+/** Clicks an element in the preview and waits for its source location. */
+async function select(locator, expectedLocation) {
+  const position = await ownPoint(locator);
+  assert.ok(position, "element has a clickable spot of its own");
+  await locator.click({ position });
+  const located = page.getByTestId("source-location");
+  await located.waitFor();
+  if (expectedLocation) {
+    await page.getByText(expectedLocation).waitFor();
+  }
+  return (await located.textContent()) ?? "";
+}
+
+/**
+ * Applies a text or class edit through the panel and checks that the file
+ * changed only inside the selected element's line range and that the
+ * preview shows the result.
+ */
+async function applyEdit({ file, kind, value, label }) {
+  const location =
+    (await page.getByTestId("source-location").textContent()) ?? "";
+  const [, startLine, endLine] = location.match(/:(\d+)–(\d+)$/) ?? [];
+  const before = await readFile(file, "utf8");
+  await (kind === "text" ? textInput : classInput).fill(value);
+  const appliedAt = Date.now();
+  await button(kind === "text" ? "Apply text" : "Apply classes").click();
+  await page
+    .getByText(
+      `the preview shows the new ${kind === "text" ? "text" : "classes"}`,
+    )
+    .waitFor({ timeout: 30_000 });
+  const refreshMs = Date.now() - appliedAt;
+  const after = await readFile(file, "utf8");
+  assert.notEqual(after, before, `${label}: file changed`);
+  const a = before.split("\n");
+  const b = after.split("\n");
+  assert.equal(b.length, a.length, `${label}: line count kept`);
+  const changed = a.flatMap((line, i) => (line === b[i] ? [] : [i + 1]));
+  for (const line of changed) {
+    assert.ok(
+      line >= Number(startLine) && line <= Number(endLine),
+      `${label}: line ${line} outside ${location}`,
+    );
+  }
+  const diff = (await page.locator(".diff").textContent()) ?? "";
+  await writeFile(join(outDir, `${label}.diff`), diff);
+  record(
+    label,
+    `${location}; lines changed ${changed.join(",")}; preview ${refreshMs} ms`,
+  );
+  return diff;
+}
+
+async function expectRefusal(locator, message, label) {
+  await locator.click();
+  await page.getByText(message).first().waitFor();
+  record(label, message);
+}
+
+async function switchFixture(id, previewPort, readySelector) {
+  await page.getByLabel("Fixture").selectOption(id);
+  await page
+    .getByText("Preview bridge: connected")
+    .waitFor({ timeout: 60_000 });
+  const frameLocator = page.frameLocator('iframe[title="Project preview"]');
+  await frameLocator.locator(readySelector).waitFor({ timeout: 60_000 });
+  assert.ok(
+    page
+      .frames()
+      .some((f) => f.url().startsWith(`http://localhost:${previewPort}`)),
+  );
+  return frameLocator;
+}
 
 async function selectHeading() {
   await preview.locator("#hero-heading").click();
@@ -71,7 +188,7 @@ try {
   const original = (await textInput.inputValue()).trim();
   const nextText = `Aurora Atelier — edited ${Date.now()}`;
   await textInput.fill(nextText);
-  await page.getByRole("button", { name: "Preview patch" }).click();
+  await button("Preview text patch").click();
   await page.locator(".diff").waitFor();
   const previewDiff = await page.locator(".diff").textContent();
   assert.ok(previewDiff?.includes(`+`) && previewDiff.includes(nextText));
@@ -83,7 +200,7 @@ try {
   record("patch preview shows diff without writing");
 
   const appliedAt = Date.now();
-  await page.getByRole("button", { name: "Apply" }).click();
+  await button("Apply text").click();
   await page
     .getByText("the preview shows the new text")
     .waitFor({ timeout: 30_000 });
@@ -114,7 +231,7 @@ try {
 
   // --- No-op ------------------------------------------------------------
   const mtimeBefore = (await stat(pageFile)).mtimeMs;
-  await page.getByRole("button", { name: "Apply" }).click();
+  await button("Apply text").click();
   await page.getByText("No change: the text already matches").waitFor();
   assert.equal((await stat(pageFile)).mtimeMs, mtimeBefore);
   record("no-op edit does not rewrite the file");
@@ -122,14 +239,33 @@ try {
   // --- Selection change while the lookup is in flight -------------------
   await selectHeading();
   await textInput.fill("Draft meant for the heading");
-  await page.route("**/__allstudio/workspace/locate", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    await route.continue();
-  });
+  // Delay only the next lookup.
+  await page.route(
+    "**/__allstudio/workspace/*/locate",
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.continue().catch(() => {});
+    },
+    { times: 1 },
+  );
   await preview.locator("main p").nth(1).click();
-  assert.ok(await textInput.isDisabled(), "editing disabled during lookup");
-  assert.equal(await textInput.inputValue(), "");
-  await page.unroute("**/__allstudio/workspace/locate");
+  // The select message arrives asynchronously; well inside the 1.5 s delay
+  // the field must be cleared and disabled while the lookup is pending.
+  await page.waitForFunction(
+    () => {
+      const input = [...document.querySelectorAll("label")]
+        .find((label) => label.firstChild?.textContent?.trim() === "Text")
+        ?.querySelector("input");
+      return input?.disabled === true && input.value === "";
+    },
+    undefined,
+    { timeout: 1000 },
+  );
+  assert.equal(
+    await page.getByTestId("source-location").count(),
+    0,
+    "no source shown until the new lookup returns",
+  );
   await page.getByText("src/app/page.tsx:13–").waitFor();
   assert.notEqual(await textInput.inputValue(), "Draft meant for the heading");
   record("old draft is cleared while a new selection is looked up");
@@ -140,7 +276,7 @@ try {
   const external = `${beforeExternal}\n`;
   await writeFile(pageFile, external, "utf8");
   await textInput.fill("Should not be written");
-  await page.getByRole("button", { name: "Apply" }).click();
+  await button("Apply text").click();
   await page
     .getByText("The file changed since this element was selected")
     .waitFor();
@@ -220,11 +356,14 @@ try {
       .querySelector('meta[name="allstudio-dev-session"]')
       ?.getAttribute("content");
     const call = async (headers, body) => {
-      const res = await fetch("/__allstudio/workspace/apply-text", {
-        method: "POST",
-        headers: { "content-type": "application/json", ...headers },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(
+        "/__allstudio/workspace/aurora-atelier/apply-text",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", ...headers },
+          body: JSON.stringify(body),
+        },
+      );
       return { status: res.status, body: await res.json() };
     };
     const edit = { oid: "abcdefg", expectedSha256: "0".repeat(64), text: "x" };
@@ -256,7 +395,7 @@ try {
   const crossOrigin = await frame.evaluate(async () => {
     try {
       const res = await fetch(
-        "http://localhost:5173/__allstudio/workspace/locate",
+        "http://localhost:5173/__allstudio/workspace/aurora-atelier/locate",
         {
           method: "POST",
           headers: {
@@ -285,8 +424,201 @@ try {
     "workspace API rejects unauthorized paths, tokens and the preview origin",
   );
 
+  // --- Aurora: button text, heading classes, layout classes ----------------
+  await select(preview.locator("main button"), "src/app/page.tsx:18–23");
+  const unsavedClasses = `${await classInput.inputValue()} unsaved-draft`;
+  await classInput.fill(unsavedClasses);
+  await applyEdit({
+    file: pageFile,
+    kind: "text",
+    value: "Start a new project",
+    label: "aurora-button-text",
+  });
+  assert.equal(
+    await classInput.inputValue(),
+    unsavedClasses,
+    "applying text keeps the unsaved classes draft",
+  );
+  assert.ok(!(await readFile(pageFile, "utf8")).includes("unsaved-draft"));
+  record("applying one field keeps the other field's unsaved draft");
+  await selectHeading();
+  const colorBefore = await preview
+    .locator("#hero-heading")
+    .evaluate((el) => getComputedStyle(el).color);
+  const headingClasses = await classInput.inputValue();
+  assert.ok(headingClasses.includes("text-zinc-950"));
+  await applyEdit({
+    file: pageFile,
+    kind: "className",
+    value: headingClasses.replace("text-zinc-950", "text-emerald-700"),
+    label: "aurora-heading-classes",
+  });
+  const colorAfter = await preview
+    .locator("#hero-heading")
+    .evaluate((el) => getComputedStyle(el).color);
+  assert.notEqual(colorAfter, colorBefore, "Tailwind applied the new color");
+  record(
+    "new Tailwind class is compiled and rendered",
+    `${colorBefore} → ${colorAfter}`,
+  );
+  // --- Editing stays locked until a save is confirmed ----------------------
+  await selectHeading();
+  await page.route(
+    "**/__allstudio/workspace/*/locate",
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await route.continue().catch(() => {});
+    },
+    { times: 1 },
+  );
+  await textInput.fill("Aurora Atelier — locked while saving");
+  await button("Apply text").click();
+  // The preview updates first; the delayed post-save lookup then holds the
+  // confirmation. During that window nothing can start a second edit.
+  await preview
+    .locator("#hero-heading", { hasText: "locked while saving" })
+    .waitFor({ timeout: 30_000 });
+  assert.ok(await classInput.isDisabled(), "classes locked until confirmed");
+  assert.ok(await button("Apply classes").isDisabled());
+  assert.equal(
+    await page.getByText("the preview shows the new text").count(),
+    0,
+    "no success message before the refresh",
+  );
+  await page
+    .getByText("the preview shows the new text")
+    .waitFor({ timeout: 30_000 });
+  assert.ok(!(await classInput.isDisabled()), "editing available again");
+  record("editing is locked from Apply until the save is confirmed");
+
+  await select(preview.locator("main"), "src/app/page.tsx:3–24");
+  await page.getByText("renders expressions or nested elements").waitFor();
+  assert.ok(await textInput.isDisabled(), "layout text is not editable");
+  await applyEdit({
+    file: pageFile,
+    kind: "className",
+    value: (await classInput.inputValue()).replace("gap-6", "gap-10"),
+    label: "aurora-layout-classes",
+  });
+  await page.screenshot({ path: join(outDir, "03-aurora-edited.png") });
+
   assert.equal(await readFile(fixtureFile, "utf8"), fixtureBefore);
   record("examples/ fixture file is unchanged");
+
+  // --- Lumen Notes: nested components ------------------------------------
+  const lumen = await switchFixture("lumen-notes", 3102, "#lumen-heading");
+  const lumenDir = join(workspaceRoot, "lumen-notes/src");
+  await select(lumen.locator("#lumen-heading"), "src/app/page.tsx:12–17");
+  await applyEdit({
+    file: join(lumenDir, "app/page.tsx"),
+    kind: "text",
+    value: "Lumen Notebook",
+    label: "lumen-heading-text",
+  });
+  await select(
+    lumen.locator("#new-note-button"),
+    "src/components/new-note-button.tsx:3–9",
+  );
+  await page.getByText("in NewNoteButton").waitFor();
+  await applyEdit({
+    file: join(lumenDir, "components/new-note-button.tsx"),
+    kind: "text",
+    value: "Write a note",
+    label: "lumen-nested-button-text",
+  });
+  await select(lumen.locator("#intro"), "src/app/page.tsx:11–36");
+  await applyEdit({
+    file: join(lumenDir, "app/page.tsx"),
+    kind: "className",
+    value: "flex flex-col gap-6",
+    label: "lumen-layout-classes",
+  });
+  await select(lumen.locator("#sync-status"), "src/app/page.tsx:");
+  await applyEdit({
+    file: join(lumenDir, "app/page.tsx"),
+    kind: "text",
+    value: "Up to date",
+    label: "lumen-ternary-branch-text",
+  });
+  const lumenPage = await readFile(join(lumenDir, "app/page.tsx"), "utf8");
+  assert.ok(
+    lumenPage.includes("{isSynced ? (") && lumenPage.includes("Offline"),
+  );
+  record("ternary condition and other branch are preserved");
+  await expectRefusal(
+    lumen.locator("nav a").first(),
+    "renders 2 times",
+    "reused component (NavLink) is refused",
+  );
+  await expectRefusal(
+    lumen.locator("article h2").first(),
+    "renders 3 times",
+    ".map() list item is refused",
+  );
+  await select(lumen.locator("#note-count"), "src/app/page.tsx:");
+  await page.getByText("renders expressions or nested elements").waitFor();
+  assert.ok(await textInput.isDisabled());
+  record(
+    "expression text is refused",
+    "{notes.length} notes in this workspace",
+  );
+  await page.screenshot({ path: join(outDir, "04-lumen-edited.png") });
+
+  // --- Harbor Studio: Tailwind variants ----------------------------------
+  const harbor = await switchFixture("harbor-studio", 3103, "#harbor-heading");
+  const harborPage = join(workspaceRoot, "harbor-studio/src/app/page.tsx");
+  await select(harbor.locator("#harbor-heading"), "src/app/page.tsx:14–19");
+  await applyEdit({
+    file: harborPage,
+    kind: "text",
+    value: "Harbor & Co",
+    label: "harbor-heading-text",
+  });
+  await select(harbor.locator("#harbor-cta"), "src/app/page.tsx:");
+  await applyEdit({
+    file: harborPage,
+    kind: "className",
+    value: (await classInput.inputValue())
+      .replace("bg-sky-600", "bg-indigo-600")
+      .replace("hover:bg-sky-500", "hover:bg-indigo-500"),
+    label: "harbor-variant-classes",
+  });
+  await select(harbor.locator("#hero"), "src/app/page.tsx:9–50");
+  const columns = () =>
+    harbor
+      .locator("#hero")
+      .evaluate(
+        (el) => getComputedStyle(el).gridTemplateColumns.split(" ").length,
+      );
+  assert.equal(await columns(), 2);
+  await applyEdit({
+    file: harborPage,
+    kind: "className",
+    value: (await classInput.inputValue()).replace(
+      "md:grid-cols-2",
+      "md:grid-cols-3",
+    ),
+    label: "harbor-layout-responsive-classes",
+  });
+  assert.equal(await columns(), 3, "md:grid-cols-3 applied in the preview");
+  record("responsive variant edit changes the rendered grid", "2 → 3 columns");
+  await select(harbor.locator("#harbor-secondary"), "src/app/page.tsx:31–37");
+  await page.getByText("className is an expression").waitFor();
+  assert.ok(await classInput.isDisabled());
+  assert.ok(!(await textInput.isDisabled()));
+  record(
+    "template-literal className is refused, its static text stays editable",
+  );
+  await select(
+    harbor.locator("#footer-copy"),
+    "src/components/site-footer.tsx:",
+  );
+  await page.getByText("renders expressions or nested elements").waitFor();
+  record("footer text with {year} is refused");
+  await page.screenshot({ path: join(outDir, "05-harbor-edited.png") });
+
+  assert.deepEqual(await snapshotExamples(), examplesBefore);
+  record("no file under examples/ changed");
 } finally {
   await context.tracing.stop({ path: join(outDir, "trace.zip") });
   await browser.close();

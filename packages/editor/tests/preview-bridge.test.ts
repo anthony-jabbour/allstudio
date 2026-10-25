@@ -23,6 +23,7 @@ const element = {
   oid: "5y3ukh6",
   tagName: "h1",
   text: "Aurora Atelier",
+  className: "text-5xl font-semibold",
   rect: { x: 10, y: 20, width: 300, height: 60 },
   instances: 1,
 };
@@ -130,6 +131,14 @@ describe("preview bridge protocol", () => {
           ...element,
           rect: { x: Number.NaN, y: 0, width: 1, height: 1 },
         },
+      },
+    ],
+    [
+      "missing className",
+      {
+        type: "select",
+        clickedTag: "h1",
+        element: { ...element, className: undefined },
       },
     ],
     [

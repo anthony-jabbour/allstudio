@@ -26,6 +26,8 @@ export interface PreviewElementSnapshot {
   tagName: string;
   /** Rendered `textContent`, truncated by the bridge. */
   text: string;
+  /** Rendered `class` attribute, truncated by the bridge. */
+  className: string;
   rect: PreviewRect;
   /** Number of rendered elements sharing this oid (e.g. `.map()` items). */
   instances: number;
@@ -116,13 +118,15 @@ function parseSnapshot(
     return undefined;
   }
   const rect = parseRect(value.rect);
-  const { oid, tagName, text, instances } = value;
+  const { oid, tagName, text, className, instances } = value;
   if (
     !isValidOid(oid) ||
     typeof tagName !== "string" ||
     !TAG_PATTERN.test(tagName) ||
     typeof text !== "string" ||
     text.length > MAX_TEXT_LENGTH ||
+    typeof className !== "string" ||
+    className.length > MAX_TEXT_LENGTH ||
     typeof instances !== "number" ||
     !Number.isInteger(instances) ||
     instances < 1 ||
@@ -131,7 +135,7 @@ function parseSnapshot(
   ) {
     return undefined;
   }
-  return { oid, tagName, text, rect, instances };
+  return { oid, tagName, text, className, rect, instances };
 }
 
 export function parsePreviewMessage(

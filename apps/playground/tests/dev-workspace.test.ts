@@ -120,7 +120,14 @@ describe("DevWorkspace text edits", () => {
     expect(applied).toMatchObject({ ok: true, written: true, noop: false });
     const after = await readFile(pageFile, "utf8");
     expect(applied.ok && applied.sha256).toBe(sha256(after));
-    expect(after).toContain(">Aurora Atelier — edited");
+    // Format-preserving splice: exactly the text bytes change; the
+    // indentation and every other line are kept.
+    expect(after).toBe(
+      before.replace(
+        "\n        Aurora Atelier\n",
+        "\n        Aurora Atelier — edited\n",
+      ),
+    );
     // Lines before the heading and from </h1> on are untouched.
     expect(after.slice(0, after.indexOf('id="hero-heading"'))).toBe(
       before.slice(0, before.indexOf('id="hero-heading"')),
@@ -266,10 +273,11 @@ describe("DevWorkspace text edits", () => {
   it("does not persist a patch that fails validation", async () => {
     const before = await readFile(pageFile, "utf8");
     const broken = await DevWorkspace.open(workspaceDir, {
-      patch: (content) => ({
+      editElement: (content) => ({
         ok: true,
         original: content,
         generated: content.replace("</h1>", "</h2>"),
+        strategy: "splice",
       }),
     });
     const { oid, element } = await heading(broken);
@@ -286,14 +294,15 @@ describe("DevWorkspace text edits", () => {
   it("does not persist a patch that drops another element's oid", async () => {
     const before = await readFile(pageFile, "utf8");
     const lossy = await DevWorkspace.open(workspaceDir, {
-      patch: (content, edit) => ({
+      editElement: (content, edit) => ({
         ok: true,
+        strategy: "splice",
         original: content,
         generated: content
           .replace(/(<p className="text-sm[^>]*) data-oid="[^"]+"/, "$1")
           .replace(
             /(id="hero-heading"[\s\S]*?>)[\s\S]*?(<\/h1>)/,
-            `$1${edit.textContent}$2`,
+            `$1${edit.kind === "text" ? edit.text : ""}$2`,
           ),
       }),
     });

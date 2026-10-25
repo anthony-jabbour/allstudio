@@ -11,8 +11,8 @@
   "scripts": {
     "dev": "bun --filter @allstudio/playground dev",
     "dev:fixture": "bun --filter @allstudio/nextjs-site-fixture dev",
-    "build": "bun --filter @allstudio/playground build && bun --filter @allstudio/nextjs-site-fixture build",
-    "typecheck": "bun --filter @allstudio/project typecheck && bun --filter @allstudio/editor typecheck && bun --filter @allstudio/playground typecheck && bun --filter @allstudio/nextjs-site-fixture typecheck",
+    "build": "bun --filter @allstudio/playground build && bun --filter @allstudio/nextjs-site-fixture build && bun --filter @allstudio/nested-components-fixture build && bun --filter @allstudio/tailwind-variants-fixture build",
+    "typecheck": "bun --filter @allstudio/project typecheck && bun --filter @allstudio/editor typecheck && bun --filter @allstudio/playground typecheck && bun --filter @allstudio/nextjs-site-fixture typecheck && bun --filter @allstudio/nested-components-fixture typecheck && bun --filter @allstudio/tailwind-variants-fixture typecheck",
     "lint": "biome check .",
     "format": "biome format --write .",
     "test": "vitest run",

@@ -1,4 +1,5 @@
 import type {
+  ElementClassName,
   ElementTextContent,
   SourceLocation,
   SourceMapperError,
@@ -16,6 +17,10 @@ export interface SourceEditWorkspace {
   previewTextEdit(request: TextEditRequest): Promise<TextEditResult>;
   /** Writes the patch if the file still matches `expectedSha256`. */
   applyTextEdit(request: TextEditRequest): Promise<TextEditResult>;
+  /** Computes a static `className` replacement for review. Never writes. */
+  previewClassEdit(request: ClassEditRequest): Promise<TextEditResult>;
+  /** Writes the `className` replacement if the file still matches. */
+  applyClassEdit(request: ClassEditRequest): Promise<TextEditResult>;
 }
 
 export interface SourceElementInfo {
@@ -25,6 +30,7 @@ export interface SourceElementInfo {
   sha256: string;
   location: SourceLocation;
   text: ElementTextContent;
+  className: ElementClassName;
 }
 
 export interface TextEditRequest {
@@ -32,6 +38,14 @@ export interface TextEditRequest {
   oid: string;
   expectedSha256: string;
   text: string;
+}
+
+export interface ClassEditRequest {
+  path: string;
+  oid: string;
+  expectedSha256: string;
+  /** Full replacement for the static className string; empty removes it. */
+  className: string;
 }
 
 export type SourceEditFailureReason =
@@ -80,6 +94,10 @@ const FAILURE_MESSAGES: Record<SourceEditFailureReason, string> = {
   "unsupported-dynamic-children":
     "This element renders expressions or nested elements. Only static text can be edited here.",
   "unsupported-multiline-text": "Text edits must be a single line.",
+  "unsupported-className-value":
+    "Class names cannot contain quotes, braces, angle brackets, backslashes, or line breaks.",
+  "unconfined-patch":
+    "This edit would change code outside the selected element (for example by reformatting). Nothing was written.",
   "invalid-request": "The edit request was malformed.",
   unauthorized: "The workspace rejected the request.",
   "path-rejected": "That file is outside the approved workspace.",

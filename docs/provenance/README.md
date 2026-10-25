@@ -26,7 +26,7 @@ Destination package: `@allstudio/editor`
 | `packages/parser/src/parse.ts` | `packages/editor/src/source-mapper/parse.ts` | Synchronous generate; id-stripping omitted |
 | `packages/parser/src/helpers.ts` | `packages/editor/src/source-mapper/fragments.ts` | Fragment helper only |
 | `packages/parser/src/ids.ts` | `packages/editor/src/source-mapper/ids.ts` | No branch-oid map; local uniqueness only |
-| `packages/parser/src/code-edit/style.ts` | `packages/editor/src/source-mapper/style.ts` | Refuse expression `className`; `tailwind-merge` only |
+| `packages/parser/src/code-edit/style.ts` | `packages/editor/src/source-mapper/style.ts` | Refuse expression `className`; `tailwind-merge` only; adds original `readClassName` |
 | `packages/parser/src/code-edit/text.ts` | `packages/editor/src/source-mapper/text.ts` | Single-line text only (multiline refused); refuses expression/element children instead of editing the first `JSXText`; adds original `readNodeTextContent` (JSX whitespace rules) |
 | `packages/parser/src/template-node/map.ts` + `helpers.ts` | `packages/editor/src/source-mapper/locations.ts` | `SourceLocation` only; dynamic/core types omitted |
 | `packages/utility/src/id.ts` (charset only) | `packages/editor/src/source-mapper/oid.ts` | `crypto.getRandomValues` instead of nanoid |
@@ -44,5 +44,9 @@ No upstream code was copied for this slice. Onlook's `apps/web/preload` (same co
 | `packages/editor/src/preview-bridge/protocol.ts` | Original |
 | `packages/editor/src/shell/*`, `packages/editor/src/site/*` | Original |
 | `apps/playground/dev/*` | Original; development-only, not the Phase 2 Electron adapter |
+
+## Phase 1 slice 3 — format-preserving edits (original code)
+
+`packages/editor/src/source-mapper/splice.ts` (`insertOidsPreservingFormat`, `spliceElementText`, `spliceElementClassName`, `isConfinedEdit`) and `editElementText` / `editElementClassName` in `source-mapper/index.ts` are original allstudio code. They use the Babel parser already listed above, and no upstream code was copied. The fixtures `examples/nested-components-fixture` and `examples/tailwind-variants-fixture` are original test projects.
 
 Do not copy Onlook trademarks, `assets/`, UI, sandbox, or `EditorEngine`.
