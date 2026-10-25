@@ -1,0 +1,21 @@
+---
+description: Consult allstudio HQ and repo specs before substantive implementation
+alwaysApply: true
+---
+
+# allstudio documentation
+
+Before a substantive change:
+
+1. Identify the git root (`allstudio/` public vs `cloud/` private) and branch.
+2. Read `AGENTS.md` and the relevant `CLAUDE.md`.
+3. Read the relevant slice of `RoadMap.md` and `HANDOFF_FOR_CLAUDE.md`.
+4. If Notion MCP is available, fetch **Start Here / Agent Map** in allstudio HQ, then query the matching Feature, accepted ADRs, and Engineering Board row. Map: `docs/notion/NOTION_MAP.md`.
+5. Inspect actual code. Do not trust progress prose, including Notion.
+6. Report **Drift** when sources disagree. Do not silently rewrite requirements.
+
+Do not read the entire Notion workspace. Query by feature ID, ADR ID, phase, status, or repo path.
+
+Never mark unmerged work as Shipped, never self-approve ADRs, never copy private cloud/pricing content into this public tree.
+
+If Notion is unavailable (typical for Claude Code cloud), continue from repo files listed above. Do not fail the task for a missing Notion login.
