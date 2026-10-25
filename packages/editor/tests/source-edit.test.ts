@@ -221,6 +221,17 @@ describe("editElementClassName", () => {
     );
   });
 
+  it("refuses clearing classes when a spread could supply className", () => {
+    const source = `export const X = (rest: object) => <p {...rest} data-oid="p1" className="grid">x</p>;\n`;
+    expect(editElementClassName(source, "p1", "")).toEqual({
+      ok: false,
+      reason: "unsupported-className-expression",
+    });
+    // Replacing the value is still fine: the attribute keeps overriding.
+    const replaced = editElementClassName(source, "p1", "flex");
+    expect(replaced.ok && replaced.generated).toContain('className="flex"');
+  });
+
   it("refuses duplicate className attributes", () => {
     const source = `export const X = () => <p data-oid="p1" className="a" className="b">x</p>;\n`;
     expect(editElementClassName(source, "p1", "c")).toEqual({

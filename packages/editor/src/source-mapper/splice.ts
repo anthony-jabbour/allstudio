@@ -315,6 +315,10 @@ export function spliceElementClassName(
   ) {
     return { ok: false, reason: "unsupported-className-expression" };
   }
+  if (className === "" && spreadAfter(0)) {
+    // Removing the attribute would let a spread's className apply instead.
+    return { ok: false, reason: "unsupported-className-expression" };
+  }
   if (className === "") {
     // Remove the attribute together with the whitespace before it.
     let start = attr.start;
