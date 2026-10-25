@@ -39,3 +39,14 @@ export type InstrumentResult =
 export type PreviewPatchResult =
   | { ok: true; original: string; generated: string }
   | { ok: false; reason: SourceMapperError };
+
+export type ElementTextContent =
+  | { ok: true; text: string }
+  | {
+      ok: false;
+      reason: "unsupported-void-element" | "unsupported-dynamic-children";
+    };
+
+export type DescribeElementResult =
+  | { ok: true; location: SourceLocation; text: ElementTextContent }
+  | { ok: false; reason: "parse-failed" | "oid-not-found" | "oid-ambiguous" };

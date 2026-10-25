@@ -2,14 +2,26 @@ import { parseProjectManifest } from "@allstudio/project";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { EDITOR_STATUS, EditorShell } from "../src/index.ts";
+import {
+  EDITOR_STATUS,
+  EditorShell,
+  type SourceEditWorkspace,
+  sourceEditFailure,
+} from "../src/index.ts";
+
+const unusedWorkspace: SourceEditWorkspace = {
+  locate: async () => sourceEditFailure("unavailable"),
+  previewTextEdit: async () => sourceEditFailure("unavailable"),
+  applyTextEdit: async () => sourceEditFailure("unavailable"),
+};
 
 describe("EditorShell", () => {
-  it("renders as a scaffold, not a working editor", () => {
-    expect(EDITOR_STATUS).toBe("scaffold");
+  it("states the slice scope and needs a workspace to edit", () => {
+    expect(EDITOR_STATUS).toBe("text-edit-slice");
     const html = renderToStaticMarkup(createElement(EditorShell));
-    expect(html).toContain("Editor scaffold");
     expect(html).toContain("not implemented yet");
+    expect(html).toContain("No preview workspace connected.");
+    expect(html).not.toContain("<iframe");
   });
 
   it("displays a parsed project manifest name", () => {
@@ -22,5 +34,23 @@ describe("EditorShell", () => {
     });
     const html = renderToStaticMarkup(createElement(EditorShell, { manifest }));
     expect(html).toContain("Fixture Site");
+  });
+
+  it("renders a sandboxed cross-origin preview with disabled edit controls", () => {
+    const html = renderToStaticMarkup(
+      createElement(EditorShell, {
+        previewUrl: "http://localhost:3101",
+        workspace: unusedWorkspace,
+      }),
+    );
+    expect(html).toContain('src="http://localhost:3101"');
+    expect(html).toContain(
+      'sandbox="allow-scripts allow-same-origin allow-forms"',
+    );
+    expect(html).not.toContain("allow-top-navigation");
+    expect(html).not.toContain("allow-popups");
+    expect(html).toContain("Preview bridge: connecting");
+    expect(html).toMatch(/<input type="text" disabled=""/);
+    expect(html).toMatch(/<button type="button" disabled="">Apply<\/button>/);
   });
 });

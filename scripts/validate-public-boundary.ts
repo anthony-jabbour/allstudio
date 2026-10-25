@@ -5,6 +5,7 @@ const ROOT = join(import.meta.dir, "..");
 const SKIP_DIRECTORIES = new Set([
   "node_modules",
   ".next",
+  ".workspace",
   "dist",
   "build",
   "coverage",
