@@ -270,6 +270,61 @@ describe("DevWorkspace text edits", () => {
     expect(results[0].ok && results[0].sha256).toBe(sha256(after));
   });
 
+  it("applies concurrent edits in call order even when the first resolves slowly", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    const { oid, element } = await heading(workspace);
+    const content = await readFile(pageFile, "utf8");
+    const paragraphOid =
+      content.match(
+        /<p className="max-w-xl text-lg[^>]*data-oid="([^"]+)"/,
+      )?.[1] ?? "";
+    // Slow down the first path resolution: the first apply must still hold
+    // its place in the per-file queue.
+    const resolve = workspace.resolve.bind(workspace);
+    let calls = 0;
+    workspace.resolve = async (path: unknown) => {
+      if (calls++ === 0) {
+        await new Promise((done) => setTimeout(done, 50));
+      }
+      return resolve(path);
+    };
+    const results = await Promise.all([
+      workspace.applyTextEdit({
+        path: element.path,
+        oid,
+        expectedSha256: element.sha256,
+        text: "First edit",
+      }),
+      workspace.applyTextEdit({
+        path: element.path,
+        oid: paragraphOid,
+        expectedSha256: element.sha256,
+        text: "Second edit",
+      }),
+    ]);
+    expect(results[0]).toMatchObject({ ok: true, written: true });
+    expect(results[1]).toMatchObject({ ok: false, reason: "stale-file" });
+  });
+
+  it("refuses to rewrite a file that is not valid UTF-8", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    const { oid } = await heading(workspace);
+    const valid = await readFile(pageFile);
+    const invalid = Buffer.concat([
+      valid,
+      Buffer.from([0x2f, 0x2f, 0xff, 0x0a]),
+    ]);
+    await writeFile(pageFile, invalid);
+    const result = await workspace.applyTextEdit({
+      path: "src/app/page.tsx",
+      oid,
+      expectedSha256: sha256(invalid.toString("utf8")),
+      text: "Changed",
+    });
+    expect(result).toMatchObject({ ok: false, reason: "unsupported-encoding" });
+    expect((await readFile(pageFile)).equals(invalid)).toBe(true);
+  });
+
   it("does not persist a patch that fails validation", async () => {
     const before = await readFile(pageFile, "utf8");
     const broken = await DevWorkspace.open(workspaceDir, {

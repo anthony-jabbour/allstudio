@@ -74,6 +74,13 @@ export function readClassName(node: T.JSXElement): ElementClassName {
   const index = attributes.findIndex(
     (attr) => t.isJSXAttribute(attr) && attr.name.name === "className",
   );
+  const duplicates =
+    attributes.filter(
+      (attr) => t.isJSXAttribute(attr) && attr.name.name === "className",
+    ).length > 1;
+  if (duplicates) {
+    return { ok: false, reason: "unsupported-className-expression" };
+  }
   if (index < 0) {
     return hasJsxSpread(attributes)
       ? { ok: false, reason: "unsupported-className-expression" }

@@ -26,8 +26,14 @@ export type SpliceResult =
   | { ok: false; reason: SourceMapperError | "not-spliceable" };
 
 const JSX_TEXT_BREAKERS = /[<>{}&]/;
-/** Characters that cannot appear in a JSX string attribute without escapes. */
-const UNSAFE_CLASS_CHARS = /["'\n\r{}<>\\]/;
+/**
+ * Characters refused in a class value: quotes and line breaks would end or
+ * break the JSX string; braces, `<` and backslashes are never valid
+ * Tailwind classes here. `&` and `>` are allowed (`[&>*]:p-2`); the caller
+ * re-reads the written value, so an HTML entity such as `&amp;` that JSX
+ * would decode is refused there.
+ */
+const UNSAFE_CLASS_CHARS = /["'\n\r{}<\\]/;
 
 function applySplices(content: string, splices: Splice[]): string {
   let out = content;
@@ -272,6 +278,13 @@ export function spliceElementClassName(
   const index = attributes.findIndex(
     (attr) => t.isJSXAttribute(attr) && attr.name.name === "className",
   );
+  const classNameCount = attributes.filter(
+    (attr) => t.isJSXAttribute(attr) && attr.name.name === "className",
+  ).length;
+  if (classNameCount > 1) {
+    // React uses the last one; editing the first would have no effect.
+    return { ok: false, reason: "unsupported-className-expression" };
+  }
   const spreadAfter = (from: number) =>
     attributes.slice(from).some((attr) => t.isJSXSpreadAttribute(attr));
 

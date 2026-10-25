@@ -92,9 +92,26 @@ async function ownPoint(locator) {
 
 /** Clicks an element in the preview and waits for its source location. */
 async function select(locator, expectedLocation) {
-  const position = await ownPoint(locator);
+  // The preview may reload after an external file change (hot reload falls
+  // back to a full reload); retry when that destroys the frame's context.
+  let position = null;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await locator.waitFor();
+      position = await ownPoint(locator);
+      await locator.click({ position });
+      break;
+    } catch (error) {
+      if (
+        attempt >= 3 ||
+        !/context was destroyed|detached/i.test(String(error))
+      ) {
+        throw error;
+      }
+      await page.waitForTimeout(500);
+    }
+  }
   assert.ok(position, "element has a clickable spot of its own");
-  await locator.click({ position });
   const located = page.getByTestId("source-location");
   await located.waitFor();
   if (expectedLocation) {
@@ -490,6 +507,38 @@ try {
     .waitFor({ timeout: 30_000 });
   assert.ok(!(await classInput.isDisabled()), "editing available again");
   record("editing is locked from Apply until the save is confirmed");
+
+  // --- A stalled post-save lookup cannot keep editing locked ---------------
+  await selectHeading();
+  await page.route(
+    "**/__allstudio/workspace/*/locate",
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 15_000));
+      await route.continue().catch(() => {});
+    },
+    { times: 1 },
+  );
+  await textInput.fill("Aurora Atelier — stalled refresh");
+  await button("Apply text").click();
+  await page
+    .getByText("refreshing the source details timed out")
+    .waitFor({ timeout: 30_000 });
+  assert.ok(
+    !(await classInput.isDisabled()),
+    "editing unlocked after deadline",
+  );
+  assert.ok(
+    (await readFile(pageFile, "utf8")).includes(
+      "Aurora Atelier — stalled refresh",
+    ),
+  );
+  // The late lookup result is ignored: the timeout message stays.
+  await page.waitForTimeout(6_000);
+  assert.equal(
+    await page.getByText("refreshing the source details timed out").count(),
+    1,
+  );
+  record("a stalled post-save lookup times out and unlocks editing");
 
   await select(preview.locator("main"), "src/app/page.tsx:3–24");
   await page.getByText("renders expressions or nested elements").waitFor();

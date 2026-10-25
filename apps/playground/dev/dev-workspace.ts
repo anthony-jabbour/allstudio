@@ -230,23 +230,25 @@ export class DevWorkspace {
     path: string,
     run: () => Promise<TextEditResult>,
   ): Promise<TextEditResult> {
-    const resolved = await this.resolve(path);
-    if (!resolved.ok) {
-      return sourceEditFailure(resolved.reason);
+    // Join the per-file queue synchronously, before any await, so applies
+    // run in call order. A lexically allowed path has no `.`/`..`/empty
+    // segments, so it names one file and can key the queue directly; `run`
+    // still resolves and checks it on the filesystem.
+    if (!isAllowedRelativePath(path)) {
+      return sourceEditFailure("path-rejected");
     }
-    const key = resolved.absolute;
-    const previous = this.writeLocks.get(key) ?? Promise.resolve();
+    const previous = this.writeLocks.get(path) ?? Promise.resolve();
     const result = previous.then(run);
     const settled = result.then(
       () => undefined,
       () => undefined,
     );
-    this.writeLocks.set(key, settled);
+    this.writeLocks.set(path, settled);
     try {
       return await result;
     } finally {
-      if (this.writeLocks.get(key) === settled) {
-        this.writeLocks.delete(key);
+      if (this.writeLocks.get(path) === settled) {
+        this.writeLocks.delete(path);
       }
     }
   }
@@ -260,7 +262,13 @@ export class DevWorkspace {
     if (!resolved.ok) {
       return sourceEditFailure(resolved.reason);
     }
-    const content = await readFile(resolved.absolute, "utf8");
+    const bytes = await readFile(resolved.absolute);
+    const content = bytes.toString("utf8");
+    // Invalid UTF-8 would be replaced by U+FFFD everywhere on write, outside
+    // the edited element too; refuse instead.
+    if (!Buffer.from(content, "utf8").equals(bytes)) {
+      return sourceEditFailure("unsupported-encoding");
+    }
     const currentSha = sha256(content);
     if (currentSha !== edit.expectedSha256) {
       return sourceEditFailure("stale-file");

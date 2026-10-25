@@ -190,10 +190,27 @@ function SourceElementEditor({
         // the message also means the panel reflects the saved file. Editing
         // stays disabled until then, and a newer edit or selection wins.
         const { kind, run } = pending;
-        void locate(oid, "refresh").then((refreshed) => {
-          if (run !== editRun.current) {
+        let settled = false;
+        // The refresh gets the same deadline as the preview check, so a
+        // stalled lookup cannot leave editing locked.
+        const deadline = window.setTimeout(() => {
+          if (settled || run !== editRun.current) {
             return;
           }
+          settled = true;
+          request.current += 1; // drop the late lookup result
+          setBusy(false);
+          setStatus({
+            kind: "error",
+            text: `Saved, and the preview shows the new ${KIND_LABEL[kind]}, but refreshing the source details timed out. Reselect the element to see its current source.`,
+          });
+        }, REFRESH_TIMEOUT_MS);
+        void locate(oid, "refresh").then((refreshed) => {
+          if (settled || run !== editRun.current) {
+            return;
+          }
+          settled = true;
+          window.clearTimeout(deadline);
           setBusy(false);
           if (refreshed) {
             setStatus({

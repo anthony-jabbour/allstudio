@@ -197,28 +197,43 @@ describe("editElementText", () => {
     });
   });
 
-  it("never returns a regenerated patch that touches other code", () => {
-    // Comments plus text are not spliceable; the regenerate fallback must be
-    // confined to the element or be refused.
+  it("refuses a regenerated patch that would reformat other code", () => {
+    // Comments plus text are not spliceable; Babel regeneration would also
+    // reformat `const   spaced   =   1;`, so the edit must be refused.
     const source = `export function P() {
   const   spaced   =   1;
   return <div data-oid="d1">{spaced}<p data-oid="p1">{/* note */}Price {"<"} 5</p></div>;
 }
 `;
-    const result = editElementText(source, "p1", "Free");
-    if (result.ok) {
-      expect(result.strategy).toBe("regenerate");
-      const start = source.indexOf('<p data-oid="p1">');
-      const end = source.indexOf("</p>") + "</p>".length;
-      expect(result.generated.startsWith(source.slice(0, start))).toBe(true);
-      expect(result.generated.endsWith(source.slice(end))).toBe(true);
-    } else {
-      expect(result.reason).toBe("unconfined-patch");
-    }
+    expect(editElementText(source, "p1", "Free")).toEqual({
+      ok: false,
+      reason: "unconfined-patch",
+    });
   });
 });
 
 describe("editElementClassName", () => {
+  it("allows Tailwind arbitrary variants with & and >", () => {
+    const source = `export const X = () => <ul data-oid="u1" className="grid">x</ul>;\n`;
+    const result = editElementClassName(source, "u1", "grid [&>*]:p-2");
+    expect(result.ok && result.generated).toContain(
+      'className="grid [&>*]:p-2"',
+    );
+  });
+
+  it("refuses duplicate className attributes", () => {
+    const source = `export const X = () => <p data-oid="p1" className="a" className="b">x</p>;\n`;
+    expect(editElementClassName(source, "p1", "c")).toEqual({
+      ok: false,
+      reason: "unsupported-className-expression",
+    });
+    const described = describeElement(source, "p1");
+    expect(described.ok && described.className).toEqual({
+      ok: false,
+      reason: "unsupported-className-expression",
+    });
+  });
+
   const source = `export function C({ rest, on }: any) {
   return (
     <section data-oid="s1" className="grid gap-4 md:grid-cols-2">
@@ -282,6 +297,7 @@ describe("editElementClassName", () => {
     "a\nb",
     "a\\b",
     "a<b",
+    "a&amp;b",
   ])("refuses unsafe class value %j", (value) => {
     expect(editElementClassName(source, "s1", value)).toEqual({
       ok: false,

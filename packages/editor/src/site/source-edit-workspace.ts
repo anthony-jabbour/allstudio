@@ -57,6 +57,7 @@ export type SourceEditFailureReason =
   | "stale-file"
   | "invalid-patch"
   | "write-failed"
+  | "unsupported-encoding"
   | "internal-error"
   | "unavailable";
 
@@ -95,7 +96,7 @@ const FAILURE_MESSAGES: Record<SourceEditFailureReason, string> = {
     "This element renders expressions or nested elements. Only static text can be edited here.",
   "unsupported-multiline-text": "Text edits must be a single line.",
   "unsupported-className-value":
-    "Class names cannot contain quotes, braces, angle brackets, backslashes, or line breaks.",
+    "Class names cannot contain quotes, braces, `<`, backslashes, line breaks, or HTML entities such as `&amp;`.",
   "unconfined-patch":
     "This edit would change code outside the selected element (for example by reformatting). Nothing was written.",
   "invalid-request": "The edit request was malformed.",
@@ -107,6 +108,8 @@ const FAILURE_MESSAGES: Record<SourceEditFailureReason, string> = {
   "invalid-patch":
     "The generated patch failed validation. Nothing was written.",
   "write-failed": "Writing the file failed. The original file was kept.",
+  "unsupported-encoding":
+    "The file is not valid UTF-8, so it cannot be rewritten without changing other bytes. Nothing was written.",
   "internal-error":
     "The workspace adapter hit an unexpected error. Check the dev server log.",
   unavailable: "The workspace adapter is not reachable.",
