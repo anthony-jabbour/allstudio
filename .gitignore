@@ -41,3 +41,6 @@ secrets.json
 
 # git (never nest a second repo here)
 **/.git/
+
+# playground editable fixture copies (never commit edits)
+.workspace/

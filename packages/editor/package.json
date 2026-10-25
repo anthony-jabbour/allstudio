@@ -5,7 +5,11 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./shell": "./src/shell/index.ts",
+    "./source-mapper": "./src/source-mapper/index.ts",
+    "./site": "./src/site/source-edit-workspace.ts",
+    "./preview-bridge": "./src/preview-bridge/protocol.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
