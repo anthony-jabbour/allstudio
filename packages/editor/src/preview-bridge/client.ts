@@ -50,6 +50,10 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
       oid,
       tagName: element.tagName.toLowerCase(),
       text: (element.textContent ?? "").slice(0, MAX_TEXT_LENGTH),
+      className: (element.getAttribute("class") ?? "").slice(
+        0,
+        MAX_TEXT_LENGTH,
+      ),
       rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
       instances: matches.length,
     };

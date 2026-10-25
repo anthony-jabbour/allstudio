@@ -13,11 +13,13 @@ const unusedWorkspace: SourceEditWorkspace = {
   locate: async () => sourceEditFailure("unavailable"),
   previewTextEdit: async () => sourceEditFailure("unavailable"),
   applyTextEdit: async () => sourceEditFailure("unavailable"),
+  previewClassEdit: async () => sourceEditFailure("unavailable"),
+  applyClassEdit: async () => sourceEditFailure("unavailable"),
 };
 
 describe("EditorShell", () => {
   it("states the slice scope and needs a workspace to edit", () => {
-    expect(EDITOR_STATUS).toBe("text-edit-slice");
+    expect(EDITOR_STATUS).toBe("text-and-class-edit-slice");
     const html = renderToStaticMarkup(createElement(EditorShell));
     expect(html).toContain("not implemented yet");
     expect(html).toContain("No preview workspace connected.");
@@ -50,7 +52,12 @@ describe("EditorShell", () => {
     expect(html).not.toContain("allow-top-navigation");
     expect(html).not.toContain("allow-popups");
     expect(html).toContain("Preview bridge: connecting");
-    expect(html).toMatch(/<input type="text" disabled=""/);
-    expect(html).toMatch(/<button type="button" disabled="">Apply<\/button>/);
+    expect(html.match(/<input type="text"[^>]*disabled=""/g)).toHaveLength(2);
+    expect(html).toContain(
+      '<button type="button" disabled="">Apply text</button>',
+    );
+    expect(html).toContain(
+      '<button type="button" disabled="">Apply classes</button>',
+    );
   });
 });

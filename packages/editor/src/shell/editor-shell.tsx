@@ -8,7 +8,7 @@ import {
 } from "../site/source-edit-workspace.ts";
 import { usePreviewBridge } from "./use-preview-bridge.ts";
 
-export const EDITOR_STATUS = "text-edit-slice" as const;
+export const EDITOR_STATUS = "text-and-class-edit-slice" as const;
 
 /** How long to wait for hot reload before reloading the preview once. */
 const REFRESH_TIMEOUT_MS = 10_000;
@@ -22,15 +22,37 @@ export interface EditorShellProps {
 
 type Status = { kind: "info" | "success" | "error"; text: string } | null;
 
+type EditKind = "text" | "className";
+
 interface PendingRefresh {
   oid: string;
-  text: string;
+  kind: EditKind;
+  /** Value the preview must show before the edit counts as visible. */
+  value: string;
   reloaded: boolean;
 }
 
-function normalizeRenderedText(text: string): string {
+function normalizeWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
+
+function previewShows(
+  element: PreviewElementSnapshot,
+  pending: PendingRefresh,
+): boolean {
+  const rendered = pending.kind === "text" ? element.text : element.className;
+  return normalizeWhitespace(rendered) === normalizeWhitespace(pending.value);
+}
+
+const NOOP_SUBJECT: Record<EditKind, string> = {
+  text: "the text already matches",
+  className: "the classes already match",
+};
+
+const KIND_LABEL: Record<EditKind, string> = {
+  text: "text",
+  className: "classes",
+};
 
 export function EditorShell({
   manifest,
@@ -41,11 +63,12 @@ export function EditorShell({
     <main className="editor-shell">
       <header className="editor-header">
         <p>allstudio playground</p>
-        <h1>Source text editing</h1>
+        <h1>Source editing</h1>
         <p>
           Shared editor package status: {EDITOR_STATUS}. Select a rendered
-          element, edit its static text, and the JSX source file is updated.
-          Layout, style, and structure editing are not implemented yet.
+          element, edit its static text or its static className, and the JSX
+          source file is updated. Layout dragging and structure editing are not
+          implemented yet.
         </p>
         {manifest ? (
           <p>
@@ -56,7 +79,7 @@ export function EditorShell({
         )}
       </header>
       {previewUrl && workspace ? (
-        <SourceTextEditor previewUrl={previewUrl} workspace={workspace} />
+        <SourceElementEditor previewUrl={previewUrl} workspace={workspace} />
       ) : (
         <p>No preview workspace connected.</p>
       )}
@@ -64,7 +87,7 @@ export function EditorShell({
   );
 }
 
-function SourceTextEditor({
+function SourceElementEditor({
   previewUrl,
   workspace,
 }: {
@@ -77,6 +100,7 @@ function SourceTextEditor({
   const [selected, setSelected] = useState<PreviewElementSnapshot | null>(null);
   const [source, setSource] = useState<SourceElementInfo | null>(null);
   const [draft, setDraft] = useState("");
+  const [classDraft, setClassDraft] = useState("");
   const [diff, setDiff] = useState("");
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
@@ -98,14 +122,13 @@ function SourceTextEditor({
         setStatus({ kind: "error", text: result.message });
         return;
       }
-      setSource(result.element);
-      setDraft(result.element.text.ok ? result.element.text.text : "");
-      if (!result.element.text.ok) {
-        setStatus({
-          kind: "error",
-          text: describeSourceEditFailure(result.element.text.reason),
-        });
-      } else if (!keepStatus) {
+      const { element } = result;
+      setSource(element);
+      setDraft(element.text.ok ? element.text.text : "");
+      setClassDraft(
+        element.className.ok ? (element.className.value ?? "") : "",
+      );
+      if (!keepStatus) {
         setStatus(null);
       }
     },
@@ -116,10 +139,11 @@ function SourceTextEditor({
     onSelect(clickedTag, element) {
       selection.current += 1;
       request.current += 1;
-      // Clear the previous element's source and draft right away, so editing
-      // stays disabled until this element's lookup finishes.
+      // Clear the previous element's source and drafts right away, so
+      // editing stays disabled until this element's lookup finishes.
       setSource(null);
       setDraft("");
+      setClassDraft("");
       setDiff("");
       setPending(null);
       setStatus(null);
@@ -134,7 +158,7 @@ function SourceTextEditor({
       if (element.instances > 1) {
         setStatus({
           kind: "error",
-          text: `This source element renders ${element.instances} times (e.g. in a list). Editing one instance is not supported.`,
+          text: `This source element renders ${element.instances} times (e.g. in a list or a reused component). Editing one instance is not supported.`,
         });
         return;
       }
@@ -145,16 +169,11 @@ function SourceTextEditor({
         return;
       }
       setSelected(element);
-      if (
-        pending &&
-        element &&
-        normalizeRenderedText(element.text) ===
-          normalizeRenderedText(pending.text)
-      ) {
+      if (pending && element && previewShows(element, pending)) {
         setPending(null);
         setStatus({
           kind: "success",
-          text: `Saved to ${source?.path ?? "source"} and the preview shows the new text.`,
+          text: `Saved to ${source?.path ?? "source"} and the preview shows the new ${KIND_LABEL[pending.kind]}.`,
         });
         void locate(oid, true);
       }
@@ -174,29 +193,35 @@ function SourceTextEditor({
       setPending(null);
       setStatus({
         kind: "error",
-        text: "The file was saved, but the preview did not show the new text. Check the preview server log.",
+        text: `The file was saved, but the preview did not show the new ${KIND_LABEL[pending.kind]}. Check the preview server log.`,
       });
     }, REFRESH_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
   }, [pending]);
 
-  const editable = Boolean(source?.text.ok) && !busy;
+  const textEditable = Boolean(source?.text.ok) && !busy;
+  const classEditable = Boolean(source?.className.ok) && !busy;
 
-  const edit = async (apply: boolean) => {
+  const edit = async (kind: EditKind, apply: boolean) => {
     if (!source || !selected) {
       return;
     }
     const selectionAtStart = selection.current;
     setBusy(true);
-    const requestBody = {
+    const target = {
       path: source.path,
       oid: selected.oid,
       expectedSha256: source.sha256,
-      text: draft,
     };
-    const result = apply
-      ? await workspace.applyTextEdit(requestBody)
-      : await workspace.previewTextEdit(requestBody);
+    const result =
+      kind === "text"
+        ? await (apply ? workspace.applyTextEdit : workspace.previewTextEdit)({
+            ...target,
+            text: draft,
+          })
+        : await (apply ? workspace.applyClassEdit : workspace.previewClassEdit)(
+            { ...target, className: classDraft },
+          );
     setBusy(false);
     if (selectionAtStart !== selection.current) {
       return;
@@ -209,7 +234,7 @@ function SourceTextEditor({
     if (result.noop) {
       setStatus({
         kind: "info",
-        text: "No change: the text already matches. The file was not rewritten.",
+        text: `No change: ${NOOP_SUBJECT[kind]}. The file was not rewritten.`,
       });
       return;
     }
@@ -223,13 +248,25 @@ function SourceTextEditor({
     setSource({
       ...source,
       sha256: result.sha256,
-      text: { ok: true, text: draft },
+      ...(kind === "text"
+        ? { text: { ok: true, text: draft } }
+        : {
+            className: {
+              ok: true,
+              value: classDraft === "" ? null : classDraft,
+            },
+          }),
     });
     setStatus({
       kind: "info",
       text: `Saved to ${source.path}. Waiting for the preview to refresh…`,
     });
-    setPending({ oid: selected.oid, text: draft, reloaded: false });
+    setPending({
+      oid: selected.oid,
+      kind,
+      value: kind === "text" ? draft : classDraft,
+      reloaded: false,
+    });
     bridge.track(selected.oid);
   };
 
@@ -297,24 +334,60 @@ function SourceTextEditor({
           <input
             type="text"
             value={draft}
-            disabled={!editable}
+            disabled={!textEditable}
             onChange={(event) => setDraft(event.target.value)}
           />
         </label>
+        {source && !source.text.ok ? (
+          <p className="field-note">
+            {describeSourceEditFailure(source.text.reason)}
+          </p>
+        ) : null}
         <div className="actions">
           <button
             type="button"
-            disabled={!editable}
-            onClick={() => void edit(false)}
+            disabled={!textEditable}
+            onClick={() => void edit("text", false)}
           >
-            Preview patch
+            Preview text patch
           </button>
           <button
             type="button"
-            disabled={!editable}
-            onClick={() => void edit(true)}
+            disabled={!textEditable}
+            onClick={() => void edit("text", true)}
           >
-            Apply
+            Apply text
+          </button>
+        </div>
+        <label className="text-field">
+          Classes
+          <input
+            type="text"
+            value={classDraft}
+            disabled={!classEditable}
+            spellCheck={false}
+            onChange={(event) => setClassDraft(event.target.value)}
+          />
+        </label>
+        {source && !source.className.ok ? (
+          <p className="field-note">
+            {describeSourceEditFailure(source.className.reason)}
+          </p>
+        ) : null}
+        <div className="actions">
+          <button
+            type="button"
+            disabled={!classEditable}
+            onClick={() => void edit("className", false)}
+          >
+            Preview class patch
+          </button>
+          <button
+            type="button"
+            disabled={!classEditable}
+            onClick={() => void edit("className", true)}
+          >
+            Apply classes
           </button>
         </div>
         {status ? (

@@ -103,3 +103,16 @@ code {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.field-note {
+  margin: 0.25rem 0 0;
+  font-size: 0.85em;
+  color: #5c5752;
+}
+
+.fixture-picker {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
