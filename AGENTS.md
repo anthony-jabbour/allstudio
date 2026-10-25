@@ -162,3 +162,11 @@ Recommendation: READY FOR REVIEW | BLOCKED | INCOMPLETE
 ```
 
 **No evidence = not done. No founder decision = no invented product decision. No eligible reusable solution = research, ask, then build deliberately.**
+
+## 9. Documentation home (Notion HQ)
+
+Private HQ (not a public share): https://app.notion.com/p/4040b5f7282081f7add6d425233aafb0  
+Agent Map: https://app.notion.com/p/4040b5f7282081508d6fde75eb3ba91a  
+Repo pointers: `docs/notion/README.md`, `docs/notion/NOTION_MAP.md`.
+
+This file, `RoadMap.md`, architecture docs, ADRs, and passing tests still win over Notion. Query HQ by feature/ADR/phase; do not ingest the whole workspace. If Notion is unreachable, continue from this repository. After a merge, add a Changelog row and update the matching Feature.

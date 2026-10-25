@@ -14,6 +14,7 @@
 5. For behaviors inspired by **Paper, Framer, Penpot, Figma**, assess whether an authorized **REA** investigation would resolve implementation questions. Public open-source code is a first-class source; for closed products, rely on authorized observable behavior, not assumptions about private internals.
 6. List unresolved product decisions. **Ask the founder before making any material choice**. You may do read-only research while awaiting a decision, but do not implement the blocked choice.
 7. Declare the smallest independently reviewable files/modules to change and the validation steps to run.
+8. If Notion is available, fetch allstudio HQ → Start Here / Agent Map and the matching Feature/ADR/Board row (`docs/notion/NOTION_MAP.md`). If Notion is not available, continue from this repository; do not block the task.
 
 ## Founder-first decision protocol (mandatory)
 
