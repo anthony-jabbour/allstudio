@@ -218,6 +218,51 @@ describe("DevWorkspace text edits", () => {
     });
   });
 
+  it("saves text that only looks like a data-oid attribute", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    const { oid, element } = await heading(workspace);
+    const text = 'Show data-oid="example"';
+    const result = await workspace.applyTextEdit({
+      path: element.path,
+      oid,
+      expectedSha256: element.sha256,
+      text,
+    });
+    expect(result).toMatchObject({ ok: true, written: true });
+    const relocated = await workspace.locate(oid);
+    expect(relocated.ok && relocated.element.text).toEqual({ ok: true, text });
+  });
+
+  it("serializes concurrent applies so one reports a conflict", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    const { oid, element } = await heading(workspace);
+    const content = await readFile(pageFile, "utf8");
+    const paragraphOid =
+      content.match(
+        /<p className="max-w-xl text-lg[^>]*data-oid="([^"]+)"/,
+      )?.[1] ?? "";
+    const results = await Promise.all([
+      workspace.applyTextEdit({
+        path: element.path,
+        oid,
+        expectedSha256: element.sha256,
+        text: "First edit",
+      }),
+      workspace.applyTextEdit({
+        path: element.path,
+        oid: paragraphOid,
+        expectedSha256: element.sha256,
+        text: "Second edit",
+      }),
+    ]);
+    expect(results[0]).toMatchObject({ ok: true, written: true });
+    expect(results[1]).toMatchObject({ ok: false, reason: "stale-file" });
+    const after = await readFile(pageFile, "utf8");
+    expect(after).toContain("First edit");
+    expect(after).not.toContain("Second edit");
+    expect(results[0].ok && results[0].sha256).toBe(sha256(after));
+  });
+
   it("does not persist a patch that fails validation", async () => {
     const before = await readFile(pageFile, "utf8");
     const broken = await DevWorkspace.open(workspaceDir, {

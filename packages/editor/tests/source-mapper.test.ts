@@ -7,6 +7,7 @@ import {
   describeElement,
   formatLineDiff,
   instrumentSource,
+  listOids,
   locateSource,
   previewPatch,
 } from "../src/index.ts";
@@ -432,5 +433,16 @@ describe("line diff", () => {
     const diff = createLineDiff("same\n", "same\n");
     expect(diff).toEqual({ changed: false, hunks: [] });
     expect(formatLineDiff(diff, "a.tsx")).toBe("");
+  });
+});
+
+describe("listOids", () => {
+  it("lists JSX data-oid attributes and ignores look-alike text", () => {
+    const source = `export function P() {
+  return <div data-oid="a1"><p data-oid="b2">data-oid="fake"</p>{"data-oid=\\"x\\""}</div>;
+}
+`;
+    expect(listOids(source)).toEqual(["a1", "b2"]);
+    expect(listOids("export default (")).toBeNull();
   });
 });

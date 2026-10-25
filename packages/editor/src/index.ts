@@ -45,6 +45,7 @@ export {
   describeElement,
   formatLineDiff,
   instrumentSource,
+  listOids,
   locateSource,
   previewPatch,
 } from "./source-mapper/index.ts";

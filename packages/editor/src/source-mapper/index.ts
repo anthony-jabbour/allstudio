@@ -103,6 +103,28 @@ export function describeElement(
   return { ok: true, location, text };
 }
 
+/**
+ * Every `data-oid` attribute value on a JSX element, in source order, or
+ * null when the content does not parse. Text that merely looks like an
+ * attribute is not counted.
+ */
+export function listOids(content: string): string[] | null {
+  const ast = getAstFromContent(content);
+  if (!ast) {
+    return null;
+  }
+  const oids: string[] = [];
+  traverse(ast, {
+    JSXOpeningElement(path: NodePath<T.JSXOpeningElement>) {
+      const oid = getOidFromJsxElement(path.node);
+      if (oid !== null) {
+        oids.push(oid);
+      }
+    },
+  });
+  return oids;
+}
+
 export function previewPatch(
   content: string,
   edit: ElementEdit,

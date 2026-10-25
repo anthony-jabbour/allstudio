@@ -119,9 +119,25 @@ try {
   assert.equal((await stat(pageFile)).mtimeMs, mtimeBefore);
   record("no-op edit does not rewrite the file");
 
+  // --- Selection change while the lookup is in flight -------------------
+  await selectHeading();
+  await textInput.fill("Draft meant for the heading");
+  await page.route("**/__allstudio/workspace/locate", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  await preview.locator("main p").nth(1).click();
+  assert.ok(await textInput.isDisabled(), "editing disabled during lookup");
+  assert.equal(await textInput.inputValue(), "");
+  await page.unroute("**/__allstudio/workspace/locate");
+  await page.getByText("src/app/page.tsx:13–").waitFor();
+  assert.notEqual(await textInput.inputValue(), "Draft meant for the heading");
+  record("old draft is cleared while a new selection is looked up");
+
   // --- Stale write ------------------------------------------------------
   await selectHeading();
-  const external = `${await readFile(pageFile, "utf8")}\n`;
+  const beforeExternal = await readFile(pageFile, "utf8");
+  const external = `${beforeExternal}\n`;
   await writeFile(pageFile, external, "utf8");
   await textInput.fill("Should not be written");
   await page.getByRole("button", { name: "Apply" }).click();
@@ -129,6 +145,8 @@ try {
     .getByText("The file changed since this element was selected")
     .waitFor();
   assert.equal(await readFile(pageFile, "utf8"), external);
+  // Undo the simulated external edit so the script can be re-run.
+  await writeFile(pageFile, beforeExternal, "utf8");
   record("external change since selection reports a conflict");
 
   // --- Dynamic children (layout <body>{children}</body>) ------------------

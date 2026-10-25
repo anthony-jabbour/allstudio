@@ -31,6 +31,7 @@ import {
   createLineDiff,
   describeElement,
   formatLineDiff,
+  listOids,
   previewPatch,
 } from "@allstudio/editor/source-mapper";
 
@@ -83,6 +84,7 @@ export function isAllowedRelativePath(path: unknown): path is string {
 
 export class DevWorkspace {
   private readonly patch: PatchFunction;
+  private readonly writeLocks = new Map<string, Promise<void>>();
 
   private constructor(
     readonly root: string,
@@ -195,8 +197,31 @@ export class DevWorkspace {
     return this.textEdit(request, false);
   }
 
-  applyTextEdit(request: TextEditRequest): Promise<TextEditResult> {
-    return this.textEdit(request, true);
+  /**
+   * Applies run one at a time per file, and the hash check happens inside
+   * that section, so two concurrent applies cannot both pass it and the
+   * second one reports `stale-file` instead of overwriting the first.
+   */
+  async applyTextEdit(request: TextEditRequest): Promise<TextEditResult> {
+    const resolved = await this.resolve(request.path);
+    if (!resolved.ok) {
+      return sourceEditFailure(resolved.reason);
+    }
+    const key = resolved.absolute;
+    const previous = this.writeLocks.get(key) ?? Promise.resolve();
+    const run = previous.then(() => this.textEdit(request, true));
+    const settled = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.writeLocks.set(key, settled);
+    try {
+      return await run;
+    } finally {
+      if (this.writeLocks.get(key) === settled) {
+        this.writeLocks.delete(key);
+      }
+    }
   }
 
   private async textEdit(
@@ -267,7 +292,8 @@ export class DevWorkspace {
       };
     }
 
-    // Re-check right before the write to narrow the race with external edits.
+    // Re-check right before the write to narrow the race with edits made
+    // outside this adapter (applies through it are already serialized).
     const latest = await readFile(resolved.absolute, "utf8");
     if (sha256(latest) !== currentSha) {
       return sourceEditFailure("stale-file");
@@ -302,9 +328,15 @@ function validatePatch(
   if (described.text.text !== request.text) {
     return "invalid-patch";
   }
-  const oids = (source: string) =>
-    [...source.matchAll(/data-oid="([^"]+)"/g)].map((match) => match[1]).sort();
-  if (oids(original).join("\n") !== oids(generated).join("\n")) {
+  // Compare JSX attributes from the AST, not a text scan, so edited text
+  // that happens to contain `data-oid="…"` is not mistaken for an attribute.
+  const before = listOids(original);
+  const after = listOids(generated);
+  if (
+    !before ||
+    !after ||
+    [...before].sort().join("\n") !== [...after].sort().join("\n")
+  ) {
     return "invalid-patch";
   }
   return null;

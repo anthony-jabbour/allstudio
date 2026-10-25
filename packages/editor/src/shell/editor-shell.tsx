@@ -82,6 +82,9 @@ function SourceTextEditor({
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingRefresh | null>(null);
   const request = useRef(0);
+  // Bumped on every selection so late edit responses for an older
+  // selection are ignored.
+  const selection = useRef(0);
 
   const locate = useCallback(
     async (oid: string, keepStatus = false) => {
@@ -111,12 +114,17 @@ function SourceTextEditor({
 
   const bridge = usePreviewBridge(frame, previewOrigin, {
     onSelect(clickedTag, element) {
+      selection.current += 1;
+      request.current += 1;
+      // Clear the previous element's source and draft right away, so editing
+      // stays disabled until this element's lookup finishes.
+      setSource(null);
+      setDraft("");
       setDiff("");
       setPending(null);
+      setStatus(null);
       setSelected(element);
       if (!element) {
-        request.current += 1;
-        setSource(null);
         setStatus({
           kind: "error",
           text: `No source mapping: the clicked <${clickedTag || "?"}> has no data-oid element around it.`,
@@ -124,8 +132,6 @@ function SourceTextEditor({
         return;
       }
       if (element.instances > 1) {
-        request.current += 1;
-        setSource(null);
         setStatus({
           kind: "error",
           text: `This source element renders ${element.instances} times (e.g. in a list). Editing one instance is not supported.`,
@@ -180,6 +186,7 @@ function SourceTextEditor({
     if (!source || !selected) {
       return;
     }
+    const selectionAtStart = selection.current;
     setBusy(true);
     const requestBody = {
       path: source.path,
@@ -191,6 +198,9 @@ function SourceTextEditor({
       ? await workspace.applyTextEdit(requestBody)
       : await workspace.previewTextEdit(requestBody);
     setBusy(false);
+    if (selectionAtStart !== selection.current) {
+      return;
+    }
     if (!result.ok) {
       setStatus({ kind: "error", text: result.message });
       return;

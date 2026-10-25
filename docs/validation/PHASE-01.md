@@ -44,10 +44,15 @@ playground-only; Electron will implement the same contract over IPC in Phase 2.
   in or out) is rejected. The source scan never follows symlinks. Files over
   1 MB are rejected. No file creation or deletion API exists.
 - **Concurrency:** every edit carries the sha256 from selection time; mismatch →
-  `stale-file` (HTTP 409). The hash is checked again just before the rename.
+  `stale-file` (HTTP 409). Applies to the same file are serialized and the
+  hash is checked inside that section, so two concurrent applies cannot both
+  win; it is checked again just before the rename for outside edits.
+- **UI selection race:** a new selection clears the previous source and draft
+  immediately (editing is disabled until its lookup returns), and edit
+  responses for an older selection are ignored.
 - **Patch validation:** the generated file must parse, the oid must resolve to
   exactly one element whose static text equals the request, and the multiset of
-  `data-oid`s must be unchanged. Otherwise `invalid-patch`, nothing written.
+  JSX `data-oid` attributes (read from the AST, not a text scan) must be unchanged. Otherwise `invalid-patch`, nothing written.
 - **API guard:** POST only, `Origin` must equal `http://localhost:5173`,
   `Sec-Fetch-Site` (when sent) must be `same-origin`, JSON content type,
   per-start 256-bit session token in `x-allstudio-session` (timing-safe compare),
@@ -65,12 +70,12 @@ playground-only; Electron will implement the same contract over IPC in Phase 2.
 | Command | Exit | Observed |
 |---|---|---|
 | `bun install --frozen-lockfile` | 0 | 143 packages; no dependency changes in this slice |
-| `bun run test` | 0 | Vitest 3.2.7 — 7 files, **98 passed** (source-mapper 23, preview-bridge 19, editor-shell 3, dev-workspace 27, workspace-api 19, manifest 5, public-boundary 2) |
+| `bun run test` | 0 | Vitest 3.2.7 — 7 files, **101 passed** (source-mapper 24, preview-bridge 19, editor-shell 3, dev-workspace 29, workspace-api 19, manifest 5, public-boundary 2) |
 | `bun run typecheck` | 0 | project, editor, playground, fixture `Exited with code 0` |
 | `bun run lint` | 0 | `Checked 56 files … No fixes applied.` |
 | `bun run validate:public-boundary` | 0 | `Public boundary check passed (99 files scanned).` |
 | `bun run build` | 0 | playground JS 234 kB (was 3,550 kB: Babel no longer ships to the browser); fixture Next.js 16.4.3 static build |
-| `bun run dev` + `node scripts/e2e/text-edit.e2e.mjs <out>` | 0 | Playwright/Chromium, **11 checks passed**, `trace.zip` + screenshots captured |
+| `bun run dev` + `node scripts/e2e/text-edit.e2e.mjs <out>` | 0 | Playwright/Chromium, **12 checks passed**, `trace.zip` + screenshots captured |
 
 ### Browser workflow evidence (Playwright, real servers)
 
@@ -82,6 +87,7 @@ PASS select heading resolves JSX source — src/app/page.tsx:7–12
 PASS patch preview shows diff without writing
 PASS apply writes JSX file and preview updates — … (preview refreshed 844 ms after Apply)
 PASS no-op edit does not rewrite the file
+PASS old draft is cleared while a new selection is looked up
 PASS external change since selection reports a conflict
 PASS dynamic {children} element is refused
 PASS DOM oid missing from source is refused
@@ -89,7 +95,7 @@ PASS ambiguous rendered oid is refused
 PASS forged preview messages are rejected
 PASS workspace API rejects unauthorized paths, tokens and the preview origin
 PASS examples/ fixture file is unchanged
-11 checks passed.
+12 checks passed.
 ```
 
 Source diff written by the first Apply on a fresh workspace (from the editor's
@@ -131,6 +137,9 @@ The E2E asserts that every byte before the heading's `id` attribute and from
 | Forged nonce from the preview frame | unit + E2E | rejected, shown as `rejected a preview message (stale-nonce)` |
 | Messages from another origin/window, before handshake, malformed shapes | unit | rejected (`unexpected-origin`, `unexpected-source`, `not-connected`, `malformed`) |
 | No-op edit | unit + E2E | `noop: true`; file mtime unchanged |
+| Two concurrent applies on one file | unit | first writes, second `stale-file`; no lost update |
+| New selection while the previous draft is still in the field | E2E (lookup delayed 1.5 s) | field cleared and disabled until the new lookup returns |
+| Text containing `data-oid="…"` | unit | saved (not mistaken for an attribute) |
 
 ### Transformations and limitations (documented, not fixed)
 
