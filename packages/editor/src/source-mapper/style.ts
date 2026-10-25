@@ -3,11 +3,13 @@
  * Upstream: https://github.com/onlook-dev/onlook
  * Commit: 423e2e924366419e418ee049093872d535eea41a
  * Source: packages/parser/src/code-edit/style.ts
- * Modifications: refuse expression className instead of appending call arguments.
+ * Modifications: refuse expression className instead of appending call arguments;
+ * adds original `readClassName`.
  * Copyright 2024 On Off, Inc.
  */
 import { twMerge } from "tailwind-merge";
 import { type T, t } from "./babel.ts";
+import type { ElementClassName } from "./types.ts";
 
 export type ClassEditResult = "ok" | "unsupported-className-expression";
 
@@ -60,4 +62,30 @@ export function tryAddClassToNode(
   }
 
   return "unsupported-className-expression";
+}
+
+/**
+ * Reads a static `className` string (allstudio). Uses the same refusal rules
+ * as `tryAddClassToNode`: expressions and spreads that could override the
+ * attribute are not editable.
+ */
+export function readClassName(node: T.JSXElement): ElementClassName {
+  const attributes = node.openingElement.attributes;
+  const index = attributes.findIndex(
+    (attr) => t.isJSXAttribute(attr) && attr.name.name === "className",
+  );
+  if (index < 0) {
+    return hasJsxSpread(attributes)
+      ? { ok: false, reason: "unsupported-className-expression" }
+      : { ok: true, value: null };
+  }
+  const attr = attributes[index] as T.JSXAttribute;
+  if (
+    !attr.value ||
+    !t.isStringLiteral(attr.value) ||
+    hasJsxSpread(attributes, index + 1)
+  ) {
+    return { ok: false, reason: "unsupported-className-expression" };
+  }
+  return { ok: true, value: attr.value.value };
 }

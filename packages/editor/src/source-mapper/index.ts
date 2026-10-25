@@ -2,12 +2,21 @@ import { type NodePath, type T, traverse } from "./babel.ts";
 import { addOidsToAst, getOidFromJsxElement } from "./ids.ts";
 import { createSourceLocations } from "./locations.ts";
 import { getAstFromContent, getContentFromAst } from "./parse.ts";
-import { tryAddClassToNode } from "./style.ts";
+import {
+  insertOidsPreservingFormat,
+  isConfinedEdit,
+  spliceElementClassName,
+  spliceElementText,
+} from "./splice.ts";
+import { readClassName, tryAddClassToNode } from "./style.ts";
 import { readNodeTextContent, updateNodeTextContent } from "./text.ts";
 import type {
   DescribeElementResult,
+  ElementClassName,
   ElementEdit,
+  ElementEditResult,
   ElementTextContent,
+  InstrumentOptions,
   InstrumentResult,
   LocateSourceOptions,
   PreviewPatchResult,
@@ -18,8 +27,11 @@ export type { DiffHunk, DiffLine, LineDiff } from "./diff.ts";
 export { createLineDiff, formatLineDiff } from "./diff.ts";
 export type {
   DescribeElementResult,
+  ElementClassName,
   ElementEdit,
+  ElementEditResult,
   ElementTextContent,
+  InstrumentOptions,
   InstrumentResult,
   LocateSourceOptions,
   PreviewPatchResult,
@@ -29,13 +41,22 @@ export type {
 
 const DEFAULT_FILENAME = "untitled.tsx";
 
-export function instrumentSource(content: string): InstrumentResult {
+export function instrumentSource(
+  content: string,
+  options: InstrumentOptions = {},
+): InstrumentResult {
   const ast = getAstFromContent(content);
   if (!ast) {
     return { ok: false, reason: "parse-failed" };
   }
-  addOidsToAst(ast);
-  const generated = getContentFromAst(ast, content);
+  const preserved = options.preserveFormatting
+    ? insertOidsPreservingFormat(content)
+    : null;
+  let generated = preserved;
+  if (generated === null) {
+    addOidsToAst(ast);
+    generated = getContentFromAst(ast, content);
+  }
   const mapped = getAstFromContent(generated);
   const locations = mapped
     ? createSourceLocations(mapped, DEFAULT_FILENAME)
@@ -90,17 +111,22 @@ export function describeElement(
     ok: false,
     reason: "unsupported-dynamic-children",
   };
+  let className: ElementClassName = {
+    ok: false,
+    reason: "unsupported-className-expression",
+  };
   traverse(ast, {
     JSXElement(path: NodePath<T.JSXElement>) {
       if (getOidFromJsxElement(path.node.openingElement) !== oid) {
         return;
       }
       text = readNodeTextContent(path.node);
+      className = readClassName(path.node);
       path.stop();
     },
   });
 
-  return { ok: true, location, text };
+  return { ok: true, location, text, className };
 }
 
 /**
@@ -184,4 +210,92 @@ export function previewPatch(
     original: content,
     generated: getContentFromAst(ast, content),
   };
+}
+
+/**
+ * Sets the static text of one element. Splices only the text bytes when the
+ * element's children have a simple shape; otherwise regenerates with
+ * `previewPatch` and refuses (`unconfined-patch`) if that changed bytes
+ * outside the element.
+ */
+export function editElementText(
+  content: string,
+  oid: string,
+  text: string,
+): ElementEditResult {
+  const spliced = spliceElementText(content, oid, text);
+  if (spliced.ok) {
+    return {
+      ok: true,
+      original: content,
+      generated: spliced.generated,
+      strategy: "splice",
+    };
+  }
+  if (spliced.reason !== "not-spliceable") {
+    return { ok: false, reason: spliced.reason };
+  }
+  const range = elementRange(content, oid);
+  const patched = previewPatch(content, { oid, textContent: text });
+  if (!patched.ok) {
+    return patched;
+  }
+  if (!range || !isConfinedEdit(content, patched.generated, ...range)) {
+    return { ok: false, reason: "unconfined-patch" };
+  }
+  return {
+    ok: true,
+    original: content,
+    generated: patched.generated,
+    strategy: "regenerate",
+  };
+}
+
+/**
+ * Replaces the whole static `className` string of one element (empty
+ * removes the attribute). Always a splice; never reformats the file.
+ */
+export function editElementClassName(
+  content: string,
+  oid: string,
+  className: string,
+): ElementEditResult {
+  const spliced = spliceElementClassName(content, oid, className);
+  if (!spliced.ok) {
+    return {
+      ok: false,
+      reason:
+        spliced.reason === "not-spliceable"
+          ? "unconfined-patch"
+          : spliced.reason,
+    };
+  }
+  return {
+    ok: true,
+    original: content,
+    generated: spliced.generated,
+    strategy: "splice",
+  };
+}
+
+function elementRange(content: string, oid: string): [number, number] | null {
+  const ast = getAstFromContent(content);
+  if (!ast) {
+    return null;
+  }
+  let range: [number, number] | null = null;
+  traverse(ast, {
+    JSXElement(path: NodePath<T.JSXElement>) {
+      const { start, end } = path.node;
+      if (
+        getOidFromJsxElement(path.node.openingElement) === oid &&
+        typeof start === "number" &&
+        typeof end === "number"
+      ) {
+        range = [start, end];
+        path.stop();
+      }
+    },
+  });
+  return range;
 }
