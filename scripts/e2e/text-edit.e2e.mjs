@@ -461,6 +461,36 @@ try {
     "new Tailwind class is compiled and rendered",
     `${colorBefore} → ${colorAfter}`,
   );
+  // --- Editing stays locked until a save is confirmed ----------------------
+  await selectHeading();
+  await page.route(
+    "**/__allstudio/workspace/*/locate",
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await route.continue().catch(() => {});
+    },
+    { times: 1 },
+  );
+  await textInput.fill("Aurora Atelier — locked while saving");
+  await button("Apply text").click();
+  // The preview updates first; the delayed post-save lookup then holds the
+  // confirmation. During that window nothing can start a second edit.
+  await preview
+    .locator("#hero-heading", { hasText: "locked while saving" })
+    .waitFor({ timeout: 30_000 });
+  assert.ok(await classInput.isDisabled(), "classes locked until confirmed");
+  assert.ok(await button("Apply classes").isDisabled());
+  assert.equal(
+    await page.getByText("the preview shows the new text").count(),
+    0,
+    "no success message before the refresh",
+  );
+  await page
+    .getByText("the preview shows the new text")
+    .waitFor({ timeout: 30_000 });
+  assert.ok(!(await classInput.isDisabled()), "editing available again");
+  record("editing is locked from Apply until the save is confirmed");
+
   await select(preview.locator("main"), "src/app/page.tsx:3–24");
   await page.getByText("renders expressions or nested elements").waitFor();
   assert.ok(await textInput.isDisabled(), "layout text is not editable");

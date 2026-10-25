@@ -30,6 +30,8 @@ interface PendingRefresh {
   /** Value the preview must show before the edit counts as visible. */
   value: string;
   reloaded: boolean;
+  /** The edit run this confirmation belongs to. */
+  run: number;
 }
 
 function normalizeWhitespace(text: string): string {
@@ -109,6 +111,9 @@ function SourceElementEditor({
   // Bumped on every selection so late edit responses for an older
   // selection are ignored.
   const selection = useRef(0);
+  // Bumped on every edit and selection. A save confirmation only reports
+  // success if no newer edit or selection started since that save.
+  const editRun = useRef(0);
 
   const locate = useCallback(
     /**
@@ -147,6 +152,8 @@ function SourceElementEditor({
     onSelect(clickedTag, element) {
       selection.current += 1;
       request.current += 1;
+      editRun.current += 1;
+      setBusy(false);
       // Clear the previous element's source and drafts right away, so
       // editing stays disabled until this element's lookup finishes.
       setSource(null);
@@ -180,13 +187,18 @@ function SourceElementEditor({
       if (pending && element && previewShows(element, pending)) {
         setPending(null);
         // Report success only once the source details are refreshed, so
-        // the message also means the panel reflects the saved file.
-        const label = KIND_LABEL[pending.kind];
+        // the message also means the panel reflects the saved file. Editing
+        // stays disabled until then, and a newer edit or selection wins.
+        const { kind, run } = pending;
         void locate(oid, "refresh").then((refreshed) => {
+          if (run !== editRun.current) {
+            return;
+          }
+          setBusy(false);
           if (refreshed) {
             setStatus({
               kind: "success",
-              text: `Saved to ${refreshed.path} and the preview shows the new ${label}.`,
+              text: `Saved to ${refreshed.path} and the preview shows the new ${KIND_LABEL[kind]}.`,
             });
           }
         });
@@ -205,6 +217,7 @@ function SourceElementEditor({
         return;
       }
       setPending(null);
+      setBusy(false);
       setStatus({
         kind: "error",
         text: `The file was saved, but the preview did not show the new ${KIND_LABEL[pending.kind]}. Check the preview server log.`,
@@ -221,6 +234,7 @@ function SourceElementEditor({
       return;
     }
     const selectionAtStart = selection.current;
+    const run = ++editRun.current;
     setBusy(true);
     const target = {
       path: source.path,
@@ -236,9 +250,12 @@ function SourceElementEditor({
         : await (apply ? workspace.applyClassEdit : workspace.previewClassEdit)(
             { ...target, className: classDraft },
           );
-    setBusy(false);
-    if (selectionAtStart !== selection.current) {
+    if (selectionAtStart !== selection.current || run !== editRun.current) {
       return;
+    }
+    if (!result.ok || !result.written) {
+      // Nothing to confirm in the preview: editing is available again.
+      setBusy(false);
     }
     if (!result.ok) {
       setStatus({ kind: "error", text: result.message });
@@ -280,6 +297,7 @@ function SourceElementEditor({
       kind,
       value: kind === "text" ? draft : classDraft,
       reloaded: false,
+      run,
     });
     bridge.track(selected.oid);
   };
