@@ -115,16 +115,19 @@ function SourceElementEditor({
      * `refresh` re-reads location and hash after a confirmed save without
      * touching the drafts, so an unsaved edit in the other field survives.
      */
-    async (oid: string, mode: "select" | "refresh" = "select") => {
+    async (
+      oid: string,
+      mode: "select" | "refresh" = "select",
+    ): Promise<SourceElementInfo | null> => {
       const id = ++request.current;
       const result = await workspace.locate(oid);
       if (id !== request.current) {
-        return;
+        return null;
       }
       if (!result.ok) {
         setSource(null);
         setStatus({ kind: "error", text: result.message });
-        return;
+        return null;
       }
       const { element } = result;
       setSource(element);
@@ -135,6 +138,7 @@ function SourceElementEditor({
         );
         setStatus(null);
       }
+      return element;
     },
     [workspace],
   );
@@ -175,11 +179,17 @@ function SourceElementEditor({
       setSelected(element);
       if (pending && element && previewShows(element, pending)) {
         setPending(null);
-        setStatus({
-          kind: "success",
-          text: `Saved to ${source?.path ?? "source"} and the preview shows the new ${KIND_LABEL[pending.kind]}.`,
+        // Report success only once the source details are refreshed, so
+        // the message also means the panel reflects the saved file.
+        const label = KIND_LABEL[pending.kind];
+        void locate(oid, "refresh").then((refreshed) => {
+          if (refreshed) {
+            setStatus({
+              kind: "success",
+              text: `Saved to ${refreshed.path} and the preview shows the new ${label}.`,
+            });
+          }
         });
-        void locate(oid, "refresh");
       }
     },
   });
