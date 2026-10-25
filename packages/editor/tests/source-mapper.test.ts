@@ -251,4 +251,86 @@ function Card() {
     const located = locateSource(instrumented.content, homeOid);
     expect(located?.component).toBe("Home");
   });
+
+  it.each([
+    ["mixed text and expression", "<p>Hello {name}!</p>"],
+    ["expression-only text", "<p>{name}</p>"],
+    [
+      "nested element children",
+      '<a href="/">\n      <span>Icon</span>\n      Label\n    </a>',
+    ],
+  ])("refuses text edits on %s without rewriting", (_label, markup) => {
+    const source = `export function G({ name }: { name: string }) {
+  return ${markup};
+}
+`;
+    const instrumented = instrumentSource(source);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = instrumented.locations[0]?.oid ?? "";
+    const patched = previewPatch(instrumented.content, {
+      oid,
+      textContent: "Bye",
+    });
+    expect(patched.ok).toBe(false);
+    if (patched.ok) {
+      return;
+    }
+    expect(patched.reason).toBe("unsupported-dynamic-children");
+  });
+
+  it("collapses static text children and keeps JSX comments", () => {
+    const source = `export function P() {
+  return <p>{/* note */}Price {"<"} 5</p>;
+}
+`;
+    const instrumented = instrumentSource(source);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = instrumented.locations[0]?.oid ?? "";
+    const patched = previewPatch(instrumented.content, {
+      oid,
+      textContent: "Free",
+    });
+    expect(patched.ok).toBe(true);
+    if (!patched.ok) {
+      return;
+    }
+    expect(patched.generated).toMatch(/>\{\/\* note \*\/\}Free<\/p>/);
+  });
+
+  it("refuses multiline text edits", () => {
+    const instrumented = instrumentSource(fixture);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = oidNear(instrumented.content, 'id="hero-heading"');
+    const patched = previewPatch(instrumented.content, {
+      oid,
+      textContent: "Line 1\nLine 2",
+    });
+    expect(patched.ok).toBe(false);
+    if (patched.ok) {
+      return;
+    }
+    expect(patched.reason).toBe("unsupported-multiline-text");
+  });
+
+  it("refuses edits when the oid matches more than one element", () => {
+    const source = `export function D() {
+  return <div><p data-oid="dup">a</p><p data-oid="dup">b</p></div>;
+}
+`;
+    const patched = previewPatch(source, { oid: "dup", textContent: "Z" });
+    expect(patched.ok).toBe(false);
+    if (patched.ok) {
+      return;
+    }
+    expect(patched.reason).toBe("oid-ambiguous");
+  });
 });
