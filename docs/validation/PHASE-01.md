@@ -16,14 +16,14 @@ decides PASS.
 | Select heading/button/layout elements and verify the expected source file and lines change; build/preview reflects the change | E2E selects all three element types in all three fixtures. Each Apply changes exactly one line, inside the reported line range. The preview hot-reloads (computed color and grid columns checked). `scripts/e2e/build-edited-workspaces.mjs` runs `next build` on every edited copy and finds the edits in the built HTML. | slice 3 + closure evidence below |
 | Dynamic/conditional markup: preserve semantics or return a clear unsupported result without source corruption | Ternary and `&&` branch text edits keep the condition byte-identical. Expression text, expression classes, spreads, duplicate classes, `.map()` items and reused components are refused, with content and mtime unchanged. | unit + fixtures + E2E |
 | No-op transformations, changed-source/hash conflicts, edits affecting unrelated nodes | Text/class no-ops leave mtime unchanged. Stale hash → `stale-file`; concurrent applies are serialized in call order. Unrelated bytes are unchanged (exact-string unit tests, plus E2E line confinement). | unit + E2E |
-| Independent source diff review | Read-only review by a separate agent instance of all Phase 1 source diffs: **no blocking issues**. Should-fix and minor items were fixed in PR #6 or deferred to Phase 2 as listed. | `docs/validation/PHASE-01-REVIEW.md` |
+| Independent source diff review | Read-only review by a separate agent instance of all Phase 1 source diffs: **no blocking issues**. Should-fix and minor items were fixed in PR #6 and PR #8, or recorded as accepted. | `docs/validation/PHASE-01-REVIEW.md` |
 | Screen recording or Playwright trace of one complete interaction | Each E2E run saves `trace.zip` and a `.webm` screen recording of the full 34-check run (select → edit → Apply → file diff → preview refresh, across three fixtures). | `scripts/e2e/text-edit.e2e.mjs` |
 
 ### Closure evidence (2026-10-25, Bun 1.4.4, Node 22.22.0)
 
 | Command | Exit | Result |
 |---|---|---|
-| `bun run test` | 0 | 193 passed (9 files) |
+| `bun run test` | 0 | 196 passed (9 files) |
 | `bun run typecheck` / `lint` / `validate:public-boundary` / `build` | 0 | all packages; build covers the playground and the 3 fixtures |
 | `ALLSTUDIO_RESET_WORKSPACE=1 bun run dev` + `node scripts/e2e/text-edit.e2e.mjs <out>` | 0 | **34 checks passed**; `trace.zip` (31 MB) and `page@….webm` (4 MB) recorded |
 | `node scripts/e2e/build-edited-workspaces.mjs` (dev server stopped) | 0 | `aurora-atelier`, `lumen-notes`, `harbor-studio`: `next build` ok (about 8 s each); built HTML contains the edits |
@@ -43,7 +43,8 @@ two scripts to regenerate them.
   CI. Recommended; not added without approval.
 - **Founder decision:** select vs interact toggle (kept as always-select).
 - **Phase 2:** the real Electron file adapter (atomic save with recovery,
-  inode/permission preservation, watcher). Review finding 3 belongs there.
+  directory-handle-relative writes, watcher). The dev adapter already keeps
+  file modes, refuses hard links and rechecks the path before rename (PR #8).
 - **Open (ADR-0002):** stripping `data-oid` attributes on export.
 - **Later phases:** structure edits (insert/move/remove) and undo/redo.
 

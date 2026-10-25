@@ -11,6 +11,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import {
+  chmod,
   lstat,
   readdir,
   readFile,
@@ -327,9 +328,26 @@ export class DevWorkspace {
     if (sha256(latest) !== currentSha) {
       return sourceEditFailure("stale-file");
     }
-    const written = await writeAtomically(resolved.absolute, patched.generated);
-    if (!written) {
-      return sourceEditFailure("write-failed");
+    // Rename replaces the inode, which would silently break a hard link.
+    const before = await lstat(resolved.absolute);
+    if (before.nlink > 1) {
+      return sourceEditFailure("path-rejected");
+    }
+    const written = await writeAtomically(
+      resolved.absolute,
+      patched.generated,
+      before.mode & 0o7777,
+      // A directory swapped for a symlink since `resolve` must not redirect
+      // the rename.
+      async () => {
+        const again = await this.resolve(path);
+        return again.ok && again.absolute === resolved.absolute;
+      },
+    );
+    if (written !== "written") {
+      return sourceEditFailure(
+        written === "moved" ? "path-rejected" : "write-failed",
+      );
     }
     return {
       ok: true,
@@ -425,21 +443,39 @@ function validatePatch(
   return null;
 }
 
-/** Temp file in the same directory, then rename, so readers never see a partial file. */
+/**
+ * Temp file in the same directory, then rename, so readers never see a partial
+ * file. The temp file gets the original permission bits; `unchanged` runs right
+ * before the rename and aborts the write when the path no longer resolves.
+ *
+ * Cleanup removes the temp file by path. If a directory on that path was moved
+ * away mid-write, the temp file moves with it and cannot be found again by
+ * path; it is left there as a dot-prefixed `.tmp` file, and the target is never
+ * written. Directory-handle-relative cleanup belongs to the Phase 2 native file
+ * adapter.
+ */
 async function writeAtomically(
   target: string,
   content: string,
-): Promise<boolean> {
+  mode: number,
+  unchanged: () => Promise<boolean>,
+): Promise<"written" | "moved" | "failed"> {
   const temp = join(
     dirname(target),
     `.allstudio-${randomBytes(6).toString("hex")}.tmp`,
   );
   try {
-    await writeFile(temp, content, { encoding: "utf8", flag: "wx" });
+    await writeFile(temp, content, { encoding: "utf8", flag: "wx", mode });
+    // `mode` above is subject to the umask; chmod is not.
+    await chmod(temp, mode);
+    if (!(await unchanged())) {
+      await rm(temp, { force: true });
+      return "moved";
+    }
     await rename(temp, target);
-    return true;
+    return "written";
   } catch {
     await rm(temp, { force: true });
-    return false;
+    return "failed";
   }
 }
