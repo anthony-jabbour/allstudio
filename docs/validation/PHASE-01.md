@@ -1,9 +1,53 @@
 # Phase 01 — Validation report
 
-**Status:** IN PROGRESS  
+**Status:** ALL GATE TESTS EVIDENCED — READY FOR FOUNDER PASS DECISION (not marked PASS; only the founder can)  
 **Slices:** (1) source mapper in `@allstudio/editor`; (2) browser preview → select → text edit → JSX write → live refresh; (3) three fixtures, heading/button/layout, text + className edits, format-preserving writes (below)  
 **Founder decision:** ADR-0002 option A (2026-10-24)  
 **This report does not mark the phase PASS.**
+
+## Phase 1 gate closure (2026-10-25)
+
+Every RoadMap.md Phase 1 gate test now has executed evidence. The founder
+decides PASS.
+
+| Gate test (RoadMap.md Phase 1) | Evidence | Where |
+|---|---|---|
+| At least three representative runnable fixtures (nested React components, Tailwind variants, realistic structure) | Aurora Atelier, Lumen Notes (components across files, a reused component, `.map()`, ternary, `&&`), Harbor Studio (`sm:`/`md:`/`lg:`/`hover:`/`focus-visible:`/`dark:` variants, `cn()`, template-literal class, `components/` + `lib/`). `next dev`, `tsc` and `next build` pass for each. | `examples/*`, slice 3 |
+| Select heading/button/layout elements and verify the expected source file and lines change; build/preview reflects the change | E2E selects all three element types in all three fixtures. Each Apply changes exactly one line, inside the reported line range. The preview hot-reloads (computed color and grid columns checked). `scripts/e2e/build-edited-workspaces.mjs` runs `next build` on every edited copy and finds the edits in the built HTML. | slice 3 + closure evidence below |
+| Dynamic/conditional markup: preserve semantics or return a clear unsupported result without source corruption | Ternary and `&&` branch text edits keep the condition byte-identical. Expression text, expression classes, spreads, duplicate classes, `.map()` items and reused components are refused, with content and mtime unchanged. | unit + fixtures + E2E |
+| No-op transformations, changed-source/hash conflicts, edits affecting unrelated nodes | Text/class no-ops leave mtime unchanged. Stale hash → `stale-file`; concurrent applies are serialized in call order. Unrelated bytes are unchanged (exact-string unit tests, plus E2E line confinement). | unit + E2E |
+| Independent source diff review | Read-only review by a separate agent instance of all Phase 1 source diffs: **no blocking issues**. Should-fix and minor items were fixed in PR #6 or deferred to Phase 2 as listed. | `docs/validation/PHASE-01-REVIEW.md` |
+| Screen recording or Playwright trace of one complete interaction | Each E2E run saves `trace.zip` and a `.webm` screen recording of the full 34-check run (select → edit → Apply → file diff → preview refresh, across three fixtures). | `scripts/e2e/text-edit.e2e.mjs` |
+
+### Closure evidence (2026-10-25, Bun 1.4.4, Node 22.22.0)
+
+| Command | Exit | Result |
+|---|---|---|
+| `bun run test` | 0 | 193 passed (9 files) |
+| `bun run typecheck` / `lint` / `validate:public-boundary` / `build` | 0 | all packages; build covers the playground and the 3 fixtures |
+| `ALLSTUDIO_RESET_WORKSPACE=1 bun run dev` + `node scripts/e2e/text-edit.e2e.mjs <out>` | 0 | **34 checks passed**; `trace.zip` (31 MB) and `page@….webm` (4 MB) recorded |
+| `node scripts/e2e/build-edited-workspaces.mjs` (dev server stopped) | 0 | `aurora-atelier`, `lumen-notes`, `harbor-studio`: `next build` ok (about 8 s each); built HTML contains the edits |
+
+```text
+PASS aurora-atelier — next build ok in 8897 ms; built HTML contains Start a new project, text-emerald-700, gap-10
+PASS lumen-notes — next build ok in 7836 ms; built HTML contains Lumen Notebook, Write a note, Up to date
+PASS harbor-studio — next build ok in 7822 ms; built HTML contains Harbor &amp; Co, md:grid-cols-3, bg-indigo-600
+```
+
+The trace and the recording are not committed (35 MB of binaries). Rerun the
+two scripts to regenerate them.
+
+### Carried forward (not Phase 1 gate items)
+
+- **Founder decision:** add Playwright as a devDependency and run the E2E in
+  CI. Recommended; not added without approval.
+- **Founder decision:** select vs interact toggle (kept as always-select).
+- **Phase 2:** the real Electron file adapter (atomic save with recovery,
+  inode/permission preservation, watcher). Review finding 3 belongs there.
+- **Open (ADR-0002):** stripping `data-oid` attributes on export.
+- **Later phases:** structure edits (insert/move/remove) and undo/redo.
+
+---
 
 ## Slice 3 — Three fixtures, text + class edits, format-preserving writes (2026-10-25)
 
@@ -213,7 +257,7 @@ Current: always-select, unchanged in this slice as instructed.
 | Select heading/button/layout; expected file and lines change; preview reflects it | E2E for all three element types in all three fixtures |
 | Dynamic/conditional markup preserved or clearly refused without corruption | see table above |
 | No-op, hash conflicts, edits affecting unrelated nodes | unit + E2E (one changed line per edit, inside the element) |
-| Independent source diff review + recording/trace of one interaction | trace captured; independent review **pending** (Greptile requested on the PR); founder validation **pending** |
+| Independent source diff review + recording/trace of one interaction | see "Phase 1 gate closure" above |
 
 Recommendation: **READY FOR HUMAN VALIDATION**. The phase is not PASS until the founder approves it.
 
