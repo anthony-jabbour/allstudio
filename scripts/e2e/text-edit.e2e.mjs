@@ -10,7 +10,8 @@
 //      dependency (adding it needs founder approval); use a global install.
 //
 // Usage: node scripts/e2e/text-edit.e2e.mjs [output-dir]
-// Writes trace.zip and screenshots into output-dir (default: ./e2e-output).
+// Writes trace.zip, a .webm screen recording, screenshots and per-edit diffs
+// into output-dir (default: ./e2e-output).
 import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
@@ -62,8 +63,10 @@ await mkdir(outDir, { recursive: true });
 const examplesBefore = await snapshotExamples();
 const fixtureBefore = await readFile(fixtureFile, "utf8");
 const browser = await chromium.launch();
+// A screen recording of the whole run (webm) is saved next to the trace.
 const context = await browser.newContext({
   viewport: { width: 1400, height: 1000 },
+  recordVideo: { dir: outDir, size: { width: 1400, height: 1000 } },
 });
 await context.tracing.start({ screenshots: true, snapshots: true });
 const page = await context.newPage();

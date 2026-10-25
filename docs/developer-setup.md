@@ -89,7 +89,17 @@ Playwright + Chromium install on `NODE_PATH`:
 node scripts/e2e/text-edit.e2e.mjs ./e2e-output
 ```
 
-It writes `trace.zip` (open with `npx playwright show-trace`) and screenshots.
+It writes `trace.zip` (open with `npx playwright show-trace`), a `.webm`
+screen recording, screenshots and per-edit diffs.
+
+To prove the edited copies still build, stop `bun run dev` and run:
+
+```bash
+node scripts/e2e/build-edited-workspaces.mjs
+```
+
+It runs `next build` in each `apps/playground/.workspace/<id>` copy and
+checks that the built HTML contains the E2E's edits.
 
 A fixture alone (unedited original, separate process):
 
