@@ -447,6 +447,12 @@ function validatePatch(
  * Temp file in the same directory, then rename, so readers never see a partial
  * file. The temp file gets the original permission bits; `unchanged` runs right
  * before the rename and aborts the write when the path no longer resolves.
+ *
+ * Cleanup removes the temp file by path. If a directory on that path was moved
+ * away mid-write, the temp file moves with it and cannot be found again by
+ * path; it is left there as a dot-prefixed `.tmp` file, and the target is never
+ * written. Directory-handle-relative cleanup belongs to the Phase 2 native file
+ * adapter.
  */
 async function writeAtomically(
   target: string,
