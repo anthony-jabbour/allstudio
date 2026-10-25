@@ -3,17 +3,23 @@ import { addOidsToAst, getOidFromJsxElement } from "./ids.ts";
 import { createSourceLocations } from "./locations.ts";
 import { getAstFromContent, getContentFromAst } from "./parse.ts";
 import { tryAddClassToNode } from "./style.ts";
-import { updateNodeTextContent } from "./text.ts";
+import { readNodeTextContent, updateNodeTextContent } from "./text.ts";
 import type {
+  DescribeElementResult,
   ElementEdit,
+  ElementTextContent,
   InstrumentResult,
   LocateSourceOptions,
   PreviewPatchResult,
   SourceLocation,
 } from "./types.ts";
 
+export type { DiffHunk, DiffLine, LineDiff } from "./diff.ts";
+export { createLineDiff, formatLineDiff } from "./diff.ts";
 export type {
+  DescribeElementResult,
   ElementEdit,
+  ElementTextContent,
   InstrumentResult,
   LocateSourceOptions,
   PreviewPatchResult,
@@ -52,6 +58,49 @@ export function locateSource(
       (location) => location.oid === oid,
     ) ?? null
   );
+}
+
+/**
+ * Resolves one oid to its source location and, when the element only holds
+ * static text, the text React renders for it. Refuses missing or duplicated
+ * oids so callers never act on the wrong element.
+ */
+export function describeElement(
+  content: string,
+  oid: string,
+  options: LocateSourceOptions = {},
+): DescribeElementResult {
+  const ast = getAstFromContent(content);
+  if (!ast) {
+    return { ok: false, reason: "parse-failed" };
+  }
+  const filename = options.filename ?? DEFAULT_FILENAME;
+  const matches = createSourceLocations(ast, filename).filter(
+    (location) => location.oid === oid,
+  );
+  const location = matches[0];
+  if (!location) {
+    return { ok: false, reason: "oid-not-found" };
+  }
+  if (matches.length > 1) {
+    return { ok: false, reason: "oid-ambiguous" };
+  }
+
+  let text: ElementTextContent = {
+    ok: false,
+    reason: "unsupported-dynamic-children",
+  };
+  traverse(ast, {
+    JSXElement(path: NodePath<T.JSXElement>) {
+      if (getOidFromJsxElement(path.node.openingElement) !== oid) {
+        return;
+      }
+      text = readNodeTextContent(path.node);
+      path.stop();
+    },
+  });
+
+  return { ok: true, location, text };
 }
 
 export function previewPatch(

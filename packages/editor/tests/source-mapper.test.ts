@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { instrumentSource, locateSource, previewPatch } from "../src/index.ts";
+import {
+  createLineDiff,
+  describeElement,
+  formatLineDiff,
+  instrumentSource,
+  locateSource,
+  previewPatch,
+} from "../src/index.ts";
 
 const fixturePath = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -332,5 +339,98 @@ function Card() {
       return;
     }
     expect(patched.reason).toBe("oid-ambiguous");
+  });
+});
+
+describe("describeElement", () => {
+  it("resolves the fixture heading location and rendered static text", () => {
+    const instrumented = instrumentSource(fixture);
+    expect(instrumented.ok).toBe(true);
+    if (!instrumented.ok) {
+      return;
+    }
+    const oid = oidNear(instrumented.content, 'id="hero-heading"');
+    const described = describeElement(instrumented.content, oid, {
+      filename: "src/app/page.tsx",
+    });
+    expect(described).toMatchObject({
+      ok: true,
+      location: { oid, path: "src/app/page.tsx", component: "Home" },
+      text: { ok: true, text: "Aurora Atelier" },
+    });
+  });
+
+  it("applies JSX whitespace rules to multi-line static text", () => {
+    const source = `export function P() {
+  return (
+    <p data-oid="p1">
+      A supported   site
+      used to validate {"<"} editing.
+    </p>
+  );
+}
+`;
+    const described = describeElement(source, "p1");
+    expect(described.ok && described.text).toEqual({
+      ok: true,
+      text: "A supported   site used to validate < editing.",
+    });
+  });
+
+  it("reports dynamic children as not editable", () => {
+    const source = `export function L({ children }) {
+  return <body data-oid="b1">{children}</body>;
+}
+`;
+    const described = describeElement(source, "b1");
+    expect(described.ok && described.text).toEqual({
+      ok: false,
+      reason: "unsupported-dynamic-children",
+    });
+  });
+
+  it("refuses missing and duplicated oids", () => {
+    const source = `export function D() {
+  return <div><p data-oid="dup">a</p><p data-oid="dup">b</p></div>;
+}
+`;
+    expect(describeElement(source, "dup")).toEqual({
+      ok: false,
+      reason: "oid-ambiguous",
+    });
+    expect(describeElement(source, "nope")).toEqual({
+      ok: false,
+      reason: "oid-not-found",
+    });
+    expect(describeElement("export default (", "dup")).toEqual({
+      ok: false,
+      reason: "parse-failed",
+    });
+  });
+});
+
+describe("line diff", () => {
+  it("reports one hunk with context around a changed line", () => {
+    const original = "a\nb\nc\nd\ne\nf";
+    const generated = "a\nb\nc\nD\ne\nf";
+    const diff = createLineDiff(original, generated, 1);
+    expect(diff.changed).toBe(true);
+    expect(formatLineDiff(diff, "src/x.tsx")).toBe(
+      [
+        "--- a/src/x.tsx",
+        "+++ b/src/x.tsx",
+        "@@ -3,3 +3,3 @@",
+        " c",
+        "-d",
+        "+D",
+        " e",
+      ].join("\n"),
+    );
+  });
+
+  it("is empty for identical content", () => {
+    const diff = createLineDiff("same\n", "same\n");
+    expect(diff).toEqual({ changed: false, hunks: [] });
+    expect(formatLineDiff(diff, "a.tsx")).toBe("");
   });
 });
