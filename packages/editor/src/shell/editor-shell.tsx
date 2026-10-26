@@ -64,7 +64,7 @@ export function EditorShell({
   return (
     <main className="editor-shell">
       <header className="editor-header">
-        <p>allstudio playground</p>
+        <p>allstudio</p>
         <h1>Source editing</h1>
         <p>
           Shared editor package status: {EDITOR_STATUS}. Select a rendered
@@ -293,6 +293,8 @@ function SourceElementEditor({
       });
       return;
     }
+    const savedOid = result.oid ?? selected.oid;
+    setSelected({ ...selected, oid: savedOid });
     setSource({
       ...source,
       sha256: result.sha256,
@@ -310,13 +312,13 @@ function SourceElementEditor({
       text: `Saved to ${source.path}. Waiting for the preview to refresh…`,
     });
     setPending({
-      oid: selected.oid,
+      oid: savedOid,
       kind,
       value: kind === "text" ? draft : classDraft,
       reloaded: false,
       run,
     });
-    bridge.track(selected.oid);
+    bridge.track(savedOid);
   };
 
   const rect = selected?.rect;

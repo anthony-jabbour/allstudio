@@ -25,3 +25,5 @@ Production integration is BLOCKED — FOUNDER DECISION: approve an explicit revi
 The source-mapping strategy is stable for unchanged element order, text edits and class edits; structural changes may reassign generated IDs. The eventual adapter must reject stale hashes and invalidate selections rather than assuming identity survives structural edits. Cross-file duplicate original IDs must be refused by workspace lookup. Compiler/config compatibility outside the demonstrated fixture, the actual DOM-selection-to-original-source write, IPC, file watching, recovery and packaged integration remain unproven.
 
 Recommendation: feasibility proof is READY FOR REVIEW; production integration and Phase 2 remain INCOMPLETE.
+
+Founder decision (2026-10-25): explicit, reviewable Next.js config integration with consent and backup APPROVED. Proceed with the connected local workflow. Earlier BLOCKED wording records the prior state and is superseded by this decision.

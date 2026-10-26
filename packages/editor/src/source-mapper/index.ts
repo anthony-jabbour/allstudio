@@ -151,6 +151,34 @@ export function listOids(content: string): string[] | null {
   return oids;
 }
 
+/** Parser ranges for literal JSX IDs; strings, comments and JSX text are excluded. */
+export function listOidAttributes(
+  content: string,
+): Array<{ oid: string; start: number; end: number }> | null {
+  const ast = getAstFromContent(content);
+  if (!ast) return null;
+  const attributes: Array<{ oid: string; start: number; end: number }> = [];
+  traverse(ast, {
+    JSXOpeningElement(path: NodePath<T.JSXOpeningElement>) {
+      for (const attribute of path.node.attributes) {
+        if (
+          attribute.type === "JSXAttribute" &&
+          attribute.name.name === "data-oid" &&
+          attribute.value?.type === "StringLiteral" &&
+          typeof attribute.start === "number" &&
+          typeof attribute.end === "number"
+        )
+          attributes.push({
+            oid: attribute.value.value,
+            start: attribute.start,
+            end: attribute.end,
+          });
+      }
+    },
+  });
+  return attributes;
+}
+
 export function previewPatch(
   content: string,
   edit: ElementEdit,

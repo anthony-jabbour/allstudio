@@ -9,6 +9,9 @@ files:
   - out/preload/**
   - out/renderer/**
   - package.json
+extraResources:
+  - from: out/runtime
+    to: local-runtime
 mac:
   identity: null
   category: public.app-category.developer-tools

@@ -70,7 +70,25 @@ try {
       process: typeof window.process,
       api: Object.keys(window.allstudio),
     })),
-    { require: "undefined", process: "undefined", api: ["runtime"] },
+    {
+      require: "undefined",
+      process: "undefined",
+      api: [
+        "runtime",
+        "recent",
+        "chooseProject",
+        "openRecent",
+        "closeProject",
+        "locate",
+        "previewTextEdit",
+        "applyTextEdit",
+        "previewClassEdit",
+        "applyClassEdit",
+        "undo",
+        "redo",
+        "onChange",
+      ],
+    },
   );
   const preferences = await application.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences(),
@@ -82,6 +100,21 @@ try {
   pass("renderer has no Node or raw IPC access; sandbox and isolation enabled");
 
   // Exercise hostile content against the actual app window, without production test hooks.
+  await application.evaluate(({ BrowserWindow }) => {
+    globalThis.frameAttempt = new Promise((resolve, reject) => {
+      const deadline = setTimeout(
+        () => reject(new Error("Frame navigation did not reach main")),
+        5000,
+      );
+      BrowserWindow.getAllWindows()[0].webContents.once(
+        "will-frame-navigate",
+        (event) => {
+          clearTimeout(deadline);
+          resolve({ url: event.url, denied: event.defaultPrevented });
+        },
+      );
+    });
+  });
   await page.evaluate((previewUrl) => {
     const frame = document.createElement("iframe");
     frame.id = "hostile-preview";
@@ -89,39 +122,16 @@ try {
     frame.src = previewUrl;
     document.body.append(frame);
   }, url);
-  const frame = page.frame({ url });
-  // Wait for the frame load rather than relying on the synchronous frame lookup.
-  const hostile =
-    frame ??
-    (await page.waitForEvent("framenavigated", {
-      predicate: (f) => f.url() === url,
-    }));
-  await hostile.waitForLoadState();
-  assert.deepEqual(
-    await hostile.evaluate(() => {
-      let parentDenied = false;
-      try {
-        window.parent.allstudio.runtime();
-      } catch {
-        parentDenied = true;
-      }
-      return {
-        require: typeof window.require,
-        process: typeof window.process,
-        api: typeof window.allstudio,
-        parentDenied,
-      };
-    }),
-    {
-      require: "undefined",
-      process: "undefined",
-      api: "undefined",
-      parentDenied: true,
-    },
+  assert.deepEqual(await application.evaluate(() => globalThis.frameAttempt), {
+    url,
+    denied: true,
+  });
+  assert.equal(
+    page.frames().some((frame) => frame.url() === url),
+    false,
   );
-  pass(
-    "hostile cross-origin iframe cannot access native APIs or the parent bridge",
-  );
+  await page.locator("#hostile-preview").evaluate((frame) => frame.remove());
+  pass("ungranted preview navigation is denied before content can load");
 
   // Give another top-level WebContents the real preload: main must still reject its IPC.
   const attackerWindow = application.waitForEvent("window");
@@ -184,10 +194,10 @@ try {
         5000,
       );
       BrowserWindow.getAllWindows()[0].webContents.once(
-        "will-navigate",
-        (event, url) => {
+        "will-frame-navigate",
+        (event) => {
           clearTimeout(deadline);
-          resolve({ url, denied: event.defaultPrevented });
+          resolve({ url: event.url, denied: event.defaultPrevented });
         },
       );
     });

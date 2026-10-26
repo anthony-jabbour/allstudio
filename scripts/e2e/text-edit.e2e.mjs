@@ -95,31 +95,56 @@ async function ownPoint(locator) {
 
 /** Clicks an element in the preview and waits for its source location. */
 async function select(locator, expectedLocation) {
-  // The preview may reload after an external file change (hot reload falls
-  // back to a full reload); retry when that destroys the frame's context.
-  let position = null;
+  // A matching source label can belong to the previous selection; wait for this lookup.
   for (let attempt = 0; ; attempt += 1) {
     try {
       await locator.waitFor();
-      position = await ownPoint(locator);
-      await locator.click({ position });
+      const oid = await locator.getAttribute("data-oid");
+      const position = await ownPoint(locator);
+      assert.ok(position, "element has a clickable spot of its own");
+      const [response] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().includes("/__allstudio/workspace/") &&
+            response.url().endsWith("/locate") &&
+            response.request().postDataJSON()?.oid === oid,
+        ),
+        locator.click({ position }),
+      ]);
+      const result = await response.json();
+      assert.equal(result.ok, true);
+      await page.waitForFunction((element) => {
+        const input = (name) =>
+          [...document.querySelectorAll("label")]
+            .find((label) => label.firstChild?.textContent?.trim() === name)
+            ?.querySelector("input");
+        const text = input("Text"),
+          classes = input("Classes");
+        return (
+          text &&
+          classes &&
+          (element.text.ok
+            ? !text.disabled && text.value === element.text.text
+            : text.disabled) &&
+          (element.className.ok
+            ? !classes.disabled &&
+              classes.value === (element.className.value ?? "")
+            : classes.disabled)
+        );
+      }, result.element);
       break;
     } catch (error) {
       if (
         attempt >= 3 ||
         !/context was destroyed|detached/i.test(String(error))
-      ) {
+      )
         throw error;
-      }
       await page.waitForTimeout(500);
     }
   }
-  assert.ok(position, "element has a clickable spot of its own");
   const located = page.getByTestId("source-location");
   await located.waitFor();
-  if (expectedLocation) {
-    await page.getByText(expectedLocation).waitFor();
-  }
+  if (expectedLocation) await page.getByText(expectedLocation).waitFor();
   return (await located.textContent()) ?? "";
 }
 
@@ -185,8 +210,7 @@ async function switchFixture(id, previewPort, readySelector) {
 }
 
 async function selectHeading() {
-  await preview.locator("#hero-heading").click();
-  await page.getByTestId("source-location").waitFor();
+  await select(preview.locator("#hero-heading"), "src/app/page.tsx:7–");
 }
 
 try {
