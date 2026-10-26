@@ -7,3 +7,5 @@ The quality job passed. The Linux desktop job built, passed all six development 
 Diagnosis: the installed linuxPackager defaults executableName to appInfo.sanitizedName, not productName. A local `bun run package --linux` produced `dist/linux-arm64-unpacked/@allstudiodesktop`, confirming the mismatch. The fix sets the supported `linux.executableName: allstudio` option. `bun run package --linux --x64` then exited 0, and filesystem inspection confirmed an executable `dist/linux-unpacked/allstudio`.
 
 The Linux binary was cross-packaged on macOS and not executed locally. This is one diagnosis-driven CI repair; a hosted run must establish Linux execution. No repeat blind repair loop is authorized by this record. Mac development/packaged smoke tests already passed six checks each; no full Phase 2 gate claim follows.
+
+Repair result: head `0c982c5` passed both hosted jobs: quality (`40227300545`) and electron-smoke (`40227300546`). The latter executes both development and packaged Linux smoke under xvfb. This remains a --no-sandbox Linux smoke test, not OS sandbox evidence. No further CI repair iteration was needed.
