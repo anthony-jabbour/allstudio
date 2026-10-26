@@ -216,7 +216,9 @@ const legacyPort =
   ) %
     15000);
 await new Promise((resolve, reject) => {
-  occupied.once("error", reject);
+  occupied.once("error", (error) =>
+    error.code === "EADDRINUSE" ? resolve() : reject(error),
+  );
   occupied.listen(legacyPort, "127.0.0.1", resolve);
 });
 try {
@@ -846,8 +848,10 @@ try {
   }
   throw error;
 } finally {
-  occupied.closeAllConnections();
-  await new Promise((resolve) => occupied.close(resolve));
+  if (occupied.listening) {
+    occupied.closeAllConnections();
+    await new Promise((resolve) => occupied.close(resolve));
+  }
   if (application) await application.close();
   if (orphanPid) {
     try {
