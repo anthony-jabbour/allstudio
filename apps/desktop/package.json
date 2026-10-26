@@ -8,8 +8,8 @@
   "author": "allstudio contributors",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite build && electron-vite preview",
-    "build": "electron-vite build",
+    "dev": "bun run build && electron-vite preview",
+    "build": "electron-vite build && node build-runtime.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "package": "electron-builder --dir --config electron-builder.yml"
   },

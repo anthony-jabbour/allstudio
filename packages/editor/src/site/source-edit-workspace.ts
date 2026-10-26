@@ -8,7 +8,7 @@ import type {
 /**
  * Runtime-neutral contract the editor UI uses to resolve and edit source.
  * The browser playground implements it over a development-only HTTP adapter;
- * the Electron app will implement it over validated IPC. The editor never
+ * the Electron app implements it over validated IPC. The editor never
  * receives raw filesystem access.
  */
 export interface SourceEditWorkspace {
@@ -126,3 +126,10 @@ export function sourceEditFailure(
 ): SourceEditFailure {
   return { ok: false, reason, message: describeSourceEditFailure(reason) };
 }
+
+export {
+  hasExactKeys,
+  parseClassEditBody,
+  parseLocateBody,
+  parseTextEditBody,
+} from "./requests.ts";

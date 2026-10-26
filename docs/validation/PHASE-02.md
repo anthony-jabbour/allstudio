@@ -1,8 +1,8 @@
 # Phase 02 — Validation report
 
-**Status:** IN PROGRESS — S0 desktop shell implemented and tested in development and a packaged Mac app; full project workflow remains incomplete.\
+**Status:** IN PROGRESS — connected local workflow implemented; recommendation READY FOR HUMAN VALIDATION. Only the founder may mark this phase PASS.\
 **Date:** 2026-10-25.\
-**Scope / commit:** public repository `/Users/jabbo/AllStudio/allstudio`, `main` at `226c170`; local documentation edits present before this task and preserved.\
+**Scope / commit:** public repository `/Users/jabbo/AllStudio/allstudio`, branch `phase-02/local-workflow`, based on `291899f` and the stacked desktop/native/preview PRs. Final head is recorded in the PR. Session-start state below is historical and preserved.\
 **Founder approval:** Phases 0 and 1 PASS, reconfirmed 2026-10-25. Founder clarified: “Phases 0 and 1 PASS; start Phase 2.” No Phase 2 PASS claimed.\
 **Research:** [Desktop toolchain and D6/D7 comparison](../research/phase-02-desktop.md).
 
@@ -19,7 +19,7 @@
 5. Test from a packaged app as soon as packaging supports it, not only a
    developer run.
 
-All five Phase 2 gate tests: **NOT RUN**. Desktop implementation does not exist yet.
+The criteria above are unchanged. Connected gate evidence is recorded in the final section; earlier NOT RUN/BLOCKED statements below describe the initial slices and are superseded there. No phase PASS is asserted.
 
 ## Session-start environment (exact outputs; credential line omitted)
 
@@ -145,3 +145,67 @@ The initial public custom-server `conf` experiment returned HTTP 200 without inv
 The isolated Next custom-server process retained resources after close; the spike logs this and exits its own process after a bounded three-second deadline. This is not production process-lifecycle proof.
 
 Final working-tree regression run: `bun run test` passed 209 tests (12 files); typecheck, lint and public-boundary checks passed. Native-only PR scope was separately verified with 206 tests excluding the later three preview-spike tests. All three Next.js fixtures and the playground built successfully earlier in the session. S0 hosted quality and Linux development/packaged smoke passed after one executable-name CI repair; see `PHASE-02-S0-CI.md`. These results do not close the complete Phase 2 gate.
+
+## Connected workflow — current evidence (2026-10-25)
+
+Founder approved explicit config integration with consent and backup. D1–D12 choices, network installs and the original native helper were approved in chat before dependent implementation. No additional third-party dependency was selected for this slice.
+
+### Actual behavior
+
+An actual Electron app opens a chosen local folder or an existing remembered grant. It verifies folder identity, asks before adding the Next config wrapper and preserves the exact adjacent original config. The wrapper is inactive when the preview-loader environment variable is absent. It does not add data-oid to JSX/TSX on disk. The bundled preview-only transform and existing DOM bridge supply source mapping; the bridge is injected only into the active direct preview frame. Renderer imports the existing EditorShell and implements the original SourceEditWorkspace through a narrow validated IPC preload.
+
+The main process holds the directory grant; the native helper receives its pinned directory FD. Source requests remain src/**/*.tsx|jsx only. Exact, separately approved configuration operations and bounded root metadata reads are internal main-process operations, never generic renderer filesystem endpoints. The native helper rejects traversal, symlinks, hard links, unsafe paths, oversized files and stale bytes. Permission bits, including special bits, are preserved. UTF-8 is validated without losing a BOM. Workspace-level synchronous queue admission preserves per-file call order and serializes history. Patch parsing/readback/OID checks still use the existing mapper.
+
+Save intent is fsynced to private JSON in userData before publication. A restart offers Restore pending edit / Keep current files / Cancel. Restore refuses a divergent current file; Keep never overwrites source. Undo/redo is session-only and hash-checked. Recursive fs.watch reports external changes; stale saves do not overwrite them. Preview code executes only after explicit permission or an unchanged remembered fingerprint of the executable/arguments/runtime assets and package/config files. The UI displays the approved warning that project code runs with the user's account access. Quit stops the process group; an inherited pipe lease also stops the preview when Electron is killed.
+
+### Gate mapping (not a founder PASS)
+
+| Exact criterion above | Executed evidence |
+|---|---|
+| 1 | Actual Mac Electron development and unsigned packaged workflows: launch/open/preview/select/preview-patch/Apply/source inspection/quit/reopen. Restricted-network packaged run uses an unavailable loopback HTTP proxy for Electron networking and an OS Seatbelt deny for preview-child non-loopback egress; preview-child EPERM and absent parent-secret sentinel are asserted. Loopback preview remains available. Host network is not modified; Chromium's Mac sandbox remains enabled. |
+| 2 | Live fs.watch notification; external source edit then stale Apply refused, bytes retained; real source undo/redo; real SIGKILL after the helper reaches PREPARED and before commit; original source retained, preview child exits, next launch restores the fsynced pending edit and retains the external comment. Backend tests also cover concurrent save order, no-op inode/mtime, BOM and invalid UTF-8, private journal mode under restrictive umask and recovery conflicts. |
+| 3 | Actual IPC attempts for dot-dot/absolute/backslash/empty/dot paths, symlink file and directory escapes, hard links, config writes through the source API and ungranted project IDs denied. Actual preview has no Node/native bridge, cannot access parent bridge, and cannot navigate to a different origin. The subframe preload probe is unavailable under the real sandbox settings; exact-frame unit guards cover a hypothetical direct IPC sender. Another WebContents supplied with the real preload is denied by main. |
+| 4 | Fresh local profile, no sign-in or app cloud keys; browser-request origins recorded with no Clerk/Railway requests. Application source has no cloud auth/runtime dependency. Parent secret sentinel is omitted from the preview env. Manual editor makes no model-provider call; UI explicitly says BYOK model requests require internet. This does not claim third-party resources used by the user's own project are offline services. |
+| 5 | Same connected workflow and security/recovery checks executed against the actual arm64 .app binary, not a dev server. Packaged shell smoke also passed six checks. Native helper, runner, loader and bridge ship as physical runtime resources outside ASAR. |
+
+### Commands and observed results
+
+- `bun run test`: 218 tests passed, 14 files; `bun run typecheck`, `bun run lint`, `bun run validate:public-boundary`: exit 0 (208 files in the boundary scan at that run).
+- `bun run build`: exit 0, browser playground and all three original Next fixtures. `bun run build:desktop` and `bun run package:desktop`: exit 0.
+- `node scripts/e2e/local-workflow.e2e.mjs`: connected actual development app flow succeeded, including source/preview round trip, restart, SIGKILL recovery, permission cancellation/invalidation and a production build outside Electron.
+- `ALLSTUDIO_FIXTURE=nested-components-fixture node scripts/e2e/local-workflow.e2e.mjs` and the equivalent tailwind-variants-fixture command: real connected flows succeeded on both additional fixtures (13 checks at those earlier runs, before the extra permission/build assertions).
+- `node scripts/e2e/local-workflow.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio --offline`: packaged restricted-network flow executed. Exact final check count/artifact directory is recorded in the final command output and PR validation.
+- `node scripts/e2e/desktop.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio`: six shell/security checks passed.
+
+Artifacts are ignored local files under `apps/desktop/dist/local-workflow-*`: saved/failure/interrupted screenshots, edit/reopen/recovery traces, requested-origins JSON and standalone-build logs. Every run uses a fresh disposable fixture and profile. Native picker/message-box return values are controlled by the E2E harness; real files, native helper, preview compilation, UI selection/Apply and process termination are not mocked. Human native-dialog UX remains part of founder validation.
+
+### Failures investigated and boundaries
+
+- Initial feature test failed because Open project did not exist; implementing the connected UI made the real workflow pass.
+- The escape-directory test deliberately formed a symlink cycle. Turbopack refused to rebuild it on restart; the denial checks had passed. Test-created links are now removed before normal preview recompilation. No production path guard was loosened.
+- Cancelling a picker remounted the editor and lost an unapplied draft. A completed-operation regression reproduced it; unchanged results now retain the current editor. An initial immediate assertion raced the operation and was strengthened before treating it as evidence.
+- A restrictive umask produced an unreadable recovery file; a real-file failing regression led to chmod on the open private temp FD. BOM package JSON in the CommonJS config path similarly received a failing regression and corrected parsing. Async CommonJS config is executed outside the app by its test.
+- Wrapping all of Electron in an additional macOS Seatbelt profile failed because Chromium could not initialize its own sandbox. The successful harness does not disable Chromium's Mac sandbox: it applies browser transport blocking and OS egress denial only to the Node-mode preview child.
+- An **extra offline production next build was attempted and failed** because the fixture imports next/font/google and Google fonts could not be downloaded. This is outside the unchanged manual launch/open/preview/edit/save/restart gate. Manual offline preview used Next's fallback fonts and completed; online standalone production build succeeded with the config wrapper inactive. The harness reports this additional offline production-build limitation rather than rewriting user typography or treating that failed extra check as PASS.
+- Native directory-relative operations do not create kernel-atomic compare-and-swap against arbitrary same-UID external writers. Final publication checks and uncertain-outcome journaling are documented; this is not an OS sandbox for explicitly permitted Node project code.
+- Tested project compiler: Next.js 16.4.3. Source editing is the supported static text/class subset from Phase 1; arbitrary config/compiler versions, source structure edits, Windows, signing/notarization and physical power-loss tests are not claimed.
+
+### Independent review and documentation drift
+
+A fresh, read-only reviewer examined the connected production diff, including native path separation, recovery, grants, wrappers, lifetime, IPC/navigation, renderer and packaging. It ran four focused backend/config tests and found no actionable production issues. It did not rerun Electron. Later QA regressions and their fixes are listed above; final executed tests remain the evidence.
+
+The private Notion Agent Map and F-004 were queried selectively. F-004 remains In Progress/In Progress; its notes still describe Electron as absent, and the map still describes Phase 0 as unpassed. These are older records: the founder's direct Phase 0/1 PASS and approved unmerged Phase 2 implementation supersede them. No requirement was changed from those notes. PRs remain unmerged, so no Shipped/changelog entry is asserted.
+
+### Delivery record
+
+**Roadmap phase / acceptance criterion:** Phase 2, all five criteria above, unchanged.\
+**Founder choices / approvals:** exact S0 toolchain; iframe; preview-only IDs; userData JSON/recovery; session history; script consent/remembered fingerprint; original C helper; consented config wrapper and exact backup; unsigned local package.\
+**OSS research:** S0 candidate URLs/stars/date/licenses in linked research; no new tool adopted for this connected slice. Existing mapper and preview bridge reused.\
+**REA:** not applicable to this runtime integration; not invoked. Public source/docs and executed tests used.\
+**Changed and actual behavior:** native grant → consented setup/run → cross-origin preview → IPC mapper edit → fsynced source save → watch/history/recovery → quit/reopen.\
+**Tests / UI / file proof:** exact commands and real artifact paths above; source bytes and modes inspected, not mocks. CI result belongs to the exact submitted head and is recorded separately when available.\
+**Negative/security/regression checks:** documented above; previous phase unit/build coverage retained.\
+**Unknowns / blocked decisions:** no founder design decision remains blocked. Known environment/compiler/export boundaries listed above; phase approval remains the founder's decision.\
+**Recommendation:** READY FOR HUMAN VALIDATION — never marked Phase 2 PASS by an agent.
+
+Final local packaged restricted-network run: **16 checks passed**, artifact directory `apps/desktop/dist/local-workflow-d5VaDE/`. The additional offline production build is explicitly not asserted by that manual gate command, after its earlier documented Google-font failure. The ordinary development workflow separately passed **16 checks** including the outside-Electron production build (`apps/desktop/dist/local-workflow-9fsrgz/`). Toolbar controls are activated with real Enter key events in the harness after pointer diagnostics showed scrolling could deliver a click to the preview instead of the toolbar; canvas element selection still uses pointer clicks. No persistence or recovery operation was mocked. Latest full regression run: 218 tests / 14 files, all typechecks, lint and boundary scan exit 0 (209 files at that scan).

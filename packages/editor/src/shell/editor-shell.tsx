@@ -64,7 +64,7 @@ export function EditorShell({
   return (
     <main className="editor-shell">
       <header className="editor-header">
-        <p>allstudio playground</p>
+        <p>allstudio</p>
         <h1>Source editing</h1>
         <p>
           Shared editor package status: {EDITOR_STATUS}. Select a rendered

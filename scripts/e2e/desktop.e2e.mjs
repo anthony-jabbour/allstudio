@@ -66,7 +66,25 @@ try {
       process: typeof window.process,
       api: Object.keys(window.allstudio),
     })),
-    { require: "undefined", process: "undefined", api: ["runtime"] },
+    {
+      require: "undefined",
+      process: "undefined",
+      api: [
+        "runtime",
+        "recent",
+        "chooseProject",
+        "openRecent",
+        "closeProject",
+        "locate",
+        "previewTextEdit",
+        "applyTextEdit",
+        "previewClassEdit",
+        "applyClassEdit",
+        "undo",
+        "redo",
+        "onChange",
+      ],
+    },
   );
   const preferences = await application.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences(),
@@ -85,39 +103,13 @@ try {
     frame.src = previewUrl;
     document.body.append(frame);
   }, url);
-  const frame = page.frame({ url });
-  // Wait for the frame load rather than relying on the synchronous frame lookup.
-  const hostile =
-    frame ??
-    (await page.waitForEvent("framenavigated", {
-      predicate: (f) => f.url() === url,
-    }));
-  await hostile.waitForLoadState();
-  assert.deepEqual(
-    await hostile.evaluate(() => {
-      let parentDenied = false;
-      try {
-        window.parent.allstudio.runtime();
-      } catch {
-        parentDenied = true;
-      }
-      return {
-        require: typeof window.require,
-        process: typeof window.process,
-        api: typeof window.allstudio,
-        parentDenied,
-      };
-    }),
-    {
-      require: "undefined",
-      process: "undefined",
-      api: "undefined",
-      parentDenied: true,
-    },
+  await page.waitForTimeout(200);
+  assert.equal(
+    page.frames().some((frame) => frame.url() === url),
+    false,
   );
-  pass(
-    "hostile cross-origin iframe cannot access native APIs or the parent bridge",
-  );
+  await page.locator("#hostile-preview").evaluate((frame) => frame.remove());
+  pass("ungranted preview navigation is denied before content can load");
 
   // Give another top-level WebContents the real preload: main must still reject its IPC.
   await application.evaluate(async ({ BrowserWindow }, previewUrl) => {
