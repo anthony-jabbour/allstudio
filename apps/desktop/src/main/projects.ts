@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import { type BrowserWindow, dialog } from "electron";
 import type {
   OpenProject,
@@ -109,6 +110,7 @@ export class Projects {
   ): Promise<ProjectResult> {
     const result = this.tail.then(task).catch((error: unknown) => ({
       ok: false as const,
+      project: this.current?.info ?? null,
       message:
         error instanceof Error
           ? error.message
@@ -148,12 +150,13 @@ export class Projects {
     remembered?: SavedProject,
   ): Promise<ProjectResult> {
     if (this.disposed) throw new Error("Desktop is closing.");
-    await this.closeCurrent();
     const workspace = await LocalWorkspace.open(
       path,
       join(this.runtime, "files"),
       join(this.data, "recovery"),
     );
+    let candidate: Preview | null = null;
+    const active = this.current?.workspace;
     try {
       const identity = await workspace.files.identity();
       if (
@@ -163,6 +166,7 @@ export class Projects {
         throw new Error(
           "The project folder was replaced. Choose its folder again to grant access.",
         );
+      if (active?.root === workspace.root) await active.pauseWrites();
       await workspace.files.list();
       const pkg = JSON.parse(
         textOf((await workspace.files.read("package.json")).bytes).replace(
@@ -266,6 +270,13 @@ export class Projects {
         ...identity,
         ...(permission ? { permission } : {}),
       };
+      // Reopening shares the local port; keep its workspace/history until startup succeeds.
+      if (this.current?.info.path === workspace.root) await this.stopPreview();
+      candidate = await this.startPreview(workspace.root, args);
+      workspace.watch((message) => {
+        if (this.current?.workspace === workspace) this.notify(message);
+      });
+      if (this.disposed) throw new Error("Desktop is closing.");
       await durableJson(join(this.data, "projects.json"), {
         schema: 1,
         projects: [entry, ...saved.filter((item) => item.id !== id)].slice(
@@ -273,20 +284,22 @@ export class Projects {
           100,
         ),
       });
-      await this.startPreview(workspace.root, args);
       const info: OpenProject = {
         id,
         path: workspace.root,
         name: entry.name,
         previewUrl: `http://127.0.0.1:${port}/`,
       };
+      await this.closeCurrent();
+      this.preview = candidate;
       this.current = { info, workspace };
-      workspace.watch(this.notify);
       return { ok: true, project: info };
     } catch (error) {
-      await this.stopPreview();
+      await this.stopPreview(candidate);
       await workspace.close();
       throw error;
+    } finally {
+      active?.resumeWrites();
     }
   }
 
@@ -309,54 +322,62 @@ export class Projects {
       expectedStop: false,
       done: new Promise((resolve) => child.once("close", () => resolve())),
     };
-    this.preview = preview;
     child.once("close", () => {
-      if (!preview.expectedStop)
+      if (!preview.expectedStop && this.preview === preview)
         this.notify(
           "Preview stopped. Reopen the project; source files are retained.",
         );
     });
-    await new Promise<void>((resolve, reject) => {
-      let output = "";
-      let logBytes = 0;
-      const timeout = setTimeout(
-        () =>
-          reject(
-            new Error(
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let output = "";
+        let diagnostics = "";
+        let logBytes = 0;
+        const timeout = setTimeout(
+          () =>
+            fail(
               "Preview startup timed out. Check dependencies and whether its local port is already in use.",
             ),
-          ),
-        45_000,
-      );
-      const fail = () => {
-        clearTimeout(timeout);
-        reject(
-          new Error(
-            "Preview could not start. Check installed dependencies and the project's config.",
-          ),
+          45_000,
         );
-      };
-      child.once("error", fail);
-      child.once("close", fail);
-      child.stderr?.on("data", (chunk: Buffer) => {
-        logBytes += chunk.length;
-        if (logBytes > 1024 * 1024) fail();
-      });
-      child.stdout?.on("data", (chunk: Buffer) => {
-        logBytes += chunk.length;
-        output = (output + chunk.toString()).slice(-2000);
-        if (output.includes("ALLSTUDIO_PREVIEW_READY\n")) {
+        const fail = (
+          message = "Preview could not start. Check installed dependencies and the project's config.",
+        ) => {
           clearTimeout(timeout);
-          resolve();
-        }
-        if (logBytes > 1024 * 1024) fail();
+          reject(
+            new Error(
+              `${message}${diagnostics ? `\n\nRecent preview output:\n${diagnostics}` : ""}`,
+            ),
+          );
+        };
+        child.once("error", (error) => fail(error.message));
+        child.once("close", () => fail());
+        const record = (chunk: Buffer) => {
+          logBytes += chunk.length;
+          diagnostics = stripVTControlCharacters(
+            diagnostics + chunk.toString(),
+          ).slice(-4096);
+          if (logBytes > 1024 * 1024) fail();
+        };
+        child.stderr?.on("data", record);
+        child.stdout?.on("data", (chunk: Buffer) => {
+          record(chunk);
+          output = (output + chunk.toString()).slice(-2000);
+          if (output.includes("ALLSTUDIO_PREVIEW_READY\n")) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
       });
-    });
+      return preview;
+    } catch (error) {
+      await this.stopPreview(preview);
+      throw error;
+    }
   }
 
-  private async stopPreview() {
-    const preview = this.preview;
-    this.preview = null;
+  private async stopPreview(preview = this.preview) {
+    if (this.preview === preview) this.preview = null;
     if (!preview) return;
     preview.expectedStop = true;
     if (preview.child.pid) {

@@ -65,12 +65,14 @@ function App() {
     try {
       const result = await task();
       if (!result.ok) {
-        setProject(null);
+        setProject((current) =>
+          current?.id === result.project?.id ? current : result.project,
+        );
         setMessage(result.message);
         return;
       }
       if (result.unchanged) {
-        setMessage("Folder selection cancelled. The current project was kept.");
+        setMessage("Current project kept.");
         return;
       }
       setProject(result.project);
@@ -84,7 +86,6 @@ function App() {
       setRecent(items);
       setRecentId(items[0]?.id ?? "");
     } catch {
-      setProject(null);
       setMessage(
         "The local operation failed. Project files and recovery data were retained.",
       );

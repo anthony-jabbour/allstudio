@@ -117,11 +117,20 @@ export class LocalWorkspace implements SourceEditWorkspace {
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
-    if (this.closing) return Promise.reject(new FileFailure("unavailable"));
+    if (this.closing || this.paused)
+      return Promise.reject(new FileFailure("unavailable"));
     // Join before any await: workspace-wide serialization also preserves per-file call order and history.
     const result = this.tail.then(task);
     this.tail = result.catch(() => {});
     return result;
+  }
+  private paused = false;
+  pauseWrites() {
+    this.paused = true;
+    return this.tail;
+  }
+  resumeWrites() {
+    this.paused = false;
   }
   private journalPath(path: string) {
     return join(this.journal, `${hash(path)}.json`);
@@ -273,7 +282,10 @@ export class LocalWorkspace implements SourceEditWorkspace {
       }
       return ambiguous || matches.length > 1
         ? sourceEditFailure("oid-ambiguous")
-        : (matches[0] ?? sourceEditFailure("oid-not-found"));
+        : (matches[0] ??
+            sourceEditFailure(
+              /^p:[a-f0-9]{32}$/.test(oid) ? "stale-file" : "oid-not-found",
+            ));
     } catch (error) {
       return failure(error);
     }
@@ -353,6 +365,14 @@ export class LocalWorkspace implements SourceEditWorkspace {
       if (generated === source) return noop;
       const after = Buffer.from(generated);
       if (after.length > 1024 * 1024) return sourceEditFailure("invalid-patch");
+      const next = preparePreviewSource(
+        join(this.root, request.path),
+        generated,
+      );
+      const ordinal = preview.injectedOids.indexOf(request.oid);
+      const nextOid = next.injectedOids[ordinal];
+      if (!nextOid || next.injectedOids.length !== preview.injectedOids.length)
+        return sourceEditFailure("invalid-patch");
       const diff = formatLineDiff(
         createLineDiff(source, generated),
         request.path,
@@ -375,6 +395,7 @@ export class LocalWorkspace implements SourceEditWorkspace {
         written: write,
         noop: false,
         sha256: write ? hash(after) : hash(before),
+        oid: write ? nextOid : request.oid,
         diff,
       };
     } catch (error) {
@@ -435,16 +456,17 @@ function originalLocation(
 ): SourceLocation {
   const lines = preview.content.split("\n");
   function point(position: { line: number; column: number }) {
-    const prefix = lines[position.line - 1]?.slice(0, position.column) ?? "";
-    const inserted = preview.injectedOids.reduce(
-      (total, oid) =>
-        total +
-        (prefix.includes(` data-oid="${oid}"`)
-          ? ` data-oid="${oid}"`.length
-          : 0),
-      0,
-    );
-    return { line: position.line, column: position.column - inserted };
+    let prefix = [
+      ...lines.slice(0, position.line - 1),
+      lines[position.line - 1]?.slice(0, position.column) ?? "",
+    ].join("\n");
+    for (const attribute of preview.attributes)
+      prefix = prefix.replace(attribute.virtual, () => attribute.original);
+    const originalLines = prefix.split("\n");
+    return {
+      line: originalLines.length,
+      column: originalLines.at(-1)?.length ?? 0,
+    };
   }
   return {
     ...location,

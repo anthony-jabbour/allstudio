@@ -100,6 +100,21 @@ try {
   pass("renderer has no Node or raw IPC access; sandbox and isolation enabled");
 
   // Exercise hostile content against the actual app window, without production test hooks.
+  await application.evaluate(({ BrowserWindow }) => {
+    globalThis.frameAttempt = new Promise((resolve, reject) => {
+      const deadline = setTimeout(
+        () => reject(new Error("Frame navigation did not reach main")),
+        5000,
+      );
+      BrowserWindow.getAllWindows()[0].webContents.once(
+        "will-frame-navigate",
+        (event) => {
+          clearTimeout(deadline);
+          resolve({ url: event.url, denied: event.defaultPrevented });
+        },
+      );
+    });
+  });
   await page.evaluate((previewUrl) => {
     const frame = document.createElement("iframe");
     frame.id = "hostile-preview";
@@ -107,7 +122,10 @@ try {
     frame.src = previewUrl;
     document.body.append(frame);
   }, url);
-  await page.waitForTimeout(200);
+  assert.deepEqual(await application.evaluate(() => globalThis.frameAttempt), {
+    url,
+    denied: true,
+  });
   assert.equal(
     page.frames().some((frame) => frame.url() === url),
     false,
@@ -176,10 +194,10 @@ try {
         5000,
       );
       BrowserWindow.getAllWindows()[0].webContents.once(
-        "will-navigate",
-        (event, url) => {
+        "will-frame-navigate",
+        (event) => {
           clearTimeout(deadline);
-          resolve({ url, denied: event.defaultPrevented });
+          resolve({ url: event.url, denied: event.defaultPrevented });
         },
       );
     });

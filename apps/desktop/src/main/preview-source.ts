@@ -5,6 +5,7 @@ export interface PreviewSource {
   content: string;
   injectedOids: string[];
   originalOids: string[];
+  attributes: Array<{ virtual: string; original: string }>;
 }
 
 export function stripPreviewOids(
@@ -12,12 +13,11 @@ export function stripPreviewOids(
   preview: PreviewSource,
 ): string {
   let original = content;
-  for (const oid of preview.injectedOids) {
-    const attribute = ` data-oid="${oid}"`;
-    if (original.split(attribute).length !== 2) {
+  for (const attribute of preview.attributes) {
+    if (original.split(attribute.virtual).length !== 2) {
       throw new Error("Preview attribute missing or ambiguous");
     }
-    original = original.replace(attribute, "");
+    original = original.replace(attribute.virtual, () => attribute.original);
   }
   if (
     JSON.stringify(listOids(original)) !== JSON.stringify(preview.originalOids)
@@ -41,19 +41,28 @@ export function preparePreviewSource(
       .filter((oid) => !originalOids.includes(oid)),
   );
   const injectedOids: string[] = [];
+  const attributes: PreviewSource["attributes"] = [];
+  const version = createHash("sha256").update(source).digest("hex");
   const content = instrumented.content.replace(
-    / data-oid="([a-z0-9._:-]+)"/g,
-    (attribute, oid: string) => {
-      if (!added.has(oid)) return attribute;
-      const stable = `p:${createHash("sha256").update(`${path}:${injectedOids.length}`).digest("hex").slice(0, 32)}`;
+    /\s+data-oid\s*=\s*(["'])([^"']+)\1/g,
+    (attribute, quote: string, oid: string) => {
+      const stable = `p:${createHash("sha256").update(`${path}:${version}:${injectedOids.length}`).digest("hex").slice(0, 32)}`;
       if (originalOids.includes(stable))
         throw new Error("Preview ID conflicts with user source");
       injectedOids.push(stable);
-      return ` data-oid="${stable}"`;
+      const virtual = attribute.replace(
+        `${quote}${oid}${quote}`,
+        () => `${quote}${stable}${quote}`,
+      );
+      attributes.push({ virtual, original: added.has(oid) ? "" : attribute });
+      return virtual;
     },
   );
-  const preview = { content, injectedOids, originalOids };
-  if (stripPreviewOids(content, preview) !== source) {
+  const preview = { content, injectedOids, originalOids, attributes };
+  if (
+    JSON.stringify(listOids(content)) !== JSON.stringify(injectedOids) ||
+    stripPreviewOids(content, preview) !== source
+  ) {
     throw new Error("Instrumentation would rewrite user source");
   }
   return preview;

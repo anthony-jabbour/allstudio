@@ -51,6 +51,6 @@ export interface OpenProject extends RecentProject {
 }
 export type ProjectResult =
   | { ok: true; project: OpenProject | null; unchanged?: boolean }
-  | { ok: false; message: string };
+  | { ok: false; message: string; project: OpenProject | null };
 export const PROJECT_CHANNEL = "allstudio:project";
 export const CHANGE_CHANNEL = "allstudio:change";

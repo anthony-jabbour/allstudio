@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { once } from "node:events";
 import {
   access,
@@ -72,6 +73,8 @@ if (offline) {
   );
 }
 const config = await readFile(join(project, "next.config.ts"), "utf8");
+const replacement = join(evidence, "replacement");
+await cp(project, replacement, { recursive: true });
 const frameProbe = join(evidence, "frame-probe.cjs");
 await writeFile(
   frameProbe,
@@ -160,7 +163,9 @@ async function launch() {
       dialog.showOpenDialog = async () => {
         const selected = {
           canceled: Boolean(globalThis.cancelPicker),
-          filePaths: globalThis.cancelPicker ? [] : [root],
+          filePaths: globalThis.cancelPicker
+            ? []
+            : [globalThis.nextFolder ?? root],
         };
         globalThis.lastPickerResult = selected;
         return selected;
@@ -169,10 +174,16 @@ async function launch() {
         globalThis.testDialogs.push(args.at(-1));
         return {
           response:
-            args.at(-1).message === "Run this project's preview?" &&
-            globalThis.cancelRun
-              ? 1
-              : 0,
+            args.at(-1).message === "An interrupted save needs review" &&
+            globalThis.cancelRecovery
+              ? 2
+              : (args.at(-1).message === "Run this project's preview?" &&
+                    globalThis.cancelRun) ||
+                  (args.at(-1).message ===
+                    "Set up this project for visual editing?" &&
+                    globalThis.cancelIntegration)
+                ? 1
+                : 0,
           checkboxChecked: true,
         };
       };
@@ -238,6 +249,12 @@ try {
       "Electron external HTTP is disabled; the preview child gets OS egress denial and no parent secret",
     );
   }
+  const originalClasses = await page
+    .getByLabel("Classes", { exact: true })
+    .inputValue();
+  await page
+    .getByLabel("Classes", { exact: true })
+    .fill("keep-this-unsaved-class-draft");
   await page.getByLabel("Text", { exact: true }).fill("Saved locally");
   await page
     .getByRole("button", { name: "Preview text patch", exact: true })
@@ -253,6 +270,10 @@ try {
     )
     .waitFor({ timeout: 30_000 });
   const saved = await readFile(sourceFile, "utf8");
+  await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
+    "keep-this-unsaved-class-draft",
+  );
+  await page.getByLabel("Classes", { exact: true }).fill(originalClasses);
   assert.ok(saved.includes("Saved locally"));
   assert.ok(!saved.includes("data-oid="));
   pass("Apply saves real uninstrumented source and live preview refreshes");
@@ -293,7 +314,7 @@ try {
     page.getByRole("button", { name: "Open project", exact: true }),
   ).toBeEnabled();
   await page
-    .getByText("Folder selection cancelled. The current project was kept.", {
+    .getByText("Current project kept.", {
       exact: true,
     })
     .waitFor();
@@ -307,6 +328,52 @@ try {
   await application.evaluate(() => {
     globalThis.cancelPicker = false;
   });
+  await application.evaluate((_, replacement) => {
+    globalThis.nextFolder = replacement;
+    globalThis.cancelIntegration = true;
+  }, replacement);
+  await toolbar(page, "Open project");
+  await page
+    .getByText("Integration cancelled. Project files were kept.", {
+      exact: true,
+    })
+    .waitFor();
+  await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+    "Keep this unapplied draft",
+  );
+  await application.evaluate(() => {
+    globalThis.cancelIntegration = false;
+    globalThis.cancelRun = true;
+  });
+  await toolbar(page, "Open project");
+  await page
+    .getByText("Preview execution cancelled.", { exact: true })
+    .waitFor();
+  await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+    "Keep this unapplied draft",
+  );
+  await appendFile(
+    join(replacement, "next.config.allstudio-original.ts"),
+    '\nthrow new Error("ALLSTUDIO_STARTUP_DIAGNOSTIC_TEST");\n',
+  );
+  await application.evaluate(() => {
+    globalThis.cancelRun = false;
+  });
+  await toolbar(page, "Open project");
+  await expect(page.locator(".project-status")).toContainText(
+    "ALLSTUDIO_STARTUP_DIAGNOSTIC_TEST",
+    { timeout: 60_000 },
+  );
+  await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+    "Keep this unapplied draft",
+  );
+  await expect(preview.locator("h1")).toHaveText("Saved locally");
+  await application.evaluate(() => {
+    globalThis.nextFolder = undefined;
+  });
+  pass(
+    "cancelled integration, denied execution and failed replacement startup retain preview and draft; errors include child diagnostics",
+  );
   await page.getByLabel("Text", { exact: true }).fill("Saved locally");
   pass(
     "cancelling folder selection retains the current project and unapplied draft",
@@ -426,10 +493,28 @@ try {
   );
   assert.ok(frameIpc === "denied" || frameIpc === "unavailable");
   pass(`subframe IPC probe: ${frameIpc}`);
+  await application.evaluate(({ BrowserWindow }) => {
+    globalThis.frameAttempt = new Promise((resolve, reject) => {
+      const deadline = setTimeout(
+        () => reject(new Error("Frame navigation did not reach main")),
+        5000,
+      );
+      BrowserWindow.getAllWindows()[0].webContents.once(
+        "will-frame-navigate",
+        (event) => {
+          clearTimeout(deadline);
+          resolve({ url: event.url, denied: event.defaultPrevented });
+        },
+      );
+    });
+  });
   await frame.evaluate(() => {
     window.location.href = "http://127.0.0.1:9/untrusted";
   });
-  await page.waitForTimeout(200);
+  assert.deepEqual(await application.evaluate(() => globalThis.frameAttempt), {
+    url: "http://127.0.0.1:9/untrusted",
+    denied: true,
+  });
   assert.ok(
     frame.url().startsWith("http://127.0.0.1:") && !frame.url().includes(":9/"),
   );
@@ -601,6 +686,57 @@ try {
   );
   pass(
     "explicit reapproval runs the changed project and remembers the new fingerprint",
+  );
+  const liveBefore = await readFile(sourceFile, "utf8");
+  const liveAfter = `${liveBefore}\n// Recovered while preview was alive\n`;
+  const journal = join(
+    profile,
+    "recovery",
+    info.id,
+    `${createHash("sha256").update("src/app/page.tsx").digest("hex")}.json`,
+  );
+  await writeFile(
+    journal,
+    JSON.stringify({
+      schema: 1,
+      path: "src/app/page.tsx",
+      before: Buffer.from(liveBefore).toString("base64"),
+      after: Buffer.from(liveAfter).toString("base64"),
+    }),
+    { mode: 0o600 },
+  );
+  await page
+    .frameLocator('iframe[title="Project preview"]')
+    .locator("h1")
+    .click();
+  await page
+    .getByLabel("Text", { exact: true })
+    .fill("Retain draft on cancelled recovery");
+  await application.evaluate(() => {
+    globalThis.cancelRecovery = true;
+  });
+  await toolbar(page, "Reopen");
+  await expect(page.locator(".project-status")).toContainText(
+    "Recovery cancelled.",
+  );
+  await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+    "Retain draft on cancelled recovery",
+  );
+  assert.equal(await readFile(sourceFile, "utf8"), liveBefore);
+  await application.evaluate(() => {
+    globalThis.cancelRecovery = false;
+  });
+  await toolbar(page, "Reopen");
+  await expect(
+    page.getByRole("button", { name: "Reopen", exact: true }),
+  ).toBeEnabled();
+  await page
+    .getByText("Preview bridge: connected", { exact: false })
+    .waitFor({ timeout: 60_000 });
+  assert.equal(await readFile(sourceFile, "utf8"), liveAfter);
+  await assert.rejects(access(journal), (error) => error.code === "ENOENT");
+  pass(
+    "reopening a live project handles pending recovery; Cancel retains its draft and later Restore succeeds",
   );
   await toolbar(page, "Close project");
   await expect(

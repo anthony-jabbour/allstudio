@@ -67,9 +67,17 @@ describe("real local workspace", () => {
     expect(await readFile(join(workspace.root, request.path), "utf8")).toBe(
       source,
     );
-    expect(await workspace.applyTextEdit(request)).toMatchObject({
+    const result = await workspace.applyTextEdit(request);
+    expect(result).toMatchObject({
       ok: true,
       written: true,
+    });
+    if (!result.ok || !result.oid)
+      throw new Error("Replacement preview ID missing");
+    expect(result.oid).not.toBe(oid);
+    expect(await workspace.locate(result.oid)).toMatchObject({
+      ok: true,
+      element: { text: { text: "Changed" } },
     });
     expect(await readFile(join(workspace.root, request.path), "utf8")).toBe(
       source.replace("Hello", "Changed"),
@@ -86,6 +94,33 @@ describe("real local workspace", () => {
       source,
     );
     expect(await workspace.redo()).toMatchObject({ ok: true });
+  });
+  it("refuses a stale DOM ID before lookup even when inserted siblings shift its ordinal", async () => {
+    const path = "src/stale-dom.tsx";
+    const before = '<main><h1 data-oid="heading">Hello</h1></main>';
+    const oldOid = preparePreviewSource(join(workspace.root, path), before)
+      .injectedOids[1];
+    const after = before.replace("<h1", "<p>Inserted</p><h1");
+    await writeFile(join(workspace.root, path), after);
+    expect(await workspace.locate(oldOid)).toMatchObject({
+      ok: false,
+      reason: "stale-file",
+    });
+    expect(
+      await workspace.applyTextEdit({
+        path,
+        oid: oldOid,
+        expectedSha256: hash(after),
+        text: "Wrong node",
+      }),
+    ).toMatchObject({ ok: false });
+    expect(await readFile(join(workspace.root, path), "utf8")).toBe(after);
+    const fresh = preparePreviewSource(join(workspace.root, path), after)
+      .injectedOids[2];
+    expect(await workspace.locate(fresh)).toMatchObject({
+      ok: true,
+      element: { text: { text: "Hello" } },
+    });
   });
   it("refuses traversal and malformed UTF-8 without changing bytes", async () => {
     const invalid = Buffer.from([0xff, 0xfe]);
@@ -108,6 +143,43 @@ describe("real local workspace", () => {
     ).toMatchObject({ ok: false, reason: "unsupported-encoding" });
     expect(await readFile(join(workspace.root, "src/bad.tsx"))).toEqual(
       invalid,
+    );
+  });
+  it("maps original columns across multiline user attributes and returns a fresh ID after class saves", async () => {
+    const path = "src/multiline.tsx";
+    const before =
+      "<main><h1 data-oid =\n 'user-heading' className='old'>Hello</h1></main>";
+    await writeFile(join(workspace.root, path), before);
+    const oid = preparePreviewSource(join(workspace.root, path), before)
+      .injectedOids[1];
+    const located = await workspace.locate(oid);
+    expect(located).toMatchObject({
+      ok: true,
+      element: {
+        location: {
+          start: { line: 1, column: 6 },
+          end: { line: 2, column: before.split("\n")[1].indexOf("</h1>") + 5 },
+        },
+      },
+    });
+    const result = await workspace.applyClassEdit({
+      path,
+      oid,
+      expectedSha256: hash(before),
+      className: "new",
+    });
+    expect(result).toMatchObject({ ok: true, written: true });
+    if (!result.ok || !result.oid) throw new Error("Replacement ID missing");
+    expect(await workspace.locate(oid)).toMatchObject({
+      ok: false,
+      reason: "stale-file",
+    });
+    expect(await workspace.locate(result.oid)).toMatchObject({
+      ok: true,
+      element: { className: { value: "new" } },
+    });
+    expect(await readFile(join(workspace.root, path), "utf8")).toBe(
+      before.replace("className='old'", "className='new'"),
     );
   });
   it("keeps BOM bytes and no-op inode/mtime unchanged", async () => {
@@ -213,5 +285,33 @@ describe("real local workspace", () => {
       "External change remains",
     );
     expect(await workspace.pending()).toHaveLength(0);
+  });
+  it("pauses admission synchronously and drains an in-flight save before recovery inspection", async () => {
+    const path = "src/drain.tsx";
+    await writeFile(join(workspace.root, path), source);
+    const oid = preparePreviewSource(join(workspace.root, path), source)
+      .injectedOids[1];
+    const request = {
+      path,
+      oid,
+      expectedSha256: hash(source),
+      text: "Drained",
+    };
+    const save = workspace.applyTextEdit(request);
+    const drained = workspace.pauseWrites();
+    try {
+      await expect(workspace.applyTextEdit(request)).rejects.toMatchObject({
+        reason: "unavailable",
+      });
+      await drained;
+      expect(await save).toMatchObject({ ok: true, written: true });
+      expect(await workspace.pending()).toHaveLength(0);
+      expect(await readFile(join(workspace.root, path), "utf8")).toBe(
+        source.replace("Hello", "Drained"),
+      );
+    } finally {
+      workspace.resumeWrites();
+    }
+    expect(await workspace.undo()).toMatchObject({ ok: true });
   });
 });

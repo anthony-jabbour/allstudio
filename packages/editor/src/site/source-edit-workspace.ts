@@ -78,6 +78,8 @@ export type TextEditResult =
       written: boolean;
       noop: boolean;
       sha256: string;
+      /** Replacement preview ID when the adapter binds IDs to source versions. */
+      oid?: string;
       /** Unified diff of the change, empty for no-ops. */
       diff: string;
     }

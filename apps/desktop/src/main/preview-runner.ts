@@ -23,8 +23,12 @@ runtime
       process.stdout.write("ALLSTUDIO_PREVIEW_READY\n"),
     );
   })
-  .catch(() => process.exit(1));
-server.on("error", () => process.exit(1));
+  .catch(fail);
+function fail(error: unknown) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+server.on("error", fail);
 let stopping = false;
 function stop() {
   if (stopping) return;
