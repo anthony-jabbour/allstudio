@@ -24,6 +24,6 @@ In-source `data-oid` attributes are written during editing, matching Onlook. Str
 
 ## Consequences
 
-- Phase 0 is not marked PASS by an agent. Human validation of the spike remains.
+- Founder marked Phase 0 **PASS** on 2026-10-25 via option A, reconfirmed in the local Phase 2 implementation chat. This records human approval, not new test execution.
 - Claude Code may extract parser code into `@allstudio/editor` with provenance.
-- Do not start Electron or copy the Onlook application tree.
+- The original hold on Electron is superseded by founder Phase 0 and Phase 1 PASS (2026-10-25) and authorization to start Phase 2. Explicit Phase 2 tooling and behavior approvals remain required. Do not copy the Onlook application tree.

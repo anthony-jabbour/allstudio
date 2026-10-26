@@ -1,6 +1,6 @@
 # Phase 1 — Independent source diff review
 
-**Status:** REVIEW RECORD. Does not mark Phase 1 PASS. Founder gate approval required.  
+**Status:** HISTORICAL REVIEW RECORD — this review did not approve a gate. Founder subsequently marked Phase 1 **PASS** (2026-10-25); see `PHASE-01.md`.\
 **Date:** 2026-10-25  
 **Reviewer:** a separate Claude agent instance, read-only. It did not write the
 code under review and changed no repository files.  

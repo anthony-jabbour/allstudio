@@ -1,0 +1,17 @@
+appId: dev.allstudio.editor
+productName: allstudio
+asar: true
+npmRebuild: false
+directories:
+  output: dist
+files:
+  - out/main/**
+  - out/preload/**
+  - out/renderer/**
+  - package.json
+mac:
+  identity: null
+  category: public.app-category.developer-tools
+linux:
+  executableName: allstudio
+  category: Development

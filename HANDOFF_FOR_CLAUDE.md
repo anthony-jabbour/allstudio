@@ -19,16 +19,16 @@ This repository is a **buildable foundation**, not a design editor.
 | `examples/nextjs-site-fixture` | Aurora Atelier: minimal Next.js + Tailwind landing page |
 | `examples/nested-components-fixture` | Lumen Notes: nested components, reused component, `.map()`, ternary, `&&` |
 | `examples/tailwind-variants-fixture` | Harbor Studio: responsive/state/dark variants, `cn()`, template-literal className |
-| `apps/desktop` | Not created (wait for Onlook proof) |
+| `apps/desktop` | Phase 2 S0: hardened Electron shell; dev and unsigned packaged Mac smoke checks pass |
 | `packages/protocol` | Not created (wait for first cloud integration) |
 | Onlook extraction | Parser slice in `@allstudio/editor`; preview bridge is original (see `docs/validation/PHASE-01.md`) |
-| Electron | Not started |
+| Electron | S0 implemented; actual local project workflow still incomplete |
 
 ## Implemented versus planned
 
 Implemented: install/lint/typecheck/unit tests/public-boundary check/playground/fixtures; Phase 0 Onlook research report; Phase 1 source mapper; Phase 1 slice 2 browser text-edit loop; Phase 1 slice 3 three fixtures + class edits + format-preserving writes (`docs/validation/PHASE-01.md`).
 
-Planned next: founder PASS decision on Phase 1. All gate tests are evidenced (`docs/validation/PHASE-01.md` → "Phase 1 gate closure"), and the independent review is in `docs/validation/PHASE-01-REVIEW.md`. Phase 2 (Electron) starts after the founder marks Phase 1. Neither Phase 0 nor Phase 1 is marked PASS by an agent.
+Phase 1 is founder **PASS** (2026-10-25) on `main` @ `5f29824` (PRs #2–#8). Evidence: `docs/validation/PHASE-01.md` and `docs/validation/PHASE-01-REVIEW.md`. Phase 0 is also founder **PASS** (2026-10-25), via ADR-0002 option A. Phase 2 is **IN PROGRESS**: S0 native shell and packaged Mac smoke checks executed; project preview/edit/save/recovery workflow remains incomplete. See `docs/validation/PHASE-02.md`. Cloud may write it; the gate proof is a local Mac run. Ask before picking a packaging tool.
 
 ## Verified commands
 
@@ -61,6 +61,6 @@ Re-run on 2026-10-25 (Linux, Bun 1.4.4) for Phase 1 gate closure: `bun run test`
 
 ## First recommended roadmap task
 
-Founder PASS decision on Phase 1 (`docs/validation/PHASE-01.md` → "Phase 1 gate closure"), plus the open decisions there (Playwright in CI; select vs interact). Then Phase 2: Electron and real local-first behavior.
+Phase 2: Electron and real local-first behavior. Open decisions that do not block starting Electron: Playwright in CI; select vs interact; packaging tool (ask before adopting).
 
 Founder approved Phase 0 exit option A (`docs/decisions/ADR-0002-phase-0-exit.md`).

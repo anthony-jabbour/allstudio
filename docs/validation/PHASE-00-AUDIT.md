@@ -1,6 +1,6 @@
 # Phase 0 / Phase 1 slice — Independent audit
 
-**Status:** AUDIT RECORD — does **not** mark Phase 0 or Phase 1 PASS. Founder gate approval required.  
+**Status:** HISTORICAL AUDIT RECORD — this audit did not approve a gate. Founder subsequently marked Phases 0 and 1 **PASS** (2026-10-25); see the phase validation reports.\
 **Auditor:** Claude Code (independent of the Cursor implementation in PR #2)  
 **Date:** 2026-10-25  
 **Audited commit:** `main` @ `cf4bcd5bfbb718e6b1d7674d2ef9652309672d06` (PR #2 merge)  
