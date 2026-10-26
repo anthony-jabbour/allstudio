@@ -14,6 +14,7 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
+import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -59,6 +60,10 @@ await symlink(
   "dir",
 );
 const sourceFile = join(project, "src/app/page.tsx");
+await appendFile(
+  sourceFile,
+  `\n// data-oid="comment-only"\nconst htmlSnippet = "<p data-oid='example'>Example</p>";\n`,
+);
 const original = await readFile(sourceFile, "utf8");
 if (offline) {
   assert.equal(
@@ -200,6 +205,20 @@ async function launch() {
   return application.firstWindow();
 }
 
+const occupied = createServer((_request, response) =>
+  response.end("Existing local service"),
+);
+const legacyPort =
+  40000 +
+  (Number.parseInt(
+    createHash("sha256").update(project).digest("hex").slice(0, 8),
+    16,
+  ) %
+    15000);
+await new Promise((resolve, reject) => {
+  occupied.once("error", reject);
+  occupied.listen(legacyPort, "127.0.0.1", resolve);
+});
 try {
   let page = await launch();
   await toolbar(page, "Open project");
@@ -209,6 +228,18 @@ try {
   const preview = page.frameLocator('iframe[title="Project preview"]');
   await preview.locator("h1").click();
   const originalHeading = await preview.locator("h1").innerText();
+  assert.notEqual(
+    new URL(
+      page
+        .frames()
+        .find((frame) => frame.url().startsWith("http://127.0.0.1:"))
+        ?.url(),
+    ).port,
+    String(legacyPort),
+  );
+  pass(
+    "preview binds an available OS-assigned port while the old fixed port is occupied; HTML snippets and comments still compile",
+  );
   await page.getByTestId("source-location").waitFor();
   assert.equal(await readFile(sourceFile, "utf8"), original);
   assert.equal(
@@ -270,12 +301,14 @@ try {
     )
     .waitFor({ timeout: 30_000 });
   const saved = await readFile(sourceFile, "utf8");
+  assert.equal(saved, original.replace(originalHeading, "Saved locally"));
   await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
     "keep-this-unsaved-class-draft",
   );
   await page.getByLabel("Classes", { exact: true }).fill(originalClasses);
   assert.ok(saved.includes("Saved locally"));
-  assert.ok(!saved.includes("data-oid="));
+  assert.ok(!saved.includes('data-oid="p:'));
+  assert.ok(saved.includes("<p data-oid='example'>Example</p>"));
   pass("Apply saves real uninstrumented source and live preview refreshes");
   const info = (await page.evaluate(() => window.allstudio.recent()))[0];
   const oid = await preview.locator("h1").getAttribute("data-oid");
@@ -813,6 +846,8 @@ try {
   }
   throw error;
 } finally {
+  occupied.closeAllConnections();
+  await new Promise((resolve) => occupied.close(resolve));
   if (application) await application.close();
   if (orphanPid) {
     try {

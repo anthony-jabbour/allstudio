@@ -20,6 +20,7 @@ interface SavedProject extends RecentProject {
 }
 interface Preview {
   child: ChildProcess;
+  port: number;
   done: Promise<void>;
   expectedStop: boolean;
 }
@@ -216,12 +217,7 @@ export class Projects {
         await applyIntegration(workspace.files, plan);
       }
       const id = hash(workspace.root);
-      const port = 40000 + (Number.parseInt(id.slice(0, 8), 16) % 15000);
-      const args = [
-        join(this.runtime, "preview-runner.cjs"),
-        workspace.root,
-        String(port),
-      ];
+      const args = [join(this.runtime, "preview-runner.cjs"), workspace.root];
       const fingerprintParts: Array<string | Buffer> = [
         identity.dev,
         identity.ino,
@@ -270,7 +266,7 @@ export class Projects {
         ...identity,
         ...(permission ? { permission } : {}),
       };
-      // Reopening shares the local port; keep its workspace/history until startup succeeds.
+      // Next holds one dev lock per project; retain workspace/history until restart succeeds.
       if (this.current?.info.path === workspace.root) await this.stopPreview();
       candidate = await this.startPreview(workspace.root, args);
       workspace.watch((message) => {
@@ -288,7 +284,7 @@ export class Projects {
         id,
         path: workspace.root,
         name: entry.name,
-        previewUrl: `http://127.0.0.1:${port}/`,
+        previewUrl: `http://127.0.0.1:${candidate.port}/`,
       };
       await this.closeCurrent();
       this.preview = candidate;
@@ -319,6 +315,7 @@ export class Projects {
     });
     const preview: Preview = {
       child,
+      port: 0,
       expectedStop: false,
       done: new Promise((resolve) => child.once("close", () => resolve())),
     };
@@ -363,7 +360,9 @@ export class Projects {
         child.stdout?.on("data", (chunk: Buffer) => {
           record(chunk);
           output = (output + chunk.toString()).slice(-2000);
-          if (output.includes("ALLSTUDIO_PREVIEW_READY\n")) {
+          const ready = output.match(/ALLSTUDIO_PREVIEW_READY:([0-9]{1,5})\n/);
+          if (ready && Number(ready[1]) >= 1024 && Number(ready[1]) <= 65535) {
+            preview.port = Number(ready[1]);
             clearTimeout(timeout);
             resolve();
           }

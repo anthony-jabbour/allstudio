@@ -2,28 +2,33 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 
-const [root, portText] = process.argv.slice(2);
-const port = Number(portText);
-if (!root || !Number.isInteger(port) || port < 1024 || port > 65535)
+const [root] = process.argv.slice(2);
+if (!root || process.argv.length !== 3)
   throw new Error("Invalid preview arguments");
 const projectRequire = createRequire(join(root, "package.json"));
 const next = projectRequire("next");
-const runtime = next({
-  dev: true,
-  dir: root,
-  hostname: "127.0.0.1",
-  port,
-  turbopack: true,
+const server = createServer();
+let closeRuntime: (() => Promise<void>) | undefined;
+server.listen(0, "127.0.0.1", () => {
+  const address = server.address();
+  if (!address || typeof address === "string")
+    return fail("Invalid preview address");
+  const runtime = next({
+    dev: true,
+    dir: root,
+    hostname: "127.0.0.1",
+    port: address.port,
+    turbopack: true,
+  });
+  closeRuntime = () => runtime.close();
+  server.on("request", runtime.getRequestHandler());
+  runtime
+    .prepare()
+    .then(() => {
+      process.stdout.write(`ALLSTUDIO_PREVIEW_READY:${address.port}\n`);
+    })
+    .catch(fail);
 });
-const server = createServer(runtime.getRequestHandler());
-runtime
-  .prepare()
-  .then(() => {
-    server.listen(port, "127.0.0.1", () =>
-      process.stdout.write("ALLSTUDIO_PREVIEW_READY\n"),
-    );
-  })
-  .catch(fail);
 function fail(error: unknown) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
@@ -35,7 +40,7 @@ function stop() {
   stopping = true;
   server.closeAllConnections();
   server.close();
-  void runtime.close().catch(() => {});
+  void closeRuntime?.().catch(() => {});
   setTimeout(() => {
     try {
       process.kill(-process.pid, "SIGKILL");
