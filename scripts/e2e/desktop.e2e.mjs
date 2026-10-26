@@ -25,6 +25,9 @@ const server = createServer((_request, response) => {
 await new Promise((done) => server.listen(0, "127.0.0.1", done));
 const url = `http://127.0.0.1:${server.address().port}/`;
 let application;
+let tracingStarted = false;
+let primaryFailure;
+const cleanupErrors = [];
 let checks = 0;
 function pass(message) {
   checks++;
@@ -44,6 +47,7 @@ try {
   await application
     .context()
     .tracing.start({ screenshots: true, snapshots: true });
+  tracingStarted = true;
   const page = await application.firstWindow();
   await page
     .getByRole("status")
@@ -120,12 +124,14 @@ try {
   );
 
   // Give another top-level WebContents the real preload: main must still reject its IPC.
-  await application.evaluate(async ({ BrowserWindow }, previewUrl) => {
-    const trusted = BrowserWindow.getAllWindows()[0];
+  const attackerWindow = application.waitForEvent("window");
+  await application.evaluate(async ({ app, BrowserWindow }, previewUrl) => {
     const attacker = new BrowserWindow({
       show: false,
       webPreferences: {
-        preload: trusted.webContents.getLastWebPreferences().preload,
+        preload: process
+          .getBuiltinModule("node:path")
+          .join(app.getAppPath(), "out/preload/index.cjs"),
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
@@ -133,18 +139,17 @@ try {
     });
     await attacker.loadURL(previewUrl);
   }, url);
-  const attacker = application.windows().find((item) => item !== page);
+  const attacker = await attackerWindow;
   assert.ok(attacker);
+  assert.notEqual(attacker, page);
   assert.equal(
-    await attacker.evaluate(async () => {
-      try {
-        await window.allstudio.runtime();
-        return "allowed";
-      } catch {
-        return "denied";
-      }
-    }),
-    "denied",
+    await attacker.evaluate(() => typeof window.allstudio?.runtime),
+    "function",
+    "The hostile window must load the real bridge before testing main's authorization",
+  );
+  await assert.rejects(
+    attacker.evaluate(() => window.allstudio.runtime()),
+    /Unauthorized desktop request/,
   );
   await attacker.close();
   pass(
@@ -152,13 +157,49 @@ try {
   );
 
   await page.evaluate((external) => {
+    const button = document.createElement("button");
+    button.id = "popup-attempt";
+    button.textContent = "Attempt untrusted popup";
+    button.addEventListener("click", () => {
+      window.popupDenied = window.open(external) === null;
+    });
+    document.body.append(button);
+  }, url);
+  await page.locator("#popup-attempt").press("Enter");
+  assert.equal(
+    await page.evaluate(() => window.popupDenied),
+    true,
+    "A real user-activated window.open must receive the deny response",
+  );
+  assert.equal(
+    await application.evaluate(
+      ({ BrowserWindow }) => BrowserWindow.getAllWindows().length,
+    ),
+    1,
+  );
+  await application.evaluate(({ BrowserWindow }) => {
+    globalThis.navigationAttempt = new Promise((resolve, reject) => {
+      const deadline = setTimeout(
+        () => reject(new Error("Navigation did not reach main")),
+        5000,
+      );
+      BrowserWindow.getAllWindows()[0].webContents.once(
+        "will-navigate",
+        (event, url) => {
+          clearTimeout(deadline);
+          resolve({ url, denied: event.defaultPrevented });
+        },
+      );
+    });
+  });
+  await page.evaluate((external) => {
     window.location.href = external;
   }, url);
-  await page.waitForTimeout(150);
+  assert.deepEqual(
+    await application.evaluate(() => globalThis.navigationAttempt),
+    { url, denied: true },
+  );
   assert.equal(page.url(), "app://editor/index.html");
-  await page.evaluate((external) => window.open(external), url);
-  await page.waitForTimeout(150);
-  assert.equal(application.windows().length, 1);
   pass("untrusted top navigation and popups denied");
 
   const forbidden = await application.evaluate(async ({ net }) => {
@@ -171,13 +212,45 @@ try {
   console.log(
     `${checks} desktop checks passed (${executablePath ? "packaged" : "development"}).`,
   );
+} catch (error) {
+  primaryFailure = error;
+  throw error;
 } finally {
   if (application) {
-    await application
-      .context()
-      .tracing.stop({ path: join(evidence, "trace.zip") });
-    await application.close();
+    try {
+      if (tracingStarted)
+        await application
+          .context()
+          .tracing.stop({ path: join(evidence, "trace.zip") });
+    } catch (error) {
+      cleanupErrors.push(error);
+    } finally {
+      try {
+        await application.close();
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
   }
-  await new Promise((done) => server.close(done));
-  await rm(userData, { recursive: true, force: true });
+  try {
+    server.closeAllConnections();
+    await new Promise((done, reject) =>
+      server.close((error) => (error ? reject(error) : done())),
+    );
+  } catch (error) {
+    cleanupErrors.push(error);
+  } finally {
+    try {
+      await rm(userData, { recursive: true, force: true });
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+  }
+  if (cleanupErrors.length && primaryFailure)
+    console.error(
+      "Cleanup also failed:",
+      cleanupErrors.map((error) => String(error)),
+    );
 }
+if (cleanupErrors.length)
+  throw new AggregateError(cleanupErrors, "Desktop test cleanup failed");
