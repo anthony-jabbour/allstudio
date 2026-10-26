@@ -408,11 +408,13 @@ try {
     "file watching detects external change; a stale save is non-destructive",
   );
 
-  const outside = join(evidence, "outside.tsx");
+  const outsideDir = join(evidence, "outside-dir");
+  await mkdir(outsideDir);
+  const outside = join(outsideDir, "outside.tsx");
   await writeFile(outside, '<p data-oid="outside">Private outside source</p>');
   await symlink(outside, join(project, "src/escape.tsx"));
   await link(outside, join(project, "src/hardlink.tsx"));
-  await symlink(evidence, join(project, "src/escape-dir"), "dir");
+  await symlink(outsideDir, join(project, "src/escape-dir"), "dir");
   for (const path of [
     "../outside.tsx",
     "src/../outside.tsx",
@@ -450,7 +452,7 @@ try {
   pass(
     "IPC denies traversal, symlink/hardlink escapes, config writes and ungranted project IDs",
   );
-  // Remove the deliberate cyclic escape before asking the real compiler to rebuild.
+  // Remove the deliberate escapes before asking the real compiler to rebuild.
   for (const name of ["escape.tsx", "hardlink.tsx", "escape-dir"])
     await rm(join(project, "src", name));
 
