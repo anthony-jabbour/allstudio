@@ -19,16 +19,16 @@ This repository is a **buildable foundation**, not a design editor.
 | `examples/nextjs-site-fixture` | Aurora Atelier: minimal Next.js + Tailwind landing page |
 | `examples/nested-components-fixture` | Lumen Notes: nested components, reused component, `.map()`, ternary, `&&` |
 | `examples/tailwind-variants-fixture` | Harbor Studio: responsive/state/dark variants, `cn()`, template-literal className |
-| `apps/desktop` | Connected local project workflow: preview-only IDs, real source saves, watch/conflicts, session history, recovery and packaged Mac evidence; founder Phase 2 gate pending |
+| `apps/desktop` | Connected local project workflow: preview-only IDs, real source saves, watch/conflicts, session history, recovery and packaged Mac evidence; founder Phase 2 PASS (2026-10-26) |
 | `packages/protocol` | Not created (wait for first cloud integration) |
 | Onlook extraction | Parser slice in `@allstudio/editor`; preview bridge is original (see `docs/validation/PHASE-01.md`) |
-| Electron | Connected workflow implemented on the Phase 2 branch; see `docs/validation/PHASE-02.md` |
+| Electron | Connected workflow merged to `main` through PRs #11–#14; see `docs/validation/PHASE-02.md` |
 
 ## Implemented versus planned
 
 Implemented: install/lint/typecheck/unit tests/public-boundary check/playground/fixtures; Phase 0 Onlook research report; Phase 1 source mapper; Phase 1 slice 2 browser text-edit loop; Phase 1 slice 3 three fixtures + class edits + format-preserving writes (`docs/validation/PHASE-01.md`).
 
-Phase 1 is founder **PASS** (2026-10-25) on `main` @ `5f29824` (PRs #2–#8). Evidence: `docs/validation/PHASE-01.md` and `docs/validation/PHASE-01-REVIEW.md`. Phase 0 is also founder **PASS** (2026-10-25), via ADR-0002 option A. Phase 2 is **IN PROGRESS**: connected development and packaged Mac workflows executed, including restricted-network operation and real interrupted-save recovery. Recommendation is at most READY FOR HUMAN VALIDATION; no agent marks Phase 2 PASS. See `docs/validation/PHASE-02.md` and `apps/desktop/README.md`. Cloud may write it; the gate proof is a local Mac run. Ask before picking a packaging tool.
+Phase 1 is founder **PASS** (2026-10-25) on `main` @ `5f29824` (PRs #2–#8). Evidence: `docs/validation/PHASE-01.md` and `docs/validation/PHASE-01-REVIEW.md`. Phase 0 is also founder **PASS** (2026-10-25), via ADR-0002 option A. Phase 2 is founder **PASS** (2026-10-26): “Phase 2 has my validation.” Implementation merged at `91fd9d8` (PRs #11–#14), with connected development and packaged Mac evidence, restricted-network operation and real interrupted-save recovery. See `docs/validation/PHASE-02.md` and `apps/desktop/README.md`. Earlier agent recommendations were pending human validation; this status records the founder's explicit decision.
 
 ## Verified commands
 
@@ -56,11 +56,10 @@ Re-run on 2026-10-25 (Linux, Bun 1.4.4) for Phase 1 gate closure: `bun run test`
 
 - Final package manager (Bun vs pnpm)
 - Public npm scope availability for `@allstudio/*`
-- Electron packaging tool
 - Exact `.allstudio` project schema beyond the illustrative v1 type
 
 ## First recommended roadmap task
 
-Phase 2: Electron and real local-first behavior. Open decisions that do not block starting Electron: Playwright in CI; select vs interact; packaging tool (ask before adopting).
+Phase 3: Professional code-aware design workspace. Phases 0–2 have founder approval. Consult `RoadMap.md` Phase 3 and seek founder decisions for material UX/architecture choices before implementation. The Phase 2 toolchain, script-consent and preview decisions are already approved and recorded in `docs/research/phase-02-desktop.md`; do not reopen them as unanswered choices.
 
 Founder approved Phase 0 exit option A (`docs/decisions/ADR-0002-phase-0-exit.md`).
