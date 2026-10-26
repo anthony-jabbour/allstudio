@@ -49,6 +49,25 @@ async function snapshot(directory, root = directory) {
   }
   return hashes;
 }
+
+function renderedIds(html) {
+  const elements = [
+    ...html.matchAll(
+      /<([a-z][a-z0-9-]*)\b[^>]*\bdata-oid="(p:[a-f0-9]{32})"[^>]*>/g,
+    ),
+  ].map((match) => ({ tag: match[1], oid: match[2] }));
+  assert.deepEqual(
+    elements.map((element) => element.tag),
+    ["html", "body", "main", "p", "h1", "p", "button"],
+    "Both layout elements and every page element must carry a preview ID",
+  );
+  assert.equal(
+    new Set(elements.map((element) => element.oid)).size,
+    7,
+    "All seven rendered preview IDs must be unique",
+  );
+  return elements;
+}
 const before = await snapshot(join(fixture, "src"));
 const configBefore = await readFile(join(fixture, "next.config.ts"), "utf8");
 // This disposable repository-owned fixture proves the loader, not transparent
@@ -100,18 +119,9 @@ try {
   const html = await first.text();
   assert.equal(first.status, 200, html.slice(0, 1000));
   await writeFile(join(output, "page.html"), html);
-  const ids = [...html.matchAll(/data-oid="(p:[a-f0-9]{32})"/g)].map(
-    (item) => item[1],
-  );
-  assert.ok(
-    ids.length >= 3,
-    "HTML must contain IDs injected during compilation",
-  );
+  const ids = renderedIds(html);
   const second = await (await fetch(url)).text();
-  assert.deepEqual(
-    [...second.matchAll(/data-oid="(p:[a-f0-9]{32})"/g)].map((item) => item[1]),
-    ids,
-  );
+  assert.deepEqual(renderedIds(second), ids);
   assert.deepEqual(await snapshot(join(fixture, "src")), before);
   assert.deepEqual(await snapshot(join(copy, "src")), copiedBefore);
   assert.equal(
