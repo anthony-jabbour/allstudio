@@ -1,0 +1,206 @@
+{
+  "observed_date": "2026-10-27",
+  "timezone": "America/Los_Angeles",
+  "method": "gh api repos/{owner}/{repo}, commits/{default_branch}; recursive Git trees for the three mandatory repositories",
+  "scope": "Repository metadata and selected source inspection; not dependency security or runtime certification",
+  "repositories": [
+    {
+      "full_name": "BetterTyped/react-zoom-pan-pinch",
+      "html_url": "https://github.com/BetterTyped/react-zoom-pan-pinch",
+      "stargazers_count": 1957,
+      "default_branch": "master",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2026-10-24T20:05:27Z",
+      "archived": false,
+      "open_issues_count": 23,
+      "head": "df6a7c6187a41bb0c7d294d0aedd7cd632369671",
+      "head_date": "2026-10-12T12:10:39Z"
+    },
+    {
+      "full_name": "benjamn/recast",
+      "html_url": "https://github.com/benjamn/recast",
+      "stargazers_count": 5256,
+      "default_branch": "master",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2026-10-18T19:06:16Z",
+      "archived": false,
+      "open_issues_count": 202,
+      "head": "111a5a8034091e7f844456b06eaac8fd1a3064fc",
+      "head_date": "2026-10-18T19:06:16Z"
+    },
+    {
+      "full_name": "daybrush/moveable",
+      "html_url": "https://github.com/daybrush/moveable",
+      "stargazers_count": 10764,
+      "default_branch": "master",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2024-06-03T07:57:45Z",
+      "archived": false,
+      "open_issues_count": 454,
+      "head": "75069102f30c88cd89ecaaa8ca7e5f7434e54807",
+      "head_date": "2023-12-03T13:52:09Z"
+    },
+    {
+      "full_name": "daybrush/selecto",
+      "html_url": "https://github.com/daybrush/selecto",
+      "stargazers_count": 2234,
+      "default_branch": "master",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2024-06-17T18:43:06Z",
+      "archived": false,
+      "open_issues_count": 94,
+      "head": "7c75ef57790ffc197afdab0f49127ce38d3707b9",
+      "head_date": "2023-12-03T09:53:11Z"
+    },
+    {
+      "full_name": "dcastil/tailwind-merge",
+      "html_url": "https://github.com/dcastil/tailwind-merge",
+      "stargazers_count": 5701,
+      "default_branch": "main",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2026-10-26T16:27:33Z",
+      "archived": false,
+      "open_issues_count": 33,
+      "head": "7b5d20c543c3de07cd9fad570a9af0b5a0f976f6",
+      "head_date": "2026-10-23T21:42:17Z"
+    },
+    {
+      "full_name": "facebook/lexical",
+      "html_url": "https://github.com/facebook/lexical",
+      "stargazers_count": 23984,
+      "default_branch": "main",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2026-10-28T05:35:22Z",
+      "archived": false,
+      "open_issues_count": 384,
+      "head": "8a573d146047f0cc2ab8eb9232a88e3c73ccd48d",
+      "head_date": "2026-10-28T04:19:23Z"
+    },
+    {
+      "full_name": "omgovich/react-colorful",
+      "html_url": "https://github.com/omgovich/react-colorful",
+      "stargazers_count": 3561,
+      "default_branch": "master",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2026-09-01T16:22:24Z",
+      "archived": false,
+      "open_issues_count": 37,
+      "head": "8506e8c4b777e0056ce3567dc3a06ced143034bc",
+      "head_date": "2026-09-01T16:18:25Z"
+    },
+    {
+      "full_name": "onlook-dev/onlook",
+      "html_url": "https://github.com/onlook-dev/onlook",
+      "stargazers_count": 27020,
+      "default_branch": "main",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "pushed_at": "2026-10-21T20:42:29Z",
+      "archived": false,
+      "open_issues_count": 383,
+      "head": "423e2e924366419e418ee049093872d535eea41a",
+      "head_date": "2026-07-22T02:07:29Z"
+    },
+    {
+      "full_name": "penpot/penpot",
+      "html_url": "https://github.com/penpot/penpot",
+      "stargazers_count": 61769,
+      "default_branch": "develop",
+      "license": {
+        "key": "mpl-2.0",
+        "name": "Mozilla Public License 2.0",
+        "spdx_id": "MPL-2.0",
+        "url": "https://api.github.com/licenses/mpl-2.0",
+        "node_id": "MDc6TGljZW5zZTE0"
+      },
+      "pushed_at": "2026-10-28T05:38:44Z",
+      "archived": false,
+      "open_issues_count": 907,
+      "head": "f6f9df9a1a94087ecc9fd30337f908598ada983c",
+      "head_date": "2026-10-27T15:01:53Z"
+    },
+    {
+      "full_name": "radix-ui/primitives",
+      "html_url": "https://github.com/radix-ui/primitives",
+      "stargazers_count": 19439,
+      "default_branch": "main",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2026-10-14T21:52:47Z",
+      "archived": false,
+      "open_issues_count": 256,
+      "head": "eb3a2b7091293e27df8f9ba906632d8daa3d81a3",
+      "head_date": "2026-10-14T19:06:36Z"
+    },
+    {
+      "full_name": "storytold/figcraft",
+      "html_url": "https://github.com/storytold/figcraft",
+      "stargazers_count": 3650,
+      "default_branch": "main",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "pushed_at": "2026-10-27T21:09:27Z",
+      "archived": false,
+      "open_issues_count": 292,
+      "head": "90054a89c4ca8a96db6e3a26cd3af3a475eaa2d7",
+      "head_date": "2026-10-27T21:09:27Z"
+    }
+  ]
+}
