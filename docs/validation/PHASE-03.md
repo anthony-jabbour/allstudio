@@ -114,3 +114,13 @@ Real nested layers and bidirectional selection (3.2), static route navigation (3
 No further founder choice blocks preparing bounded Layers work. Structural eligibility/UX and new asset permission/import contracts require review before those later implementations. No cloud, AI/MCP, boards or third-party runtime was added.
 
 Recommendation: READY FOR REVIEW for Slice 3.1; INCOMPLETE for the Phase 3 gate. Do not merge or mark PASS without founder approval.
+
+## Slice 3.2 — preparation (2026-10-28)
+
+Branch `feat/phase-03-layers` starts at `92ac26d` in the same active checkout, stacked on draft PR #16. Main remains `d132d58`. No merge occurred. GitHub readback confirms both PR #16 `check` and `electron-smoke` completed SUCCESS against `92ac26dcf08a5ea9c4e6fb8412ba78d732fb8df2`.
+
+Read-only live playground DOM inventory: Aurora 7 rendered source elements / 7 source IDs / maximum DOM depth 4; Lumen 28 / 21 / depth 7; Harbor 19 / 18 / depth 7. Existing nested/Tailwind fixtures therefore already exercise repeated rendered IDs. No source edits or new test fixtures were needed for this inventory.
+
+Inspected pinned Onlook `apps/web/preload/script/api/dom.ts` and `packages/models/src/element/layers.ts` for tree traversal, direct-text labels and rendered/source identity separation. Proposal remains an original bounded collector/tree over the existing bridge; no upstream source was copied and no dependency/native capability selected. Design: `docs/superpowers/specs/2026-10-27-phase-03-layers-design.md`. Implementation and its behavior/security tests remain pending design approval; no production source changed in this preparation step.
+
+Fresh read-only Slice 3.2 builder review raised two material design gaps: full-document uniqueness versus truncated tree counts, and selection outside the displayed tree. The design now explicitly preserves existing full-document selected-element instance counting outside the new collector traversal budget, never authorizes edits from partial tree counts, and displays outside-tree selection truthfully without highlighting another row. Reviewer follow-up confirmed both gaps resolved and reported nothing important remaining before design approval. The selected-element query's pre-existing unbounded runtime is explicitly unclaimed. No implementation/runtime proof yet.
