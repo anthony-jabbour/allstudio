@@ -153,3 +153,7 @@ Detailed executable acceptance plans are in [architecture recommendation](phase-
 ## Delivery and remaining evidence
 
 Baseline tests, real source/preview/restart/security evidence and exact local artifact paths are in [PHASE-03](../validation/PHASE-03.md). Upstream adaptation proofs NOT RUN. Full project integration, dependency-security certification, unfamiliar-user sessions and Phase 3 founder gate are pending. REA tools are available, but no live target/CDP endpoint was provided; source research and supplied screenshots suffice for this bounded recommendation. No REA invocation or runtime observation is claimed.
+
+## Follow-up: installed typography utility evidence (2026-10-28)
+
+Thirteen executed installed-library probes demonstrate why whole-string tailwind-merge is not a property-scoped typography operation: font-size conflicts remove leading utilities, slash size can lose coupled leading, and unrelated duplicate padding classes are normalized. See [typography transform evidence](phase-03-typography-transform.md) and its captured inputs/results. This changes the implementation recommendation, not production code; no new dependency or typography control was adopted.

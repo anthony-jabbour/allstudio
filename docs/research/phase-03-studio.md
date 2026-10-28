@@ -94,5 +94,6 @@ Every case compares selection, inspector display, actual source, preview and per
 - [Source inventories, metadata, reuse matrix](phase-03-open-source-editor-audit.md)
 - [Architecture alternatives and two proof plans](phase-03-editor-architecture-recommendation.md)
 - [Screenshot analysis and component/theme map](phase-03-design-reference-analysis.md)
+- [Typography scope-preservation probes](phase-03-typography-transform.md)
 
 Recommendation: READY FOR REVIEW for the research/design package; Phase 3 INCOMPLETE. Slice 3.1 implementation followed explicit founder approval; no dependency install, cloud change, new source transform or third-party asset copy occurred.

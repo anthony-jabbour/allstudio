@@ -1,0 +1,89 @@
+{
+  "observedDate": "2026-10-28",
+  "scope": "Installed-library behavior only; no source editing or UI proof",
+  "tailwindMergeVersion": "3.7.0",
+  "fixtureTailwindVersion": "4.3.3",
+  "fontSizeConflicts": [
+    "leading"
+  ],
+  "cases": [
+    {
+      "name": "base font size",
+      "before": "mx-auto text-sm font-semibold leading-7 text-slate-900 hover:text-red-500 md:text-3xl",
+      "added": "text-xl",
+      "result": "mx-auto font-semibold text-slate-900 hover:text-red-500 md:text-3xl text-xl"
+    },
+    {
+      "name": "breakpoint font size",
+      "before": "text-sm md:text-lg hover:text-red-500 md:font-bold",
+      "added": "md:text-2xl",
+      "result": "text-sm hover:text-red-500 md:font-bold md:text-2xl"
+    },
+    {
+      "name": "size with slash leading",
+      "before": "text-base/7 text-red-500",
+      "added": "text-xl",
+      "result": "text-red-500 text-xl"
+    },
+    {
+      "name": "new slash size removes leading",
+      "before": "leading-7 text-sm text-red-500",
+      "added": "text-xl/8",
+      "result": "text-red-500 text-xl/8"
+    },
+    {
+      "name": "weight versus family",
+      "before": "font-sans font-medium text-lg",
+      "added": "font-bold",
+      "result": "font-sans text-lg font-bold"
+    },
+    {
+      "name": "font family versus weight",
+      "before": "font-sans font-bold",
+      "added": "font-serif",
+      "result": "font-bold font-serif"
+    },
+    {
+      "name": "text color versus size",
+      "before": "text-xl text-red-500 md:text-white",
+      "added": "text-blue-600",
+      "result": "text-xl md:text-white text-blue-600"
+    },
+    {
+      "name": "unknown arbitrary text",
+      "before": "text-[var(--hero)] text-red-500",
+      "added": "text-xl",
+      "result": "text-red-500 text-xl"
+    },
+    {
+      "name": "typed arbitrary size",
+      "before": "text-[length:var(--hero)] leading-7",
+      "added": "text-xl",
+      "result": "text-xl"
+    },
+    {
+      "name": "arbitrary property",
+      "before": "text-lg [font-size:30px]",
+      "added": "text-xl",
+      "result": "[font-size:30px] text-xl"
+    },
+    {
+      "name": "important utility",
+      "before": "text-sm! md:text-lg",
+      "added": "text-xl",
+      "result": "text-sm! md:text-lg text-xl"
+    },
+    {
+      "name": "unknown custom font",
+      "before": "font-brand font-medium",
+      "added": "font-bold",
+      "result": "font-brand font-bold"
+    },
+    {
+      "name": "unrelated duplicate utilities",
+      "before": "px-2 px-4 text-sm",
+      "added": "text-xl",
+      "result": "px-4 text-xl"
+    }
+  ]
+}
