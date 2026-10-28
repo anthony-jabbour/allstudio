@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
+    "./studio.css": "./src/shell/studio.css",
     ".": "./src/index.ts",
     "./shell": "./src/shell/index.ts",
     "./source-mapper": "./src/source-mapper/index.ts",

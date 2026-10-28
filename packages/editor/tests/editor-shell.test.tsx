@@ -60,4 +60,34 @@ describe("EditorShell", () => {
       '<button type="button" disabled="">Apply classes</button>',
     );
   });
+  it("provides a Studio toolbar, appearance and honest navigation before layers exist", () => {
+    const html = renderToStaticMarkup(
+      createElement(EditorShell, {
+        previewUrl: "http://localhost:3101",
+        workspace: unusedWorkspace,
+      }),
+    );
+    expect(html).toContain('aria-label="Studio toolbar"');
+    expect(html).toContain('aria-label="Appearance"');
+    expect(html).toContain('value="system"');
+    expect(html).toContain('value="light"');
+    expect(html).toContain('value="dark"');
+    expect(html).toContain('aria-label="Project navigator"');
+    expect(html).toContain("Layer navigation is not available in this slice.");
+    expect(html).toContain('aria-label="Canvas"');
+  });
+
+  it("renders host project controls without granting preview privileges", () => {
+    const html = renderToStaticMarkup(
+      createElement(EditorShell, {
+        projectControls: createElement(
+          "button",
+          { type: "button" },
+          "Open project",
+        ),
+      }),
+    );
+    expect(html).toContain("Open project");
+    expect(html).not.toContain("<iframe");
+  });
 });

@@ -1,6 +1,6 @@
 # Phase 3 — baseline, gaps and dependency-ordered implementation
 
-Status: IN PROGRESS. Slice 3.0 research/baseline; no production behavior changed.
+Status: IN PROGRESS. Slice 3.0 research/baseline complete; approved Slice 3.1 shell implemented, with runtime evidence in PHASE-03.
 Date: 2026-10-27 (America/Los_Angeles).
 Branch: `feat/phase-03-studio-foundation` in the existing `/Users/jabbo/AllStudio/allstudio` checkout.
 Public HEAD / GitHub main: `d132d58ed70f2a38ea4af529144f5a051827aa36`.
@@ -69,7 +69,7 @@ Allowed modules: shared shell/CSS and exports if required, desktop renderer/CSS,
 Fixtures: all three existing real Next projects; Aurora first complete edit/reopen, nested/reused and Tailwind variants as regressions.
 Dependency choice: none. Keep existing source and native pipeline. No copied upstream manager until the audit/proof justifies it.
 Checks: lint/typecheck/unit/boundary; desktop and fixture builds; real Electron integration with source and screenshot proof; packaged offline; keyboard/focus/contrast in both themes. Preserve visible unsupported states; no fabricated tree or working-looking property controls.
-Pending design details: theme default/local preference and narrow-window panel behavior need review as proposed in the design map. A source-safe implementation must not silently decide later structural/asset permissions.
+Founder approved system appearance initially, local light/dark override and collapsible panels in this chat. A source-safe implementation must not silently decide later structural/asset permissions.
 
 ## Static route sub-slice boundary
 
@@ -95,4 +95,4 @@ Every case compares selection, inspector display, actual source, preview and per
 - [Architecture alternatives and two proof plans](phase-03-editor-architecture-recommendation.md)
 - [Screenshot analysis and component/theme map](phase-03-design-reference-analysis.md)
 
-Recommendation: READY FOR REVIEW for the research/design package; Phase 3 INCOMPLETE. Implementation has not started. No dependency install, cloud change, source transform or third-party asset copy occurred.
+Recommendation: READY FOR REVIEW for the research/design package; Phase 3 INCOMPLETE. Slice 3.1 implementation followed explicit founder approval; no dependency install, cloud change, new source transform or third-party asset copy occurred.

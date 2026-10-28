@@ -289,6 +289,92 @@ try {
     .getByLabel("Classes", { exact: true })
     .fill("keep-this-unsaved-class-draft");
   await page.getByLabel("Text", { exact: true }).fill("Saved locally");
+  const layoutWidth = await preview
+    .locator("body")
+    .evaluate(() => window.innerWidth);
+  const frameBeforeTheme = page
+    .frames()
+    .find((frame) => frame.url().startsWith("http://127.0.0.1:"));
+  await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.getByRole("button", { name: "Navigator", exact: true }).click();
+  await expect(
+    page.getByRole("complementary", { name: "Project navigator" }),
+  ).toBeHidden();
+  await expect
+    .poll(() => preview.locator("body").evaluate(() => window.innerWidth))
+    .toBe(layoutWidth);
+  await page.getByRole("button", { name: "Inspector", exact: true }).click();
+  await expect(
+    page.getByRole("complementary", { name: "Selection" }),
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Inspector", exact: true }).click();
+  await page.getByRole("button", { name: "Navigator", exact: true }).click();
+  await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+    "Saved locally",
+  );
+  await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
+    "keep-this-unsaved-class-draft",
+  );
+  assert.equal(
+    page.frames().find((frame) => frame.url().startsWith("http://127.0.0.1:")),
+    frameBeforeTheme,
+  );
+  assert.equal(await readFile(sourceFile, "utf8"), original);
+  await expect
+    .poll(async () => {
+      const target = await preview.locator("h1").boundingBox();
+      const overlay = await page.locator(".selection-box").boundingBox();
+      return target && overlay
+        ? Math.max(
+            ...["x", "y", "width", "height"].map((key) =>
+              Math.abs(target[key] - overlay[key]),
+            ),
+          )
+        : Infinity;
+    })
+    .toBeLessThan(2);
+  await page.screenshot({ path: join(evidence, "studio-dark.png") });
+  await page.getByLabel("Appearance", { exact: true }).selectOption("light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.screenshot({ path: join(evidence, "studio-light.png") });
+  pass(
+    "Studio theme and panel controls preserve the live frame, unsaved drafts and source",
+  );
+  const windowSize = await application.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].getContentSize(),
+  );
+  await application.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setContentSize(620, 900),
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    )
+    .toBe(true);
+  await page.getByLabel("Text", { exact: true }).focus();
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("button", { name: "Preview text patch", exact: true }),
+  ).toBeFocused();
+  await page.screenshot({
+    path: join(evidence, "studio-narrow.png"),
+    fullPage: false,
+  });
+  await application.evaluate(
+    ({ BrowserWindow }, [width, height]) =>
+      BrowserWindow.getAllWindows()[0].setContentSize(width, height),
+    windowSize,
+  );
+  await page.getByLabel("Text", { exact: true }).scrollIntoViewIfNeeded();
+  pass(
+    "narrow Studio keeps editing controls reachable without horizontal overflow and preserves keyboard order",
+  );
+
   await page
     .getByRole("button", { name: "Preview text patch", exact: true })
     .click();
@@ -577,7 +663,28 @@ try {
   await application.close();
   application = undefined;
   page = await launch();
-  await toolbar(page, "Reopen");
+  await expect(
+    page.getByRole("heading", { name: "Home", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Appearance", { exact: true })).toHaveValue(
+    "light",
+  );
+  await page
+    .getByLabel("Search projects", { exact: true })
+    .fill("no-project-matches-this-query");
+  await expect(page.getByText("No projects match your search.")).toBeVisible();
+  await page.getByLabel("Search projects", { exact: true }).fill("");
+  await page.screenshot({ path: join(evidence, "home-light.png") });
+  await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
+  await page.screenshot({ path: join(evidence, "home-dark.png") });
+  await page
+    .getByRole("region", { name: "Recent local projects" })
+    .getByRole("button")
+    .first()
+    .click();
+  pass(
+    "Home search filters remembered local projects and a project card reopens the existing grant; appearance survives restart",
+  );
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });

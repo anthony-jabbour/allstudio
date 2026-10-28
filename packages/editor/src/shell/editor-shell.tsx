@@ -18,6 +18,9 @@ export interface EditorShellProps {
   /** Live preview of the workspace project, served from its own origin. */
   previewUrl?: string;
   workspace?: SourceEditWorkspace;
+  projectControls?: import("react").ReactNode;
+  homeContent?: import("react").ReactNode;
+  disabled?: boolean;
 }
 
 type Status = { kind: "info" | "success" | "error"; text: string } | null;
@@ -60,31 +63,118 @@ export function EditorShell({
   manifest,
   previewUrl,
   workspace,
+  projectControls,
+  homeContent,
+  disabled,
 }: EditorShellProps) {
+  const [appearance, setAppearance] = useState(() => {
+    try {
+      const saved = localStorage.getItem("allstudio:appearance:v1");
+      return saved === "light" || saved === "dark" ? saved : "system";
+    } catch {
+      return "system";
+    }
+  });
+  const [navigatorOpen, setNavigatorOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  useEffect(() => {
+    document.documentElement.dataset.theme = appearance;
+    try {
+      localStorage.setItem("allstudio:appearance:v1", appearance);
+    } catch {
+      // Appearance storage is optional; editing must remain available.
+    }
+  }, [appearance]);
+  const connected = Boolean(previewUrl && workspace);
   return (
-    <main className="editor-shell">
-      <header className="editor-header">
-        <p>allstudio</p>
-        <h1>Source editing</h1>
-        <p>
-          Shared editor package status: {EDITOR_STATUS}. Select a rendered
-          element, edit its static text or its static className, and the JSX
-          source file is updated. Layout dragging and structure editing are not
-          implemented yet.
-        </p>
-        {manifest ? (
-          <p>
-            Loaded project: {manifest.name} ({manifest.projectId})
-          </p>
-        ) : (
-          <p>No project manifest loaded.</p>
-        )}
-      </header>
-      {previewUrl && workspace ? (
-        <SourceElementEditor previewUrl={previewUrl} workspace={workspace} />
+    <main
+      className="editor-shell"
+      data-navigator={navigatorOpen}
+      data-inspector={inspectorOpen}
+    >
+      <section className="studio-toolbar" aria-label="Studio toolbar">
+        <span className="studio-brand">
+          <span aria-hidden="true">✳</span> allstudio
+        </span>
+        <h1>{manifest?.name ?? (connected ? "Studio" : "Home")}</h1>
+        {connected ? <span className="studio-mode">Studio</span> : null}
+        <div className="studio-toolbar-end">
+          {connected ? (
+            <>
+              <button
+                type="button"
+                aria-pressed={navigatorOpen}
+                onClick={() => setNavigatorOpen((value) => !value)}
+              >
+                Navigator
+              </button>
+              <button
+                type="button"
+                aria-pressed={inspectorOpen}
+                onClick={() => setInspectorOpen((value) => !value)}
+              >
+                Inspector
+              </button>
+            </>
+          ) : null}
+          <label className="appearance-control">
+            Appearance
+            <select
+              aria-label="Appearance"
+              value={appearance}
+              onChange={(event) => setAppearance(event.target.value)}
+            >
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+        </div>
+      </section>
+      {projectControls ? (
+        <div className="studio-project-controls">{projectControls}</div>
+      ) : null}
+      {connected && previewUrl && workspace ? (
+        <div className="studio-body" inert={disabled}>
+          <aside
+            className="studio-navigator"
+            aria-label="Project navigator"
+            hidden={!navigatorOpen}
+          >
+            <h2>Pages</h2>
+            <p className="current-page">
+              <span aria-hidden="true">▤</span> {new URL(previewUrl).pathname}
+            </p>
+            <p className="field-note">Current preview route</p>
+            <div className="navigator-section">
+              <h2>Layers</h2>
+              <p className="field-note">
+                Layer navigation is not available in this slice.
+              </p>
+              <p className="field-note">
+                Select an element directly on the canvas.
+              </p>
+            </div>
+          </aside>
+          <SourceElementEditor previewUrl={previewUrl} workspace={workspace} />
+        </div>
       ) : (
-        <p>No preview workspace connected.</p>
+        <section className="studio-home" aria-label="Local workspace">
+          {homeContent ?? (
+            <>
+              <h2>Open a project to start designing</h2>
+              <p>No preview workspace connected.</p>
+            </>
+          )}
+        </section>
       )}
+      <footer className="studio-footer">
+        <span>Local workspace · No account required</span>
+        <span>
+          Static text and class editing · Layout dragging and structure editing
+          are not implemented yet.
+        </span>
+      </footer>
     </main>
   );
 }
@@ -325,30 +415,34 @@ function SourceElementEditor({
 
   return (
     <div className="editor-workspace">
-      <div className="preview-pane">
-        <iframe
-          key={frameKey}
-          ref={frame}
-          className="preview-frame"
-          title="Project preview"
-          src={previewUrl}
-          sandbox="allow-scripts allow-same-origin allow-forms"
-          onLoad={bridge.handleFrameLoad}
-        />
-        {rect ? (
-          <div
-            className="selection-box"
-            aria-hidden="true"
-            style={{
-              left: rect.x,
-              top: rect.y,
-              width: rect.width,
-              height: rect.height,
-            }}
+      <section className="studio-canvas" aria-label="Canvas">
+        <div className="canvas-label">Live preview · Desktop · 1440px</div>
+        <div className="preview-pane">
+          <iframe
+            key={frameKey}
+            ref={frame}
+            className="preview-frame"
+            title="Project preview"
+            src={previewUrl}
+            sandbox="allow-scripts allow-same-origin allow-forms"
+            onLoad={bridge.handleFrameLoad}
           />
-        ) : null}
-      </div>
+          {rect ? (
+            <div
+              className="selection-box"
+              aria-hidden="true"
+              style={{
+                left: rect.x,
+                top: rect.y,
+                width: rect.width,
+                height: rect.height,
+              }}
+            />
+          ) : null}
+        </div>
+      </section>
       <aside className="inspector" aria-label="Selection">
+        <h2>Design</h2>
         <p className="bridge-status">
           Preview bridge: {bridge.connected ? "connected" : "connecting…"}
           {bridge.lastRejection

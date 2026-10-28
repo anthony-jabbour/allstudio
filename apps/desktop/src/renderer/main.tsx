@@ -8,7 +8,7 @@ import type {
   RecentProject,
   RuntimeInfo,
 } from "../shared/desktop-api.ts";
-import "../../../playground/src/styles.css";
+import "@allstudio/editor/studio.css";
 import "./styles.css";
 
 declare global {
@@ -23,6 +23,7 @@ function App() {
   const [project, setProject] = useState<OpenProject | null>(null);
   const [recent, setRecent] = useState<RecentProject[]>([]);
   const [recentId, setRecentId] = useState("");
+  const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
     "Choose a local project. Applying an edit saves it to disk.",
@@ -116,94 +117,166 @@ function App() {
     }
   }
   return (
-    <div className="page">
-      <output>
-        {error
-          ? "Desktop connection failed."
-          : runtime
-            ? `Electron ${runtime.electron} · ${runtime.packaged ? "Packaged" : "Development"} · Local editor`
-            : "Connecting to desktop…"}
-      </output>
-      <p className="project-path">
-        Manual editing is local and requires no account. BYOK model requests
-        require an internet connection.
-      </p>
-      <nav className="project-toolbar" aria-label="Local project">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void open(() => window.allstudio.chooseProject())}
-        >
-          Open project
-        </button>
-        <label>
-          Recent projects
-          <select
-            value={recentId}
-            disabled={busy || !recent.length}
-            onChange={(event) => setRecentId(event.target.value)}
-          >
-            {!recent.length ? (
-              <option value="">No recent projects</option>
-            ) : (
-              recent.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
-        <button
-          type="button"
-          disabled={busy || !recentId}
-          onClick={() => void open(() => window.allstudio.openRecent(recentId))}
-        >
-          Reopen
-        </button>
-        <button
-          type="button"
-          disabled={busy || !project}
-          onClick={() => void open(() => window.allstudio.closeProject())}
-        >
-          Close project
-        </button>
-        <button
-          type="button"
-          disabled={busy || !project}
-          onClick={() => void history(false)}
-        >
-          Undo saved edit
-        </button>
-        <button
-          type="button"
-          disabled={busy || !project}
-          onClick={() => void history(true)}
-        >
-          Redo saved edit
-        </button>
-      </nav>
-      <output className="project-status">{message}</output>
-      {project ? <p className="project-path">{project.path}</p> : null}
-      <div inert={busy}>
-        <EditorShell
-          key={`${project?.id ?? "closed"}:${session}`}
-          manifest={
-            project
-              ? {
-                  schemaVersion: 1,
-                  projectId: project.id,
-                  name: project.name,
-                  artifacts: [{ id: "site", kind: "site", path: "src" }],
-                  sourceFramework: "nextjs-react",
-                  createdAt: new Date().toISOString(),
+    <div className="desktop-app">
+      <EditorShell
+        disabled={busy}
+        key={`${project?.id ?? "closed"}:${session}`}
+        projectControls={
+          <>
+            <nav className="project-toolbar" aria-label="Local project">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void open(() => window.allstudio.chooseProject())
                 }
-              : undefined
-          }
-          previewUrl={project?.previewUrl}
-          workspace={workspace}
-        />
-      </div>
+              >
+                Open project
+              </button>
+              <label>
+                Recent projects
+                <select
+                  value={recentId}
+                  disabled={busy || !recent.length}
+                  onChange={(event) => setRecentId(event.target.value)}
+                >
+                  {!recent.length ? (
+                    <option value="">No recent projects</option>
+                  ) : (
+                    recent.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={busy || !recentId}
+                onClick={() =>
+                  void open(() => window.allstudio.openRecent(recentId))
+                }
+              >
+                Reopen
+              </button>
+              <button
+                type="button"
+                disabled={busy || !project}
+                onClick={() => void open(() => window.allstudio.closeProject())}
+              >
+                Close project
+              </button>
+              <button
+                type="button"
+                disabled={busy || !project}
+                onClick={() => void history(false)}
+              >
+                Undo saved edit
+              </button>
+              <button
+                type="button"
+                disabled={busy || !project}
+                onClick={() => void history(true)}
+              >
+                Redo saved edit
+              </button>
+            </nav>
+            <output className="project-status">{message}</output>
+          </>
+        }
+        homeContent={
+          <div className="workspace-home">
+            <aside className="home-sidebar">
+              <h2>Workspace</h2>
+              <p className="current-page">Recent projects</p>
+              <p className="field-note">Your files stay on this computer.</p>
+            </aside>
+            <section
+              className="home-projects"
+              aria-label="Recent local projects"
+            >
+              <div className="home-heading">
+                <h2>Recents</h2>
+                <label>
+                  Search projects
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search local projects…"
+                  />
+                </label>
+              </div>
+              <div className="project-grid">
+                {recent
+                  .filter((item) =>
+                    `${item.name} ${item.path}`
+                      .toLowerCase()
+                      .includes(search.toLowerCase()),
+                  )
+                  .map((item) => (
+                    <button
+                      className="project-card"
+                      key={item.id}
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void open(() => window.allstudio.openRecent(item.id))
+                      }
+                    >
+                      <span className="project-card-title">{item.name}</span>
+                      <span className="project-card-path">{item.path}</span>
+                      <span className="project-card-art" aria-hidden="true">
+                        ▤
+                      </span>
+                      <span className="project-card-open">Open project →</span>
+                    </button>
+                  ))}
+              </div>
+              {!recent.length ? (
+                <p className="home-empty">
+                  Open a local Next.js project to start. Your recent projects
+                  will appear here.
+                </p>
+              ) : recent.every(
+                  (item) =>
+                    !`${item.name} ${item.path}`
+                      .toLowerCase()
+                      .includes(search.toLowerCase()),
+                ) ? (
+                <p className="home-empty">No projects match your search.</p>
+              ) : null}
+            </section>
+          </div>
+        }
+        manifest={
+          project
+            ? {
+                schemaVersion: 1,
+                projectId: project.id,
+                name: project.name,
+                artifacts: [{ id: "site", kind: "site", path: "src" }],
+                sourceFramework: "nextjs-react",
+                createdAt: new Date().toISOString(),
+              }
+            : undefined
+        }
+        previewUrl={project?.previewUrl}
+        workspace={workspace}
+      />
+      <footer className="desktop-status">
+        <output>
+          {error
+            ? "Desktop connection failed."
+            : runtime
+              ? `Electron ${runtime.electron} · ${runtime.packaged ? "Packaged" : "Development"} · Local editor`
+              : "Connecting to desktop…"}
+        </output>
+        <span>
+          Manual editing is local. BYOK model requests require internet.
+        </span>
+      </footer>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { _electron } from "@playwright/test";
+import { _electron, expect } from "@playwright/test";
 
 const desktop = resolve("apps/desktop");
 const executablePath = process.argv[2];
@@ -55,9 +55,30 @@ try {
       hasText: `Electron 45.0.0 · ${executablePath ? "Packaged" : "Development"}`,
     })
     .waitFor();
-  await page
-    .getByRole("heading", { name: "Source editing", exact: true })
-    .waitFor();
+  await page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
+  assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
+  await page.reload();
+  await expect(page.getByLabel("Appearance", { exact: true })).toHaveValue(
+    "dark",
+  );
+  await page.getByLabel("Appearance", { exact: true }).selectOption("light");
+  assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  assert.equal(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).colorScheme,
+    ),
+    "light",
+  );
+  await page.getByLabel("Appearance", { exact: true }).selectOption("system");
+  assert.equal(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).colorScheme,
+    ),
+    "dark",
+  );
+  await page.emulateMedia({ colorScheme: null });
   assert.equal(page.url(), "app://editor/index.html");
   const info = await page.evaluate(() => window.allstudio.runtime());
   assert.equal(info.electron, "45.0.0");
