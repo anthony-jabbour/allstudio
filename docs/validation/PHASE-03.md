@@ -128,3 +128,66 @@ Fresh read-only Slice 3.2 builder review raised two material design gaps: full-d
 ## Independent typography research while Layers approval is pending (2026-10-28)
 
 Executed 13 installed tailwind-merge 3.7.0 behavior probes; fixture Tailwind resolves 4.3.3. Whole-string font-size merging removes explicit line-height utilities and also normalizes unrelated duplicate utilities. Recorded actual inputs/results in `docs/research/phase-03-typography-probes.json` and analysis/reproduction in `phase-03-typography-transform.md`. Existing source-edit implementation is unchanged. These library observations support property-scoped token preservation and future rendered-style confirmation; they do not establish a working typography inspector. No runtime test suite was rerun for these docs-only observations.
+
+## Slice 3.2 — rendered layers and synchronized selection
+
+Status: READY FOR REVIEW for this slice; Phase 3 remains IN PROGRESS. Implementation/validation collected 2026-10-28; final artifact/readback review 2026-10-29. Founder explicitly approved the reviewed design with “Approve and implement Slice 3.2 (recommended).” Branch `feat/phase-03-layers` is stacked on unmerged PR #16 (`92ac26d`) in the existing checkout. No merge, new worktree, dependency or native permission.
+
+### Actual behavior and changed boundaries
+
+- Real instrumented DOM hierarchy appears in the shared navigator, with direct-text/aria-label/alt labels, nested expand/collapse and active selection. Uninstrumented wrappers are omitted; the parent is the nearest included DOM ancestor. This is a derived preview snapshot, not a canonical design document.
+- Rendered node IDs are WeakMap-held identities separate from source OIDs. Canvas/tree selection uses the same source lookup and geometry. Reused component/list rows identify their own visible instance; editing one repeated instance remains refused.
+- Tree supports one Tab stop, Up/Down, Left/Right, Home/End and Enter/Space. Disclosure/focus movement preserves drafts; selecting a different element keeps the existing canvas draft-discard behavior. Selected resolvable source context stays in the trusted inspector and row tooltip.
+- Protocol version 2 adds sanitized bounded layer snapshots, strict generation/node-target selection and fixed errors. Existing exact-frame/origin/nonce checks remain. New limits: 1000 nodes, 10000 visited elements, 64 DOM levels, 80-character labels; identities remain bounded. Parent-before-child parsing rejects duplicate/cyclic/invalid parents. Truncation and outside-tree selection are explicit; stale layer requests retain current selection/drafts and cannot trigger source writes.
+- Missing idle targets clear geometry and disable editing. Active apply/post-save confirmation retains the existing HMR deadline while a new source ID temporarily has no DOM target. Current save results still refresh hashes/source and observed preview before success.
+- Layout-only scroll/resize remeasures the tracked target without recollecting an unchanged tree. Hierarchy/label/identity mutations mark collection dirty; every select-layer still recollects synchronously to reject stale targets.
+
+Changed production files: `packages/editor/src/preview-bridge/{protocol,client}.ts`, `shell/{use-preview-bridge,editor-shell}.tsx|ts`, new `shell/layer-tree.tsx`, shared CSS and type exports. Test/harness files cover these changes. Source mapper, desktop main/preload/shared IPC, native file helper, grants and cloud remain unchanged. Onlook source was a behavior/reference inventory only; no third-party UI/algorithm source was copied. Tree/group semantics follow the [WAI-ARIA treeview pattern example](https://www.w3.org/WAI/ARIA/apg/patterns/treeview/examples/treeview-navigation/); two narrowly justified Biome exceptions preserve list/group tree semantics. This is not assistive-technology certification.
+
+### Commands and observed evidence
+
+| Exact command | Observed result |
+|---|---|
+| `bun run test -- packages/editor/tests/preview-bridge.test.ts` | RED: 5 expected missing-contract/identity failures; GREEN: 44 protocol tests |
+| `node scripts/e2e/layers.e2e.mjs` with `bun run dev` and disposable fixtures | RED: rendered tree absent; final GREEN: 13 real-browser scenarios across all three fixtures |
+| `bun run lint` | exit 0, 119 files |
+| `bun run typecheck` | exit 0, all seven package checks |
+| `bun run test` | exit 0, 252 tests / 15 files; repeated after resumed final readback with the same result |
+| `bun run validate:public-boundary` | exit 0, 232 files |
+| `bun run build` | exit 0, playground and all three fixtures |
+| `bun run build:desktop` and `bun run package:desktop` | exit 0, current unsigned arm64 Mac package |
+| `bun run test:local` | 23 connected development checks; source/HMR/history/conflict/restart/recovery/security and initial tree selection |
+| `ALLSTUDIO_FIXTURE=nested-components-fixture bun run test:local` | 23 checks, evidence `apps/desktop/dist/local-workflow-VgdD8b/` |
+| `ALLSTUDIO_FIXTURE=tailwind-variants-fixture bun run test:local` | 23 checks, evidence `apps/desktop/dist/local-workflow-epge0t/` |
+| `node scripts/e2e/local-workflow.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio --offline` | 23 packaged restricted-network checks, evidence `apps/desktop/dist/local-workflow-BIUPYh/`; offline production build explicitly NOT RUN |
+| `node scripts/e2e/desktop.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio` | exit 0, six packaged shell/security checks, revalidated after resumed readback |
+| `NODE_PATH=/Users/jabbo/AllStudio/allstudio/node_modules/.bun/@playwright+test@1.64.1/node_modules node scripts/e2e/text-edit.e2e.mjs /tmp/allstudio-layers-regression-fresh` | all 34 prior browser checks across three fixtures; no examples source changed |
+| `git diff --check` | exit 0 |
+
+Long-running integration process handles had expired when the turn resumed. Their completed PASS summaries, traces/screenshots and saved fixture files were inspected; the original PTY exit status was no longer retrievable for those completed runs. No live job was restarted based on an observation timeout. The final unit and packaged shell commands were rerun with fresh exit 0 results. Build/package child logs explicitly record exit 0. The integration outcomes above report the actual scenario summaries rather than inventing a recovered PTY exit status.
+
+### Reproduced defects and corrections
+
+1. Desktop HMR race: a newly saved source OID briefly disappeared before the refreshed DOM arrived. The first connected run saved real source but cancelled confirmation as an idle missing selection. Preserved the current apply/pending confirmation path while keeping genuinely removed idle targets disabled. The connected and packaged workflows then completed all 23 checks.
+2. Collector overhead: a real scroll probe with 1000 extra DOM nodes observed 1014 source-attribute reads from needless recollection. Dirty classification removed this added hierarchy scan; the 13-scenario layer suite verifies the bound. This does not benchmark or bound the pre-existing whole-document selected-element uniqueness query.
+3. Harness precision: parent treeitem boxes contain descendants; row activation tests now click the parent's own visible row. The old Fixture label locator became ambiguous with legitimate layer text and now targets the combobox. Forged-message tests were upgraded to protocol 2. No trust checks were relaxed.
+
+### Source, preview and visual proof
+
+Layer-specific evidence: `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-layers-e2e-3Lhpx5/` contains `layers.png`, `source-before.tsx`, `source-after.tsx` and `trace.zip`. The screenshot shows the same edited heading in the tree, actual preview and source inspector, with an exact source diff. The 13 scenarios cover heading/button/container selection, keyboard/draft preservation, real save/HMR, stale/malformed requests, escaped DOM labels, reused components/map instances, other fixture compatibility, node/depth/visit truncation, duplicate source targets outside the displayed tree and idle target removal.
+
+Final packaged evidence `apps/desktop/dist/local-workflow-BIUPYh/` includes both theme Studio/Home screenshots, narrow-window proof, saved/interrupted screenshots, edit/reopen/recovery traces and real project files. Its final heading is **Recovered local edit**, as asserted after interrupted-save restoration; it is not expected to remain the earlier Saved locally checkpoint. Actual JSX contains no preview-only instrumentation. The two additional native fixture directories above likewise retain their tested source and traces.
+
+Prior browser regression evidence `/tmp/allstudio-layers-regression-fresh/` contains `trace.zip`, webm, three-fixture screenshots and 11 per-edit source diffs. Those exercise existing manual text/class edits, not new visual typography/layout controls. User-facing docs now explain the rendered subset, tree keyboard behavior and explicit limits.
+
+Direct screenshot review inspected packaged dark/light active tree states and the actual browser source-diff/HMR state. Tree nesting, selected-row contrast, inspector context, canvas outline and theme spacing are visible. Exact Paper font/token fidelity and formal screen-reader behavior remain unclaimed.
+
+### Independent review, compatibility and remaining limits
+
+A fresh read-only implementation reviewer reported no actionable P1/P2/P3 findings after checking protocol/identity/generation limits, repeated-instance refusal, HMR and tree keyboard behavior. Final delta review also found no actionable issue in dirty collection or row-focus styling. Reviews were static; reviewers did not execute runtime tests or approve the phase.
+
+Protocol 1 cached playground runtime copies are incompatible by design; regenerate disposable `.workspace` copies after preserving any fixture edits (`ALLSTUDIO_RESET_WORKSPACE=1 bun run dev`). Actual Electron previews bundle matching version 2 runtime and require no new user source markers. Prior local fixture sources were preserved/restored for this task, refreshing only generated bridge files that exactly matched the old pinned bridge. Edited test fixture copies remain under `/tmp/allstudio-layers-01k2x1hy/`. No real user project or earlier-phase evidence was reset.
+
+The selected-element whole-document uniqueness query remains outside the new collector budget, as founder-approved; no hard total selection-runtime bound is claimed. New collector/transport limits are explicit, and partial tree counts never authorize edits. Only source-identified DOM nodes are shown; dynamic/unmapped/ambiguous edits still fail through existing workspace validation. Unfamiliar-user sessions, formal contrast/assistive-technology checks, signed distribution and physical power-loss remain pending. The historical offline production `next/font/google` limitation remains unchanged.
+
+Recommendation: READY FOR REVIEW for Slice 3.2; INCOMPLETE for Phase 3. Next unimplemented slices: static route navigation (3.2b), visual typography and spacing/layout controls (3.3–3.4), device/zoom/breakpoint tools (3.5), structural edits and assets (3.6–3.7). No merge or phase PASS authorized.

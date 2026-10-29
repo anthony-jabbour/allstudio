@@ -1,6 +1,6 @@
 # Phase 3.2 — rendered layers and selection design
 
-Status: PROPOSED for founder review before implementation. Initial draft: 2026-10-27; updated 2026-10-28.
+Status: APPROVED — founder replied “Approve and implement Slice 3.2 (recommended)” in this chat. Initial draft: 2026-10-27; updated 2026-10-28.
 Base: `92ac26dcf08a5ea9c4e6fb8412ba78d732fb8df2` (draft PR #16, both quality/Electron CI checks successful).
 Branch: `feat/phase-03-layers`, stacked on #16 in the same active checkout; no merge/worktree/clone.
 

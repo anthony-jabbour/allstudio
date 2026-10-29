@@ -3,9 +3,7 @@
   "scope": "Installed-library behavior only; no source editing or UI proof",
   "tailwindMergeVersion": "3.7.0",
   "fixtureTailwindVersion": "4.3.3",
-  "fontSizeConflicts": [
-    "leading"
-  ],
+  "fontSizeConflicts": ["leading"],
   "cases": [
     {
       "name": "base font size",

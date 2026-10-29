@@ -4,7 +4,7 @@
  * every inbound message is checked for the expected origin, the expected
  * window, the session nonce, and a strict shape before the editor acts on it.
  */
-export const PREVIEW_BRIDGE_VERSION = 1;
+export const PREVIEW_BRIDGE_VERSION = 2;
 export const EDITOR_MESSAGE_SOURCE = "allstudio-editor";
 export const PREVIEW_MESSAGE_SOURCE = "allstudio-preview";
 
@@ -13,6 +13,24 @@ const OID_PATTERN = /^[a-z0-9\-._:]{1,64}$/;
 const TAG_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
 const MAX_TEXT_LENGTH = 2000;
 const MAX_INSTANCES = 10_000;
+const NODE_ID_PATTERN = /^n[1-9][0-9]{0,15}$/;
+export const MAX_LAYER_NODES = 1000;
+export const MAX_LAYER_DEPTH = 64;
+export const MAX_LAYER_LABEL_LENGTH = 80;
+
+export interface PreviewLayerNode {
+  id: string;
+  parentId: string | null;
+  oid: string;
+  tagName: string;
+  label: string;
+}
+
+export interface PreviewLayersSnapshot {
+  generation: number;
+  nodes: PreviewLayerNode[];
+  truncated: boolean;
+}
 
 export interface PreviewRect {
   x: number;
@@ -22,6 +40,7 @@ export interface PreviewRect {
 }
 
 export interface PreviewElementSnapshot {
+  nodeId: string;
   oid: string;
   tagName: string;
   /** Rendered `textContent`, truncated by the bridge. */
@@ -36,6 +55,12 @@ export interface PreviewElementSnapshot {
 export type PreviewMessage =
   | { type: "boot" }
   | { type: "ready"; nonce: string }
+  | ({ type: "layers"; nonce: string } & PreviewLayersSnapshot)
+  | {
+      type: "layer-error";
+      nonce: string;
+      reason: "stale-layer" | "missing-layer";
+    }
   | {
       type: "select";
       nonce: string;
@@ -51,7 +76,8 @@ export type PreviewMessage =
 
 export type EditorMessage =
   | { type: "hello"; nonce: string }
-  | { type: "track"; nonce: string; oid: string | null };
+  | { type: "track"; nonce: string; oid: string | null }
+  | { type: "select-layer"; nonce: string; generation: number; nodeId: string };
 
 export interface InboundMessageEvent {
   origin: string;
@@ -118,8 +144,10 @@ function parseSnapshot(
     return undefined;
   }
   const rect = parseRect(value.rect);
-  const { oid, tagName, text, className, instances } = value;
+  const { nodeId, oid, tagName, text, className, instances } = value;
   if (
+    typeof nodeId !== "string" ||
+    !NODE_ID_PATTERN.test(nodeId) ||
     !isValidOid(oid) ||
     typeof tagName !== "string" ||
     !TAG_PATTERN.test(tagName) ||
@@ -135,7 +163,72 @@ function parseSnapshot(
   ) {
     return undefined;
   }
-  return { oid, tagName, text, className, rect, instances };
+  return { nodeId, oid, tagName, text, className, rect, instances };
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
+  return Object.keys(value).every((key) => keys.includes(key));
+}
+
+function parseLayers(
+  value: Record<string, unknown>,
+): PreviewLayersSnapshot | null {
+  if (
+    !hasOnlyKeys(value, [
+      "source",
+      "version",
+      "type",
+      "nonce",
+      "generation",
+      "nodes",
+      "truncated",
+    ]) ||
+    !Number.isSafeInteger(value.generation) ||
+    (value.generation as number) < 1 ||
+    typeof value.truncated !== "boolean" ||
+    !Array.isArray(value.nodes) ||
+    value.nodes.length > MAX_LAYER_NODES
+  )
+    return null;
+  const nodes: PreviewLayerNode[] = [];
+  const depths = new Map<string, number>();
+  for (const node of value.nodes) {
+    if (
+      !isRecord(node) ||
+      !hasOnlyKeys(node, ["id", "parentId", "oid", "tagName", "label"])
+    )
+      return null;
+    const { id, parentId, oid, tagName, label } = node;
+    if (
+      typeof id !== "string" ||
+      !NODE_ID_PATTERN.test(id) ||
+      depths.has(id) ||
+      !isValidOid(oid) ||
+      typeof tagName !== "string" ||
+      !TAG_PATTERN.test(tagName) ||
+      typeof label !== "string" ||
+      label.length > MAX_LAYER_LABEL_LENGTH ||
+      (parentId !== null &&
+        (typeof parentId !== "string" || !depths.has(parentId)))
+    )
+      return null;
+    const depth =
+      parentId === null ? 1 : (depths.get(parentId as string) ?? 0) + 1;
+    if (depth > MAX_LAYER_DEPTH) return null;
+    depths.set(id, depth);
+    nodes.push({
+      id,
+      parentId: parentId as string | null,
+      oid,
+      tagName,
+      label,
+    });
+  }
+  return {
+    generation: value.generation as number,
+    nodes,
+    truncated: value.truncated,
+  };
 }
 
 export function parsePreviewMessage(
@@ -160,7 +253,9 @@ export function parsePreviewMessage(
   if (data.type === "boot") {
     return { ok: true, message: { type: "boot" } };
   }
-  if (!["ready", "select", "element"].includes(data.type)) {
+  if (
+    !["ready", "select", "element", "layers", "layer-error"].includes(data.type)
+  ) {
     return { ok: false, reason: "malformed" };
   }
   if (expected.nonce === null) {
@@ -173,6 +268,23 @@ export function parsePreviewMessage(
 
   if (data.type === "ready") {
     return { ok: true, message: { type: "ready", nonce } };
+  }
+  if (data.type === "layers") {
+    const layers = parseLayers(data);
+    return layers
+      ? { ok: true, message: { type: "layers", nonce, ...layers } }
+      : { ok: false, reason: "malformed" };
+  }
+  if (data.type === "layer-error") {
+    if (
+      !hasOnlyKeys(data, ["source", "version", "type", "nonce", "reason"]) ||
+      (data.reason !== "stale-layer" && data.reason !== "missing-layer")
+    )
+      return { ok: false, reason: "malformed" };
+    return {
+      ok: true,
+      message: { type: "layer-error", nonce, reason: data.reason },
+    };
   }
   const element = parseSnapshot(data.element);
   if (element === undefined) {

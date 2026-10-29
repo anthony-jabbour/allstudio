@@ -3,6 +3,8 @@
 // workspace adapter (dev server today, Electron main process later).
 export type {
   PreviewElementSnapshot,
+  PreviewLayerNode,
+  PreviewLayersSnapshot,
   PreviewMessage,
   PreviewMessageRejection,
 } from "../preview-bridge/protocol.ts";
