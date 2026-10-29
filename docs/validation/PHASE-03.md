@@ -191,3 +191,15 @@ Protocol 1 cached playground runtime copies are incompatible by design; regenera
 The selected-element whole-document uniqueness query remains outside the new collector budget, as founder-approved; no hard total selection-runtime bound is claimed. New collector/transport limits are explicit, and partial tree counts never authorize edits. Only source-identified DOM nodes are shown; dynamic/unmapped/ambiguous edits still fail through existing workspace validation. Unfamiliar-user sessions, formal contrast/assistive-technology checks, signed distribution and physical power-loss remain pending. The historical offline production `next/font/google` limitation remains unchanged.
 
 Recommendation: READY FOR REVIEW for Slice 3.2; INCOMPLETE for Phase 3. Next unimplemented slices: static route navigation (3.2b), visual typography and spacing/layout controls (3.3–3.4), device/zoom/breakpoint tools (3.5), structural edits and assets (3.6–3.7). No merge or phase PASS authorized.
+
+## Slice 3.3 — research and reviewed design (2026-10-29)
+
+Branch `feat/phase-03-typography` starts at `97f5bb4` in the existing checkout, stacked on draft PR #17. Current remote main remains `d132d58`; #17 quality/Electron checks are SUCCESS and no merge/review comments were observed.
+
+Read additional pinned Onlook typography controls/hook source and inspected the current SourceEditWorkspace/snapshot contracts. Executed and captured11 installed Tailwind4.3.3 compiler candidates, then reproduced their exact CSS with assertions. Coupled size/leading can be retained through supported static utility syntax; colour-alpha compiles through oklab colour-mix, so naive RGB string equality is insufficient. See `phase-03-typography-compiler-probe.json` and the approved-boundary research note. No runtime/property-control/cascade/persistence result is claimed from compiler output.
+
+A complete proposed six-group design is recorded at `docs/superpowers/specs/2026-10-29-phase-03-typography-design.md`. A fresh independent local builder review found no material planning gaps; no implementation or runtime tests were run by the reviewer. Design approval requested before changing production code. Base scope preserves other variants; actual breakpoint tools remain3.5.
+
+Reason cloud capability checks returned login_required, account/workspace null and no scopes, with billing/compute not checked. A generic pairing login link was supplied privately so the user can select/approve the intended workspace. No account/workspace was chosen silently and no cloud task, paid run, activation or purchase occurred. Local review completed the independent design check.
+
+Status: IN PROGRESS — design ready for founder review; no typography production code changed yet.
