@@ -1,0 +1,37 @@
+{
+  "discoveredRoutes": ["/", "/about"],
+  "unsupportedRoutes": ["/journal/[slug]"],
+  "hostileProbes": [
+    {
+      "route": "//evil.com",
+      "status": 400,
+      "ok": false,
+      "reason": "invalid-request"
+    },
+    {
+      "route": "http://evil.com",
+      "status": 400,
+      "ok": false,
+      "reason": "invalid-request"
+    },
+    {
+      "route": "/about/../secret",
+      "status": 400,
+      "ok": false,
+      "reason": "invalid-request"
+    },
+    {
+      "route": "/journal/[slug]",
+      "status": 422,
+      "ok": false,
+      "reason": "route-unsupported"
+    },
+    {
+      "route": "/missing",
+      "status": 404,
+      "ok": false,
+      "reason": "route-not-found"
+    }
+  ],
+  "checks": 7
+}

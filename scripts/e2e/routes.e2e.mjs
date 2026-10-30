@@ -66,6 +66,9 @@ try {
     "Pages navigator lists static routes (/ and /about) and marks /journal/[slug] as unsupported Dynamic",
   );
 
+  const initialRootHeading =
+    (await preview.locator("#hero-heading").textContent())?.trim() ?? "";
+  assert.ok(initialRootHeading.length > 0);
   await preview.locator("#hero-heading").click();
   await expect(page.getByTestId("source-location")).toContainText(
     "src/app/page.tsx",
@@ -233,14 +236,17 @@ try {
   await expect(
     page.getByText("Preview bridge: connected", { exact: false }),
   ).toBeVisible({ timeout: 30000 });
-  await expect(preview.locator("#hero-heading")).toHaveText("Aurora Atelier", {
-    timeout: 30000,
-  });
+  await expect(preview.locator("#hero-heading")).toHaveText(
+    initialRootHeading,
+    {
+      timeout: 30000,
+    },
+  );
   pass("switching back to / renders #hero-heading on the root route");
 
   await writeFile(
     join(evidence, "measured.json"),
-    JSON.stringify(
+    `${JSON.stringify(
       {
         discoveredRoutes: ["/", "/about"],
         unsupportedRoutes: ["/journal/[slug]"],
@@ -249,7 +255,7 @@ try {
       },
       null,
       2,
-    ),
+    )}\n`,
   );
   assert.deepEqual(errors, []);
   console.log(`${checks} route checks passed.`);

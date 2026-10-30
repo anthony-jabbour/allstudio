@@ -421,3 +421,53 @@ Complete local traces: layout `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/
 ### Review, security and boundaries
 
 No Electron main/preload/IPC/path grant/atomic write/history/recovery code changed. Existing negative IPC, traversal, symlink/hardlink, nonce/origin/frame/schema, stale/ambiguous target and recovery tests passed. The subframe injection probe remains unavailable. Offline production Next build remains NOT RUN in the offline harness; online portability was verified separately. With 3.4a, 3.4b and 3.4c evidenced, Slice 3.4 is complete as a feature (`READY FOR REVIEW`, not Phase 3 `PASS`). Static route navigation (3.2b), responsive viewport/breakpoint controls (3.5), bounded structural edits (3.6), project-owned assets (3.7), unfamiliar-user sessions and assistive-technology validation remain open. No merge or PASS.
+
+---
+
+## 9. Slice 3.2b — Static Route & Page Navigation Validation (2026-10-30)
+
+- **Slice status:** `READY FOR REVIEW` (Slice 3.2b only; overall Phase 3 remains `INCOMPLETE` — do not mark `PASS`).
+- **Design specification:** [docs/superpowers/specs/2026-10-30-phase-03-routes-design.md](../superpowers/specs/2026-10-30-phase-03-routes-design.md)
+- **Evidence directory:** [docs/validation/evidence/phase-03-routes/](./evidence/phase-03-routes/)
+
+### 9.1 Implemented Scope & Safety Guarantees
+
+1. **Bounded App Router Route Discovery (`packages/editor/src/site/routes.ts`):**
+   - Discovers Next.js App Router `page.{tsx,ts,jsx,js}` files under `src/app/` or `app/` using existing project file listings (`NativeFiles.list` on desktop, `DevWorkspace.listSourceFiles` in playground) without adding dependencies or new filesystem/Electron permissions.
+   - Unwraps unambiguous route groups `(group)` and lists static routes in deterministic sorted order (`/` first, then alphabetical pathname).
+   - Explicitly classifies dynamic (`[slug]`), catch-all (`[...slug]`), optional catch-all (`[[...slug]]`), parallel (`@slot`), intercepting (`(.)`, `(..)`, `(...)`), private (`_folder`), colliding route-group paths, and duplicate page extensions as `supported: false` with human-readable reasons.
+2. **Hostile Route Validation & Preview Isolation (`validateSelectedRoute`, `apps/desktop/src/main/index.ts`):**
+   - Rejects non-strings, empty strings, paths not starting with `/`, `//` protocol-relative URLs, scheme prefixes (`http:`, `javascript:`), query strings (`?`), hash fragments (`#`), backslashes (`\`), percent-encoding (`%`), control characters, and `.` / `..` traversal segments with `invalid-request`.
+   - Rejects unknown routes with `route-not-found` and dynamic/unsupported routes with `route-unsupported`.
+   - In Electron (`apps/desktop/src/main/index.ts`), `will-frame-navigate` and `did-frame-finish-load` enforce both `target.origin === allowed.origin` and `target.pathname === allowed.pathname && target.search === ""` against the active project's approved `previewUrl`, preventing untrusted preview code from navigating the iframe to unapproved routes on the same loopback origin.
+3. **Navigator Pages UI, Preview Bridge Reset & Unsaved Draft Guard (`packages/editor/src/shell/editor-shell.tsx`, `use-preview-bridge.ts`):**
+   - Renders the `Pages` section above `Layers` in the left Navigator (following D2/D3).
+   - Displays static routes as selectable buttons and unsupported routes as disabled rows with explicit reason badges (e.g., `dynamic`).
+   - Checks `hasUnsavedInspectorDraft` before switching routes. When any text, class, typography, spacing, appearance, or layout draft is dirty, displays an inline confirmation banner (`route-draft-confirm`) with **Discard and switch** and **Keep editing** actions.
+   - Resets the preview bridge (`bridge.reset()`), selection, and drafts upon route switch so the new route's `generation: 1` layer snapshot connects cleanly without stale layer IDs.
+
+### 9.2 Commands Executed & Observed Results
+
+- `bun run lint && bun run typecheck && bun run test && bun run validate:public-boundary && git diff --check`:
+  - `668 pass, 0 fail` across 25 test files (`packages/editor/tests/routes.test.ts`: 61 tests; updated `local-workspace.test.ts`, `dev-workspace.test.ts`, `workspace-api.test.ts`, `editor-shell.test.tsx`).
+- Serial Browser E2E Suite (never concurrent):
+  - `node scripts/e2e/routes.e2e.mjs` -> `routes e2e passed: 7 checks` ([measured.json](./evidence/phase-03-routes/measured.json), [routes-about.png](./evidence/phase-03-routes/routes-about.png), [routes-draft-confirm.png](./evidence/phase-03-routes/routes-draft-confirm.png), [about-before.tsx.txt](./evidence/phase-03-routes/about-before.tsx.txt), [about-after.tsx.txt](./evidence/phase-03-routes/about-after.tsx.txt))
+  - `node scripts/e2e/layout.e2e.mjs` -> `layout e2e passed: 15 checks`
+  - `node scripts/e2e/appearance.e2e.mjs` -> `appearance e2e passed: 10 checks`
+  - `node scripts/e2e/typography.e2e.mjs` -> `typography e2e passed: 10 checks`
+  - `node scripts/e2e/spacing.e2e.mjs` -> `spacing e2e passed: 12 checks`
+  - `node scripts/e2e/layers.e2e.mjs` -> `layers e2e passed: 13 checks`
+  - `NODE_PATH=node_modules/.bun/playwright@1.64.1/node_modules node scripts/e2e/text-edit.e2e.mjs /tmp/allstudio-routes-browser-regression` -> `e2e passed: 34 checks`
+- Serial Native & Packaged Offline Electron Validation:
+  - `bun run build && bun run build:desktop && bun run package:desktop` -> exit `0`
+  - `bun run test:desktop` (development) -> `desktop e2e passed: 6 checks`
+  - `node scripts/e2e/desktop.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio` (packaged) -> `desktop e2e passed: 6 checks`
+  - `bun run test:local` (development) -> `local workflow e2e passed: 36 checks` (`apps/desktop/dist/local-workflow-3Ot1SN`)
+  - `ALLSTUDIO_FIXTURE=nested-components-fixture bun run test:local` -> `local workflow e2e passed: 23 checks` (`apps/desktop/dist/local-workflow-eZcEe0`)
+  - `ALLSTUDIO_FIXTURE=tailwind-variants-fixture bun run test:local` -> `local workflow e2e passed: 23 checks` (`apps/desktop/dist/local-workflow-acHij0`)
+  - `node scripts/e2e/local-workflow.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio --offline` -> `local workflow e2e passed: 36 checks` (`apps/desktop/dist/local-workflow-NM2jR4`)
+  - Standalone Next.js portability check (`cd apps/desktop/dist/local-workflow-3Ot1SN/project && env -i PATH="$PATH" HOME="$HOME" NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 CI=1 node node_modules/next/dist/bin/next build`) -> exit `0`, static routes `/` and `/about` plus dynamic `/journal/[slug]` compiled cleanly outside allstudio.
+
+### 9.3 Remaining Open Items for Phase 3
+
+Responsive viewport/breakpoint controls (3.5), bounded structural edits (3.6), project-owned assets (3.7), unfamiliar-user sessions, and assistive-technology validation remain open. Phase 3 remains `INCOMPLETE`.
