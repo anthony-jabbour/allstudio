@@ -314,4 +314,99 @@ describe("real local workspace", () => {
     }
     expect(await workspace.undo()).toMatchObject({ ok: true });
   });
+  it("discovers static App Router routes and fails closed on missing, ambiguous, dynamic, or hostile routes", async () => {
+    const appDir = join(workspace.root, "src/app");
+    try {
+      await mkdir(join(appDir, "about"), { recursive: true });
+      await mkdir(join(appDir, "(marketing)/pricing"), { recursive: true });
+      await mkdir(join(appDir, "journal/[slug]"), { recursive: true });
+      await writeFile(join(appDir, "page.tsx"), source);
+      await writeFile(join(appDir, "about/page.tsx"), source);
+      await writeFile(join(appDir, "(marketing)/pricing/page.tsx"), source);
+      await writeFile(join(appDir, "journal/[slug]/page.tsx"), source);
+
+      const snapshot = await workspace.discoverRoutes();
+      expect(snapshot.routes).toEqual([
+        { route: "/", sourcePath: "src/app/page.tsx" },
+        { route: "/about", sourcePath: "src/app/about/page.tsx" },
+        {
+          route: "/pricing",
+          sourcePath: "src/app/(marketing)/pricing/page.tsx",
+        },
+      ]);
+      expect(snapshot.unsupported).toEqual([
+        expect.objectContaining({
+          route: "/journal/[slug]",
+          sourcePath: "src/app/journal/[slug]/page.tsx",
+          reason: "dynamic-route",
+        }),
+      ]);
+
+      const selected = await workspace.selectRoute(
+        "http://127.0.0.1:4321/",
+        "/about",
+      );
+      expect(selected).toMatchObject({
+        ok: true,
+        route: "/about",
+        sourcePath: "src/app/about/page.tsx",
+        previewUrl: "http://127.0.0.1:4321/about",
+        routes: snapshot.routes,
+        unsupportedRoutes: snapshot.unsupported,
+      });
+
+      await rm(join(appDir, "about/page.tsx"));
+      expect(
+        await workspace.selectRoute("http://127.0.0.1:4321/", "/about"),
+      ).toMatchObject({
+        ok: false,
+        reason: "route-not-found",
+      });
+
+      await writeFile(join(appDir, "about/page.tsx"), source);
+      await mkdir(join(appDir, "(group)/about"), { recursive: true });
+      await writeFile(join(appDir, "(group)/about/page.tsx"), source);
+      const duplicateSnapshot = await workspace.discoverRoutes();
+      expect(duplicateSnapshot.unsupported).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            route: "/about",
+            reason: "ambiguous-route",
+          }),
+        ]),
+      );
+      expect(
+        await workspace.selectRoute("http://127.0.0.1:4321/", "/about"),
+      ).toMatchObject({
+        ok: false,
+        reason: "route-unsupported",
+      });
+
+      expect(
+        await workspace.selectRoute(
+          "http://127.0.0.1:4321/",
+          "/journal/[slug]",
+        ),
+      ).toMatchObject({
+        ok: false,
+        reason: "route-unsupported",
+      });
+
+      for (const hostile of [
+        "http://evil.com",
+        "//evil.com",
+        "/about/../secret",
+        "/about?x=1",
+      ]) {
+        expect(
+          await workspace.selectRoute("http://127.0.0.1:4321/", hostile),
+        ).toMatchObject({
+          ok: false,
+          reason: "invalid-request",
+        });
+      }
+    } finally {
+      await rm(appDir, { recursive: true, force: true });
+    }
+  });
 });

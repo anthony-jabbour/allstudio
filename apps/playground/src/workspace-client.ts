@@ -1,10 +1,13 @@
 import {
   type ClassEditRequest,
+  type DiscoveredRoute,
   type LocateElementResult,
+  type SelectRouteResult,
   type SourceEditWorkspace,
   sourceEditFailure,
   type TextEditRequest,
   type TextEditResult,
+  type UnsupportedRoute,
 } from "@allstudio/editor/shell";
 
 const API_PREFIX = "/__allstudio/workspace/";
@@ -45,6 +48,8 @@ export function createHttpWorkspace(
       call<TextEditResult>("preview-class", request),
     applyClassEdit: (request: ClassEditRequest) =>
       call<TextEditResult>("apply-class", request),
+    selectRoute: (route: string) =>
+      call<SelectRouteResult>("select-route", { route }),
   };
 }
 
@@ -60,6 +65,9 @@ export interface PlaygroundFixture {
   id: string;
   name: string;
   previewUrl: string;
+  activeRoute?: string;
+  routes?: DiscoveredRoute[];
+  unsupportedRoutes?: UnsupportedRoute[];
 }
 
 /** Fixture list injected by the dev-workspace plugin; empty in `vite build`. */

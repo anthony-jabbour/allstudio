@@ -27,6 +27,7 @@ export interface DesktopApi {
     projectId: string,
     request: ClassEditRequest,
   ): Promise<TextEditResult>;
+  selectRoute(projectId: string, route: string): Promise<SelectRouteResult>;
   undo(projectId: string): Promise<TextEditResult>;
   redo(projectId: string): Promise<TextEditResult>;
   onChange(callback: (message: string) => void): () => void;
@@ -36,9 +37,12 @@ export const RUNTIME_CHANNEL = "allstudio:runtime";
 
 import type {
   ClassEditRequest,
+  DiscoveredRoute,
   LocateElementResult,
+  SelectRouteResult,
   TextEditRequest,
   TextEditResult,
+  UnsupportedRoute,
 } from "@allstudio/editor/site";
 
 export interface RecentProject {
@@ -48,6 +52,9 @@ export interface RecentProject {
 }
 export interface OpenProject extends RecentProject {
   previewUrl: string;
+  activeRoute: string;
+  routes: DiscoveredRoute[];
+  unsupportedRoutes: UnsupportedRoute[];
 }
 export type ProjectResult =
   | { ok: true; project: OpenProject | null; unchanged?: boolean }

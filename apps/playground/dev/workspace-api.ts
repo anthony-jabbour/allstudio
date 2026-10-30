@@ -14,6 +14,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   parseClassEditBody,
   parseLocateBody,
+  parseSelectRouteBody,
   parseTextEditBody,
   type SourceEditFailureReason,
   sourceEditFailure,
@@ -40,6 +41,8 @@ const STATUS: Partial<Record<SourceEditFailureReason, number>> = {
   "path-rejected": 403,
   "file-not-found": 404,
   "oid-not-found": 404,
+  "route-not-found": 404,
+  "route-unsupported": 422,
   "stale-file": 409,
   "oid-ambiguous": 409,
   "write-failed": 500,
@@ -138,6 +141,16 @@ export function createWorkspaceApiMiddleware(options: WorkspaceApiOptions) {
         send(res, result.ok ? 200 : (STATUS[result.reason] ?? 422), result);
         return;
       }
+      if (action === "select-route") {
+        const parsed = parseSelectRouteBody(body);
+        if (!parsed) {
+          fail(res, "invalid-request");
+          return;
+        }
+        const result = await workspace.selectRoute(parsed.route);
+        send(res, result.ok ? 200 : (STATUS[result.reason] ?? 422), result);
+        return;
+      }
       if (action === "preview-text" || action === "apply-text") {
         const parsed = parseTextEditBody(body);
         if (!parsed) {
@@ -174,5 +187,6 @@ export function createWorkspaceApiMiddleware(options: WorkspaceApiOptions) {
 export {
   parseClassEditBody,
   parseLocateBody,
+  parseSelectRouteBody,
   parseTextEditBody,
 } from "@allstudio/editor/site";

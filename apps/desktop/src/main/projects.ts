@@ -2,6 +2,10 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
+import {
+  type SelectRouteResult,
+  sourceEditFailure,
+} from "@allstudio/editor/site";
 import { type BrowserWindow, dialog } from "electron";
 import type {
   OpenProject,
@@ -54,7 +58,11 @@ const METADATA = [
 ];
 
 export class Projects {
-  current: { info: OpenProject; workspace: LocalWorkspace } | null = null;
+  current: {
+    info: OpenProject;
+    workspace: LocalWorkspace;
+    basePreviewUrl: string;
+  } | null = null;
   private preview: Preview | null = null;
   private tail: Promise<unknown> = Promise.resolve();
   private disposed = false;
@@ -280,15 +288,27 @@ export class Projects {
           100,
         ),
       });
+      const basePreviewUrl = `http://127.0.0.1:${candidate.port}/`;
+      const routeSnapshot = await workspace.discoverRoutes();
+      const initialRoute = routeSnapshot.routes[0]?.route ?? "/";
+      const initialResolved = await workspace.selectRoute(
+        basePreviewUrl,
+        initialRoute,
+      );
       const info: OpenProject = {
         id,
         path: workspace.root,
         name: entry.name,
-        previewUrl: `http://127.0.0.1:${candidate.port}/`,
+        previewUrl: initialResolved.ok
+          ? initialResolved.previewUrl
+          : basePreviewUrl,
+        activeRoute: initialRoute,
+        routes: routeSnapshot.routes,
+        unsupportedRoutes: routeSnapshot.unsupported,
       };
       await this.closeCurrent();
       this.preview = candidate;
-      this.current = { info, workspace };
+      this.current = { info, workspace, basePreviewUrl };
       return { ok: true, project: info };
     } catch (error) {
       await this.stopPreview(candidate);
@@ -407,6 +427,26 @@ export class Projects {
     await this.stopPreview();
     await previous?.workspace.close();
   }
+  async selectRoute(route: string): Promise<SelectRouteResult> {
+    if (!this.current) {
+      return sourceEditFailure("unauthorized");
+    }
+    const result = await this.current.workspace.selectRoute(
+      this.current.basePreviewUrl,
+      route,
+    );
+    if (result.ok && this.current) {
+      this.current.info = {
+        ...this.current.info,
+        previewUrl: result.previewUrl,
+        activeRoute: result.route,
+        routes: result.routes,
+        unsupportedRoutes: result.unsupportedRoutes,
+      };
+    }
+    return result;
+  }
+
   close() {
     return this.operation(async () => {
       await this.closeCurrent();
