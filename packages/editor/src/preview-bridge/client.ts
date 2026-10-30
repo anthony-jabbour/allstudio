@@ -17,7 +17,7 @@ export interface PreviewBridgeConfig {
 
 const EDITOR_SOURCE = "allstudio-editor";
 const PREVIEW_SOURCE = "allstudio-preview";
-const VERSION = 6;
+const VERSION = 7;
 const OID_ATTRIBUTE = "data-oid";
 const MAX_TEXT_LENGTH = 2000;
 const MAX_LAYER_NODES = 1000;
@@ -52,6 +52,21 @@ const APPEARANCE_KEYS = [
   "backgroundColor",
   "backgroundImage",
   "borderRadius",
+] as const;
+
+const LAYOUT_KEYS = [
+  "display",
+  "flexDirection",
+  "justifyContent",
+  "alignItems",
+  "gridTemplateColumns",
+  "gridTemplateRows",
+  "width",
+  "height",
+  "minWidth",
+  "maxWidth",
+  "minHeight",
+  "maxHeight",
 ] as const;
 
 export function installPreviewBridge(config: PreviewBridgeConfig): void {
@@ -100,6 +115,9 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
     const appearance = Object.fromEntries(
       APPEARANCE_KEYS.map((key) => [key, null]),
     ) as Record<(typeof APPEARANCE_KEYS)[number], string | null>;
+    const layout = Object.fromEntries(
+      LAYOUT_KEYS.map((key) => [key, null]),
+    ) as Record<(typeof LAYOUT_KEYS)[number], string | null>;
     try {
       const style = getComputedStyle(element);
       for (const key of TYPOGRAPHY_KEYS) {
@@ -114,10 +132,15 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
         const observed = style[key];
         appearance[key] = observed && observed.length <= 256 ? observed : null;
       }
+      for (const key of LAYOUT_KEYS) {
+        const observed = style[key];
+        layout[key] = observed && observed.length <= 256 ? observed : null;
+      }
     } catch {
       // A detached/unavailable measurement is not a default property value.
     }
     return {
+      layout,
       appearance,
       spacing,
       typography,

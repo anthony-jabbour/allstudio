@@ -6,6 +6,7 @@ export type {
   PreviewExpectation,
   PreviewLayerNode,
   PreviewLayersSnapshot,
+  PreviewLayout,
   PreviewMessage,
   PreviewMessageRejection,
   PreviewRect,

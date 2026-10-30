@@ -4,7 +4,7 @@
  * every inbound message is checked for the expected origin, the expected
  * window, the session nonce, and a strict shape before the editor acts on it.
  */
-export const PREVIEW_BRIDGE_VERSION = 6;
+export const PREVIEW_BRIDGE_VERSION = 7;
 export const EDITOR_MESSAGE_SOURCE = "allstudio-editor";
 export const PREVIEW_MESSAGE_SOURCE = "allstudio-preview";
 
@@ -40,6 +40,7 @@ export interface PreviewRect {
 }
 
 export interface PreviewElementSnapshot {
+  layout: PreviewLayout;
   appearance: PreviewAppearance;
   spacing: PreviewSpacing;
   typography: PreviewTypography;
@@ -54,6 +55,23 @@ export interface PreviewElementSnapshot {
   /** Number of rendered elements sharing this oid (e.g. `.map()` items). */
   instances: number;
 }
+
+/** Fixed selected-element layout measurement; each value is bounded or null. */
+export const LAYOUT_KEYS = [
+  "display",
+  "flexDirection",
+  "justifyContent",
+  "alignItems",
+  "gridTemplateColumns",
+  "gridTemplateRows",
+  "width",
+  "height",
+  "minWidth",
+  "maxWidth",
+  "minHeight",
+  "maxHeight",
+] as const;
+export type PreviewLayout = Record<(typeof LAYOUT_KEYS)[number], string | null>;
 
 export interface PreviewTypography {
   fontSize: string | null;
@@ -93,6 +111,20 @@ export type PreviewAppearance = Record<
   (typeof APPEARANCE_KEYS)[number],
   string | null
 >;
+
+function parseLayout(value: unknown): PreviewLayout | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, LAYOUT_KEYS)) return null;
+  for (const key of LAYOUT_KEYS) {
+    if (
+      value[key] !== null &&
+      (typeof value[key] !== "string" || value[key].length > 256)
+    )
+      return null;
+  }
+  return Object.fromEntries(
+    LAYOUT_KEYS.map((key) => [key, value[key]]),
+  ) as PreviewLayout;
+}
 
 function parseAppearance(value: unknown): PreviewAppearance | null {
   if (!isRecord(value) || !hasOnlyKeys(value, APPEARANCE_KEYS)) return null;
@@ -239,6 +271,7 @@ function parseSnapshot(
   const typography = parseTypography(value.typography);
   const spacing = parseSpacing(value.spacing);
   const appearance = parseAppearance(value.appearance);
+  const layout = parseLayout(value.layout);
   const { nodeId, oid, tagName, text, className, instances } = value;
   if (
     typeof nodeId !== "string" ||
@@ -257,7 +290,8 @@ function parseSnapshot(
     !rect ||
     !typography ||
     !spacing ||
-    !appearance
+    !appearance ||
+    !layout
   ) {
     return undefined;
   }
@@ -272,6 +306,7 @@ function parseSnapshot(
     typography,
     spacing,
     appearance,
+    layout,
   };
 }
 

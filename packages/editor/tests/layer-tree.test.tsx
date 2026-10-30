@@ -30,6 +30,20 @@ const layers = {
   ],
 };
 const selected = {
+  layout: {
+    display: null,
+    flexDirection: null,
+    justifyContent: null,
+    alignItems: null,
+    gridTemplateColumns: null,
+    gridTemplateRows: null,
+    width: null,
+    height: null,
+    minWidth: null,
+    maxWidth: null,
+    minHeight: null,
+    maxHeight: null,
+  },
   appearance: {
     backgroundColor: null,
     backgroundImage: null,
