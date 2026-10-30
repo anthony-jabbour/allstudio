@@ -373,3 +373,51 @@ Fresh independent read-only implementation review ([code-reviewer](fcd74d5d-7f21
 No Electron main/preload/IPC/path grant/atomic write/history/recovery code changed. Existing negative IPC, traversal, symlink/hardlink, nonce/origin/frame/schema, stale/ambiguous target and recovery tests passed. The subframe injection probe remains unavailable. Offline production Next build remains NOT RUN in the offline harness. Other OS/architectures, signing/notarization, unfamiliar-user sessions and assistive-technology validation remain pending/unclaimed.
 
 Next approved work: 3.4c flex/grid/layout/sizing through the same source pipeline. Responsive tools 3.5, bounded structural edits 3.6, assets/finishing 3.7 and route navigation 3.2b remain open. Entire 3.4 stays open until 3.4c exists. Recommendation: READY FOR REVIEW for Slice 3.4b; INCOMPLETE for Phase 3. No merge or PASS.
+
+## Slice 3.4c — real source-backed layout and sizing (2026-10-30 Pacific)
+
+**Status: READY FOR REVIEW for Slice 3.4c and the integrated Slice 3.4 feature (spacing + appearance + layout/sizing); Phase 3 remains IN PROGRESS.** Founder approved the reviewed 3.4 design with “Approve and implement Slice 3.4 (recommended).” Branch `feat/phase-03-layout` starts at `origin/main` `24cbd6dda7444f794929ef0c6c2ff3222e39d5fd` (merged PRs #16–#20). Source implementation commits: `0bc405b` pure layout/sizing class transformations and `size-*` companion splitting, `2c68333` protocol v7 bounded layout measurement and confirmation, `87a587e` shared Layout inspector and browser/Electron E2E validation. No new dependency, native permission, source-of-truth change, cloud edit, Phase 4/5 feature or merge.
+
+### What works
+
+Eight controls cover Base `display` (`block`, `flex`, `inline-flex`, `grid`, `inline-grid`), `flexDirection` (`flex-row`, `flex-col`, `flex-row-reverse`, `flex-col-reverse`), `justifyContent` (`justify-start|end|center|between|around|evenly`), `alignItems` (`items-start|end|center|stretch|baseline`), uniform `gridColumns` (`grid-cols-1..12`), uniform `gridRows` (`grid-rows-1..12`), and `width`/`height` (`auto`, `full`, `fit`, `min`, `max`, standard fractions, positive spacing-scale presets, and explicit `1–4096px` literals up to three decimals). Source settings and last-observed computed values remain separate. Companion shorthand `size-*` expands in-place when one dimension changes (`size-20` → `w-[220px] h-20`) and preserves original bytes on no-ops. Mixed `size-*` + `w-*`/`h-*` conflicts, arbitrary grid templates, `subgrid`, viewport units, container tokens and `!`-modified utilities fail closed for the affected property without disabling unrelated controls. `min-w-*`, `max-w-*`, `min-h-*` and `max-h-*` constraints are preserved and surfaced in the inspector as a visible reason a size edit may remain unconfirmed.
+
+Protocol v7 adds a strict selected-only `layout` record of 12 nullable bounded strings (`<= 256` chars) from the existing single `getComputedStyle(element)` pass: `display`, `flexDirection`, `justifyContent`, `alignItems`, `gridTemplateColumns`, `gridTemplateRows`, `width`, `height`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`. `observesLayout` checks active `display` before confirming flex/grid axes, verifies resolved pixel track counts for `grid-cols-1..12` and `grid-rows-1..12`, and requires `< 0.02px` agreement on literal `width`/`height`. Inactive flex/grid axes, responsive overrides (`md:grid-cols-2`), and min/max-constrained dimensions (`w-[1200px]` clamped by `max-w-5xl` at `1024px`) retain the saved source edit and truthfully report rendering unconfirmed with Undo available.
+
+### Exact executed checks and results
+
+| Command | Final observed result |
+|---|---|
+| `bun run lint` | exit 0, no issues |
+| `bun run typecheck` | seven workspace checks exit 0 |
+| `bun run test` | 593 tests / 24 files passed |
+| `bun run validate:public-boundary` | exit 0 |
+| `bun run build` | playground and all three fixtures exit 0, online |
+| `bun run build:desktop` | exit 0 |
+| `bun run package:desktop` | exit 0, unsigned Mac arm64 |
+| `bun run test:desktop` | 6 development security checks passed |
+| `node scripts/e2e/desktop.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio` | 6 packaged security checks passed |
+| `bun run test:local` | 35 native workflows passed, including exact layout diff/render/undo/redo and full quit/reopen |
+| `ALLSTUDIO_FIXTURE=nested-components-fixture bun run test:local` | 23 checks passed |
+| `ALLSTUDIO_FIXTURE=tailwind-variants-fixture bun run test:local` | 23 checks passed |
+| `node scripts/e2e/local-workflow.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio --offline` | 35 packaged offline workflows passed; OS preview egress denied and parent secret absent; production next build NOT RUN in this harness |
+| `node scripts/e2e/appearance.e2e.mjs` against disposable `bun run dev` copies | 10 prior appearance scenarios passed, run serially |
+| `node scripts/e2e/typography.e2e.mjs` after appearance | 10 prior typography scenarios passed, run serially |
+| `node scripts/e2e/spacing.e2e.mjs` after typography | 12 prior spacing scenarios passed, run serially |
+| `node scripts/e2e/layers.e2e.mjs` after spacing | 13 prior layer scenarios passed, run serially |
+| `node scripts/e2e/layout.e2e.mjs` after layers | 15 isolated real-browser layout/sizing/geometry scenarios passed, run serially |
+| `NODE_PATH=/Users/jabbo/AllStudio/allstudio/node_modules/.bun/@playwright+test@1.64.1/node_modules node scripts/e2e/text-edit.e2e.mjs /tmp/allstudio-layout-browser-regression` after a fresh workspace reset | all 34 prior text/class scenarios passed, three fixtures; no examples source changed |
+| `env -i PATH="$PATH" HOME="$HOME" NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 CI=1 node node_modules/next/dist/bin/next build` in the final saved native project `apps/desktop/dist/local-workflow-4QKJOY/project` | exit 0; generated HTML retains `text-[36px] ... p-[16px]` and `w-[240px] rounded-[12px] bg-[#112233] ... flex justify-center`, recovered heading and no preview OIDs |
+| `git diff --check` | clean |
+
+RED was observed before each implementation step: missing `site/layout.ts` (`layout.test.ts`), missing `shell/layout-confirmation.ts` and protocol v6 vs v7 mismatch (`11 failed` in `preview-bridge.test.ts`), and missing `Preview layout patch`/`Apply layout` controls (`editor-shell.test.tsx`). During native E2E authoring on Aurora's `"Start a project"` button inside `<main className="... flex flex-col ...">`, selecting `inline-flex` exposed standard CSS Flexbox blockification (`getComputedStyle(el).display` resolves to `"flex"` on a direct flex item), which `observesLayout` honestly treated as unconfirmed for `"inline-flex"`; the native workflow test now uses `display: flex` + `w-[240px]` + `justify-center` on that flex item. Browser harnesses and Electron runs were executed strictly serially.
+
+### Actual source, rendering, geometry and persistence
+
+Committed artifacts: [evidence/phase-03-layout](evidence/phase-03-layout/). Harbor `#hero` proves `grid-rows-2` (`238px` → `238px 238px`, rect height `462` → `732`) and unconstrained `w-[800px]` (`1024px` → `800px`, columns `472px 472px` → `360px 360px`) while preserving `max-w-5xl` and `md:grid-cols-2 md:items-center lg:py-28`. Constrained `w-[1200px]` on `#hero` stays clamped at `1024px` by `max-w-5xl`, displays the constraint note, preserves `max-w-5xl`, and reports unconfirmed. Base `grid-cols-3` under `md:grid-cols-2` at 1440px and `flex-col` on `display: grid` both preserve source and report unconfirmed. On Harbor's multi-child CTA flex container (`flex flex-wrap gap-3`), applying `flex-col justify-between items-start` changes computed `flexDirection`/`justifyContent`/`alignItems` and moves `#harbor-secondary` from `(x: 355.3125, y: 248)` beside `#harbor-cta` `(x: 232, y: 248)` to `(x: 232, y: 304)` stacked below it. Companion `size-20` on `#harbor-cta` expands to `w-[220px] h-20` with rendered `220px × 80px`. Native and packaged offline Electron runs persist `w-[240px] ... flex justify-center` across Undo/Redo and full quit/reopen alongside earlier typography, spacing and appearance edits.
+
+Complete local traces: layout `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-layout-e2e-m3Qbxn/trace.zip`; appearance `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-appearance-e2e-Ui40rP/trace.zip`; typography `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-typography-e2e-m5v26q/trace.zip`; spacing `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-spacing-e2e-Co4eU3/trace.zip`; layers `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-layers-e2e-r0p0J8/trace.zip`; browser regression `/tmp/allstudio-layout-browser-regression/trace.zip`. Native directories: online `apps/desktop/dist/local-workflow-4QKJOY`, offline `local-workflow-51Pe6I`, nested `local-workflow-sCAWo7`, variants `local-workflow-gnkPKu`.
+
+### Review, security and boundaries
+
+No Electron main/preload/IPC/path grant/atomic write/history/recovery code changed. Existing negative IPC, traversal, symlink/hardlink, nonce/origin/frame/schema, stale/ambiguous target and recovery tests passed. The subframe injection probe remains unavailable. Offline production Next build remains NOT RUN in the offline harness; online portability was verified separately. With 3.4a, 3.4b and 3.4c evidenced, Slice 3.4 is complete as a feature (`READY FOR REVIEW`, not Phase 3 `PASS`). Static route navigation (3.2b), responsive viewport/breakpoint controls (3.5), bounded structural edits (3.6), project-owned assets (3.7), unfamiliar-user sessions and assistive-technology validation remain open. No merge or PASS.
