@@ -51,6 +51,16 @@ export function appearanceTargets(
 
 const SINGLE_PX = /^(\d+(?:\.\d+)?)px$/;
 
+function uniformRadius(value: string): boolean {
+  if (value.includes("/")) return false;
+  const parts = value.trim().split(/\s+/);
+  return (
+    parts.length >= 1 &&
+    parts.length <= 4 &&
+    parts.every((part) => part === parts[0] && SINGLE_PX.test(part))
+  );
+}
+
 export function observesAppearance(
   observed: PreviewAppearance,
   targets: AppearanceTarget[],
@@ -73,7 +83,11 @@ export function observesAppearance(
           ),
       );
     }
-    if (expectation.kind === "project") return true;
+    if (expectation.kind === "project") {
+      // A preset still has to produce one radius; an overridden corner is unconfirmed.
+      if (property === "borderRadius" && !uniformRadius(actual)) return false;
+      return true;
+    }
     if (expectation.kind !== "literal") return false;
     // A multi-value (per-corner) computed radius is never a uniform literal.
     const px = SINGLE_PX.exec(actual);

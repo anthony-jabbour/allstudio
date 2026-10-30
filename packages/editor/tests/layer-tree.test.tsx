@@ -1,7 +1,12 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { LayerTree } from "../src/shell/layer-tree.tsx";
+import {
+  LayerTree,
+  nearbyVisibleLayerId,
+  restoreLayerTreeFocus,
+  scrollLayerRowIntoView,
+} from "../src/shell/layer-tree.tsx";
 
 const layers = {
   generation: 1,
@@ -41,6 +46,8 @@ const selected = {
     marginBlockEnd: null,
     rowGap: null,
     columnGap: null,
+    flexDirection: null,
+    flexWrap: null,
   },
   typography: {
     fontSize: null,
@@ -89,5 +96,42 @@ describe("LayerTree", () => {
     expect(html).toContain("Layer tree is partial");
     expect(html).toContain("outside the displayed layer tree");
     expect(html).not.toContain('aria-selected="true"');
+  });
+  it("scrolls the selected row into view without moving keyboard focus", () => {
+    const focused: string[] = [];
+    const scrolled: string[] = [];
+    const row = {
+      focus: () => focused.push("n2"),
+      scrollIntoView: () => scrolled.push("n2"),
+    };
+    const root = {
+      querySelector: (selector: string) =>
+        selector === '[data-layer-id="n2"]' ? row : null,
+    };
+    scrollLayerRowIntoView(root as unknown as ParentNode, "n2");
+    expect(scrolled).toEqual(["n2"]);
+    expect(focused).toEqual([]);
+  });
+  it("restores keyboard focus to a nearby surviving row only when the tree had focus", () => {
+    const visible = layers.nodes.filter((node) => node.id !== "n2");
+    expect(nearbyVisibleLayerId(visible, "n2", layers.nodes)).toBe("n1");
+    const restored: string[] = [];
+    restoreLayerTreeFocus({
+      visible,
+      focusedId: "n2",
+      nodes: layers.nodes,
+      treeHasFocus: true,
+      focus: (id) => restored.push(id),
+    });
+    expect(restored).toEqual(["n1"]);
+    restored.length = 0;
+    restoreLayerTreeFocus({
+      visible,
+      focusedId: "n2",
+      nodes: layers.nodes,
+      treeHasFocus: false,
+      focus: (id) => restored.push(id),
+    });
+    expect(restored).toEqual([]);
   });
 });

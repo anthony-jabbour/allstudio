@@ -17,7 +17,7 @@ export interface PreviewBridgeConfig {
 
 const EDITOR_SOURCE = "allstudio-editor";
 const PREVIEW_SOURCE = "allstudio-preview";
-const VERSION = 5;
+const VERSION = 6;
 const OID_ATTRIBUTE = "data-oid";
 const MAX_TEXT_LENGTH = 2000;
 const MAX_LAYER_NODES = 1000;
@@ -44,6 +44,8 @@ const SPACING_KEYS = [
   "marginBlockEnd",
   "rowGap",
   "columnGap",
+  "flexDirection",
+  "flexWrap",
 ] as const;
 
 const APPEARANCE_KEYS = [

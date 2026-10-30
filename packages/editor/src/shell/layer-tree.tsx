@@ -20,6 +20,52 @@ interface LayerTreeProps {
   onSelect(id: string): void;
 }
 
+export function nearbyVisibleLayerId(
+  visible: readonly { id: string }[],
+  lostId: string,
+  nodes: readonly { id: string }[],
+): string | undefined {
+  const lostIndex = nodes.findIndex((node) => node.id === lostId);
+  if (lostIndex === -1) return visible[0]?.id;
+  return (
+    [...visible]
+      .reverse()
+      .find(
+        (node) => nodes.findIndex((item) => item.id === node.id) < lostIndex,
+      )?.id ??
+    visible.find(
+      (node) => nodes.findIndex((item) => item.id === node.id) > lostIndex,
+    )?.id
+  );
+}
+
+export function scrollLayerRowIntoView(
+  root: ParentNode | null,
+  id: string,
+): void {
+  root
+    ?.querySelector<HTMLElement>(`[data-layer-id="${id}"]`)
+    ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+export function restoreLayerTreeFocus(options: {
+  visible: readonly { id: string }[];
+  focusedId: string | null;
+  nodes: readonly { id: string }[];
+  treeHasFocus: boolean;
+  focus(id: string): void;
+}): void {
+  const { visible, focusedId, nodes, treeHasFocus, focus } = options;
+  if (
+    !treeHasFocus ||
+    !focusedId ||
+    visible.some((node) => node.id === focusedId)
+  )
+    return;
+  const next = nearbyVisibleLayerId(visible, focusedId, nodes);
+  if (next) focus(next);
+}
+
 export function LayerTree({
   layers,
   selected,
@@ -28,6 +74,7 @@ export function LayerTree({
   onSelect,
 }: LayerTreeProps) {
   const tree = useRef<HTMLUListElement>(null);
+  const treeHasFocus = useRef(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [focused, setFocused] = useState<string | null>(null);
   const selectedId = selected?.nodeId;
@@ -79,6 +126,12 @@ export function LayerTree({
   }, [layers, collapsed]);
   const tabStop =
     visible.find((node) => node.id === focused)?.id ?? visible[0]?.id;
+  const revealKey = `${selectedId ?? ""}:${selectionVersion}`;
+  useEffect(() => {
+    const id = revealKey.slice(0, revealKey.lastIndexOf(":"));
+    if (!id || !visible.some((node) => node.id === id)) return;
+    scrollLayerRowIntoView(tree.current, id);
+  }, [revealKey, visible]);
   const toggle = (id: string) =>
     setCollapsed((previous) => {
       const next = new Set(previous);
@@ -93,6 +146,20 @@ export function LayerTree({
       ?.querySelector<HTMLElement>(`[data-layer-id="${id}"]`)
       ?.focus();
   };
+  useEffect(() => {
+    restoreLayerTreeFocus({
+      visible,
+      focusedId: focused,
+      nodes: layers?.nodes ?? [],
+      treeHasFocus: treeHasFocus.current,
+      focus: (id) => {
+        setFocused(id);
+        tree.current
+          ?.querySelector<HTMLElement>(`[data-layer-id="${id}"]`)
+          ?.focus();
+      },
+    });
+  }, [visible, focused, layers]);
   const keyDown = (
     event: KeyboardEvent<HTMLLIElement>,
     node: PreviewLayerNode,
@@ -223,6 +290,19 @@ export function LayerTree({
               className="layer-tree"
               role="tree"
               aria-label="Rendered layers"
+              onFocusCapture={() => {
+                treeHasFocus.current = true;
+              }}
+              onBlurCapture={(event) => {
+                if (
+                  event.currentTarget.contains(
+                    event.relatedTarget as Node | null,
+                  )
+                )
+                  return;
+                if (visible.some((node) => node.id === focused))
+                  treeHasFocus.current = false;
+              }}
             >
               {renderNodes(null)}
             </ul>

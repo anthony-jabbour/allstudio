@@ -32,6 +32,8 @@ const element = {
     marginBlockEnd: "0px",
     rowGap: "32px",
     columnGap: "32px",
+    flexDirection: "row",
+    flexWrap: "nowrap",
   },
   appearance: {
     backgroundColor: "rgb(2, 132, 199)",
@@ -512,7 +514,7 @@ describe("bounded selected appearance measurement", () => {
       expect(result.message.element?.appearance).toEqual(appearance);
   });
   it("is part of the protocol version that the runtime copy reports", () => {
-    expect(PREVIEW_BRIDGE_VERSION).toBe(5);
+    expect(PREVIEW_BRIDGE_VERSION).toBe(6);
     expect(
       parsePreviewMessage(
         event({ type: "boot", version: PREVIEW_BRIDGE_VERSION - 1 }),

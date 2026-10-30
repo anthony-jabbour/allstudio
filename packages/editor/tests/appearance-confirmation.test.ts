@@ -76,6 +76,18 @@ describe("appearance rendered confirmation", () => {
       true,
     );
   });
+  it("does not confirm a radius preset when rendered corners stay unequal", () => {
+    const list = targets(CTA, CTA.replace("rounded-full", "rounded-lg"));
+    expect(
+      observesAppearance({ ...measured, borderRadius: "4px 8px 8px" }, list),
+    ).toBe(false);
+    expect(
+      observesAppearance(
+        { ...measured, borderRadius: "8px 8px 8px 8px" },
+        list,
+      ),
+    ).toBe(true);
+  });
   it("requires an actual change for project presets", () => {
     const list = targets(CTA, CTA.replace("rounded-full", "rounded-lg"));
     expect(observesAppearance(measured, list)).toBe(false);
