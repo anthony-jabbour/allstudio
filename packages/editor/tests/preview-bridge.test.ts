@@ -20,6 +20,14 @@ const expected = {
   nonce: "n".repeat(48),
 };
 const element = {
+  typography: {
+    fontSize: "48px",
+    fontWeight: "600",
+    lineHeight: "60px",
+    textAlign: "start",
+    color: "rgb(0, 0, 0)",
+    fontFamily: "Arial",
+  },
   nodeId: "n1",
   oid: "5y3ukh6",
   tagName: "h1",
@@ -197,6 +205,59 @@ describe("preview bridge protocol", () => {
     // Replies go only to the configured editor origin, never "*".
     expect(client).toContain("config.editorOrigin,");
     expect(client).not.toContain('"*"');
+  });
+});
+
+describe("measured typography snapshot", () => {
+  it("accepts explicit unavailable values without fabricating defaults", () => {
+    const typography = Object.fromEntries(
+      Object.keys(element.typography).map((key) => [key, null]),
+    );
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "h1",
+          element: { ...element, typography },
+        }),
+        expected,
+      ),
+    ).toMatchObject({ ok: true, message: { element: { typography } } });
+  });
+  it("accepts the exact measurement length limit", () => {
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "h1",
+          element: {
+            ...element,
+            typography: { ...element.typography, fontFamily: "x".repeat(256) },
+          },
+        }),
+        expected,
+      ).ok,
+    ).toBe(true);
+  });
+  it.each([
+    undefined,
+    null,
+    [],
+    { ...element.typography, color: 1 },
+    { ...element.typography, fontSize: undefined },
+    { ...element.typography, fontFamily: "x".repeat(257) },
+    { ...element.typography, path: "/private/file" },
+  ])("rejects malformed measured records %j", (typography) => {
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "h1",
+          element: { ...element, typography },
+        }),
+        expected,
+      ),
+    ).toEqual({ ok: false, reason: "malformed" });
   });
 });
 

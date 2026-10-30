@@ -431,3 +431,58 @@ code,
     max-height: 32dvh;
   }
 }
+
+.typography-inspector {
+  margin-top: 20px;
+  border-top: 1px solid var(--studio-border);
+  padding-top: 16px;
+}
+.typography-inspector h2 {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.typography-field {
+  margin-top: 14px;
+  min-width: 0;
+}
+.typography-field label {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  margin-top: 8px;
+}
+.typography-field input,
+.typography-field select {
+  min-width: 0;
+  width: 100%;
+}
+.typography-field .field-note {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.typography-inspector .actions {
+  flex-direction: column;
+}
+@media (min-width: 761px) {
+  .editor-shell {
+    height: calc(100dvh - 32px);
+    min-height: 560px;
+  }
+  .editor-workspace {
+    min-height: 0;
+  }
+  .inspector {
+    min-height: 0;
+    overflow: auto;
+  }
+}
+.typography-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  border: 1px solid var(--studio-border);
+  border-radius: 3px;
+  vertical-align: -2px;
+}

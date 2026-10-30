@@ -203,3 +203,49 @@ A complete proposed six-group design is recorded at `docs/superpowers/specs/2026
 Reason cloud capability checks returned login_required, account/workspace null and no scopes, with billing/compute not checked. A generic pairing login link was supplied privately so the user can select/approve the intended workspace. No account/workspace was chosen silently and no cloud task, paid run, activation or purchase occurred. Local review completed the independent design check.
 
 Status: IN PROGRESS — design ready for founder review; no typography production code changed yet.
+
+
+## Slice 3.3 — source-backed typography implementation (2026-10-29)
+
+Status: **READY FOR REVIEW for Slice 3.3; Phase 3 remains IN PROGRESS.** Founder approved the linked six-group design with “Approve and implement Slice 3.3 (recommended).” Active checkout branch `feat/phase-03-typography`, stacked on unmerged #17 (`97f5bb434d6ac5c371f0337e9c52238976b265d8`). Remote main rechecked at `d132d58ed70f2a38ea4af529144f5a051827aa36`; private cloud head is `10ef1d77b802e2fa61be2cd08ce849226b5f29da`. No cloud files, native permissions, dependency/lockfile, mapper or filesystem adapter changed. Earlier preparation status above is historical.
+
+### Implemented behavior and boundaries
+
+The shared inspector edits six Base typography groups: size, weight, line height, alignment, sRGB hex text colour and existing project sans/serif/mono aliases. Pure token-range transformations retain unrelated classes, whitespace, responsive/state variants, explicit size/leading coupling and colour alpha. Unsupported/ambiguous groups refuse editing. Dynamic classes and repeated rendered instances remain read-only. Source settings and last observed CSS are distinct; missing utilities do not imply inherited/default values.
+
+Preview protocol v3 adds exactly six bounded nullable measured strings on selected elements, with strict key/type/length validation. There is no layer-wide computed-style scan, new IPC endpoint, path or native capability. Existing nonce/origin/window/schema/instance checks remain. The inspector uses the existing class draft, diff/Apply, expected hash, atomic write, journal and history pipeline. Source is never saved on blur; unsaved text drafts survive typography Apply. Literal confirmation requires changed measured output matching the request; project presets require observed change without assuming default definitions. Equivalent, unavailable or CSS-overridden output retains source and reports rendering unconfirmed after the existing bounded refresh deadline, with Undo available.
+
+### Executed verification
+
+| Exact command | Observed final result |
+|---|---|
+| `bun run lint` | exit 0, no issues |
+| `bun run typecheck` | all seven workspace checks exit 0 |
+| `bun run test` | 17 files, 301 tests passed |
+| `bun run validate:public-boundary` | exit 0 |
+| `bun run build` | playground and all three Next.js fixtures exit 0, online |
+| `bun run build:desktop` | exit 0 |
+| `bun run package:desktop` | exit 0, unsigned Mac arm64 package |
+| `bun run test:desktop` | 6 development checks passed |
+| `node scripts/e2e/desktop.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio` | 6 packaged checks passed |
+| `bun run test:local` | 26 native checks passed, including six-property source/render proof, undo/redo and typography quit/reopen |
+| `ALLSTUDIO_FIXTURE=nested-components-fixture bun run test:local` | 23 checks passed |
+| `ALLSTUDIO_FIXTURE=tailwind-variants-fixture bun run test:local` | 23 checks passed |
+| `node scripts/e2e/local-workflow.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio --offline` | 26 packaged offline checks passed with OS preview egress denied; typography source and appearance survive full quit/reopen |
+| `node scripts/e2e/typography.e2e.mjs` with `bun run dev` and disposable copies | 10 real-browser scenarios passed |
+| `NODE_PATH=/Users/jabbo/AllStudio/allstudio/node_modules/.bun/@playwright+test@1.64.1/node_modules node scripts/e2e/text-edit.e2e.mjs /tmp/allstudio-typography-browser-regression` | all 34 prior browser checks passed, three fixtures, no examples source changed |
+| `node scripts/e2e/layers.e2e.mjs` | all 13 layer scenarios passed, including typography refusal for repeated instances |
+
+RED was observed for the missing typography module/inspector, new measured schema tests, unknown-colour alpha incorrectly blocking size, unchanged literal output incorrectly confirming success, typed hex mutating its own shorthand alpha, and stale custom-input synchronization after manual Classes A/B/A changes. Each received a focused fix and final GREEN proof. A cold-start harness click before bridge connection initially lost selection; the harness now waits for the real connected state before clicking (also after reload/reopen/fixture switch). The first font-alias assertion wrongly assumed the system monospace name; inspection showed the project uses Geist Mono, so the assertion now checks the actual project alias. The offline production build remains **NOT RUN** in the offline harness; historical `next/font/google` offline failure is unchanged. A subframe native IPC probe remains **unavailable**, not evidence of a successful denial; renderer/main-frame guards and real preview capability attacks passed their available checks.
+
+### Source, rendered and persistence evidence
+
+Committed review evidence is under [evidence/phase-03-typography](evidence/phase-03-typography/): six-property screenshot, overridden/unconfirmed screenshot, dark/narrow screenshot, offline reopened screenshot, exact before/after TSX snapshots and command logs. Browser source changes only `text-5xl`→`text-[36px]`, `font-semibold`→`font-bold`, `leading-tight`→`leading-[1.5]`, `text-zinc-950`→`text-[#112233]`, plus `text-center font-mono`; unrelated JSX and the unapplied text draft remain intact. Actual selected-heading CSS: 36px, 700, 54px, center, rgb(17,34,51), project Geist Mono. No-op retained inode/mtime. CSS `!important` override kept the source edit but correctly withheld visual confirmation. Harbor Base size edit retained `sm:text-5xl lg:text-6xl`, rendered60px at1440px, and reported unconfirmed. A stale hash preserved external bytes.
+
+Full traces remain local: typography `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-typography-e2e-Cl9I7Q/trace.zip`; browser regression `/tmp/allstudio-typography-browser-regression/trace.zip` plus webm/diffs; layers `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-layers-e2e-14EMPd/trace.zip`. Native evidence directories: online `apps/desktop/dist/local-workflow-oNV4cs`, packaged offline `local-workflow-KLJpVF`, nested `local-workflow-wG2Mj2`; variants `local-workflow-9ws4OD`. Disposable edited playground copies retained at `/tmp/allstudio-typography-noo8czhc/edited-workspaces`. Pre-existing copies restored, only byte-recognized generated v2 bridge files refreshed to v3, existing JSX untouched.
+
+### Independent review, security and remaining gates
+
+Fresh local read-only reviewer found three P2 issues (hex input normalization, unchanged-output confirmation and stale draft marker). All were reproduced/fixed; final re-review reported no additional actionable findings and independently ran93 helper/confirmation/protocol tests successfully. It did not substitute for founder review or runtime proof. Selected measurements stay untrusted and bounded; no preview native privilege, Electron security policy or filesystem grant changed. Existing path/hardlink/symlink/hash/conflict/recovery tests and layer dirty-scan budgets pass.
+
+Remaining: founder review of this stacked slice and current PR head; unfamiliar-user and assistive-technology sessions remain pending human validation. Exact downloaded font availability and wide-gamut colour fidelity are not claimed. Breakpoint-specific tools, spacing/layout, structural editing and assets remain unimplemented slices3.4–3.7; static route navigation also remains pending. The next recommended slice is a reviewed source-safe spacing/layout design using this same draft/diff/hash/history/measurement flow. No new engine or permission decision is required by Slice3.3. Phase gate remains INCOMPLETE; no merge or PASS authorized.

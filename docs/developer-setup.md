@@ -116,3 +116,13 @@ bun --filter @allstudio/tailwind-variants-fixture dev     # Harbor Studio on :30
 - Onlook application/UI extraction (only the source-mapper slice is extracted)
 - Cloud integration
 - Creative boards
+
+### Typography integration proof
+
+With fresh disposable playground copies and `bun run dev` running:
+
+```sh
+node scripts/e2e/typography.e2e.mjs
+```
+
+This exercises all six shared inspector groups, exact file diffs, rendered CSS, typed hex entry, draft synchronization, no-op, invalid input, an overridden CSS result, Base edits preserving responsive variants, and stale-hash refusal. Traces/screenshots and source snapshots are written to the printed temporary evidence folder. It modifies only disposable playground copies. See `apps/desktop/README.md` for the manual workflow and `docs/validation/PHASE-03.md` for native/offline evidence and remaining phase gates.

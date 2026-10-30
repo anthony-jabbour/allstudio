@@ -1,0 +1,27 @@
+$ vitest run
+
+ RUN  v3.2.7 /Users/jabbo/AllStudio/allstudio
+
+ ✓ tests/security/public-boundary.test.ts (2 tests) 56ms
+ ✓ apps/desktop/tests/native-files.test.ts (7 tests) 1441ms
+   ✓ native handle-relative file helper > reads and atomically replaces a file with expected-byte checks and mode preservation  753ms
+ ✓ packages/editor/tests/source-mapper.test.ts (24 tests) 140ms
+ ✓ apps/playground/tests/workspace-api.test.ts (29 tests) 236ms
+ ✓ packages/editor/tests/layer-tree.test.tsx (2 tests) 30ms
+ ✓ packages/editor/tests/source-edit.test.ts (46 tests) 235ms
+ ✓ apps/desktop/tests/preview-source.test.ts (6 tests) 93ms
+ ✓ packages/editor/tests/typography.test.ts (35 tests) 8ms
+ ✓ apps/playground/tests/fixtures.test.ts (33 tests) 804ms
+ ✓ apps/desktop/tests/config-integration.test.ts (3 tests) 532ms
+ ✓ packages/project/tests/manifest.test.ts (5 tests) 2ms
+ ✓ packages/editor/tests/typography-confirmation.test.ts (5 tests) 6ms
+ ✓ apps/desktop/tests/security.test.ts (2 tests) 3ms
+ ✓ apps/desktop/tests/local-workspace.test.ts (9 tests) 730ms
+ ✓ packages/editor/tests/preview-bridge.test.ts (53 tests) 5ms
+ ✓ packages/editor/tests/editor-shell.test.tsx (5 tests) 23ms
+ ✓ apps/playground/tests/dev-workspace.test.ts (35 tests) 1087ms
+
+ Test Files  17 passed (17)
+      Tests  301 passed (301)
+   Start at  20:48:15
+   Duration  3.05s (transform 449ms, setup 0ms, collect 15.05s, tests 5.43s, environment 1ms, prepare 942ms)

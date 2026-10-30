@@ -17,13 +17,21 @@ export interface PreviewBridgeConfig {
 
 const EDITOR_SOURCE = "allstudio-editor";
 const PREVIEW_SOURCE = "allstudio-preview";
-const VERSION = 2;
+const VERSION = 3;
 const OID_ATTRIBUTE = "data-oid";
 const MAX_TEXT_LENGTH = 2000;
 const MAX_LAYER_NODES = 1000;
 const MAX_LAYER_DEPTH = 64;
 const MAX_LAYER_LABEL_LENGTH = 80;
 const MAX_LAYER_VISITS = 10000;
+const TYPOGRAPHY_KEYS = [
+  "fontSize",
+  "fontWeight",
+  "lineHeight",
+  "textAlign",
+  "color",
+  "fontFamily",
+] as const;
 
 export function installPreviewBridge(config: PreviewBridgeConfig): void {
   if (typeof window === "undefined" || window.parent === window) return;
@@ -62,7 +70,20 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
       `[${OID_ATTRIBUTE}="${CSS.escape(oid)}"]`,
     ).length;
     const rect = element.getBoundingClientRect();
+    const typography = Object.fromEntries(
+      TYPOGRAPHY_KEYS.map((key) => [key, null]),
+    ) as Record<(typeof TYPOGRAPHY_KEYS)[number], string | null>;
+    try {
+      const style = getComputedStyle(element);
+      for (const key of TYPOGRAPHY_KEYS) {
+        const observed = style[key];
+        typography[key] = observed && observed.length <= 256 ? observed : null;
+      }
+    } catch {
+      // A detached/unavailable measurement is not a default property value.
+    }
     return {
+      typography,
       nodeId: nodeId(element),
       oid,
       tagName: element.tagName.toLowerCase(),
@@ -287,6 +308,8 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
   );
   window.addEventListener("scroll", () => scheduleReport(), true);
   window.addEventListener("resize", () => scheduleReport());
+  document.addEventListener("load", () => scheduleReport(), true);
+  document.fonts?.addEventListener("loadingdone", () => scheduleReport());
   new MutationObserver((records) =>
     scheduleReport(
       records.some(

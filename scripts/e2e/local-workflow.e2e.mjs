@@ -307,6 +307,107 @@ try {
       "Electron external HTTP is disabled; the preview child gets OS egress denial and no parent secret",
     );
   }
+  if (fixtureName === "nextjs-site-fixture") {
+    const typographyBefore = await readFile(sourceFile, "utf8");
+    const typographyClasses = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    await page
+      .getByLabel("Font size preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Font size px", { exact: true }).fill("36");
+    await page
+      .getByLabel("Font weight preset", { exact: true })
+      .selectOption("font-bold");
+    await page
+      .getByLabel("Line height preset", { exact: true })
+      .selectOption("custom:ratio");
+    await page.getByLabel("Line height ratio", { exact: true }).fill("1.5");
+    await page
+      .getByLabel("Text alignment preset", { exact: true })
+      .selectOption("text-center");
+    await page
+      .getByLabel("Text colour preset", { exact: true })
+      .selectOption("custom:hex");
+    await page
+      .getByLabel("Text colour hex", { exact: true })
+      .pressSequentially("#112233");
+    await page
+      .getByLabel("Font family preset", { exact: true })
+      .selectOption("font-mono");
+    const typographyAfterClasses = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    assert.equal(await readFile(sourceFile, "utf8"), typographyBefore);
+    await toolbar(page, "Preview typography patch");
+    await expect(page.locator(".diff")).toContainText("text-[36px]");
+    await toolbar(page, "Apply typography");
+    await expect(page.getByText(/Saved typography.*observed/)).toBeVisible({
+      timeout: 30000,
+    });
+    const measured = await preview.locator("h1").evaluate((element) => {
+      const css = getComputedStyle(element);
+      return [
+        css.fontSize,
+        css.fontWeight,
+        css.lineHeight,
+        css.textAlign,
+        css.color,
+        css.fontFamily,
+      ];
+    });
+    assert.deepEqual(measured.slice(0, 5), [
+      "36px",
+      "700",
+      "54px",
+      "center",
+      "rgb(17, 34, 51)",
+    ]);
+    assert.ok(measured[5].includes("Geist Mono"));
+    const typographyAfter = typographyBefore.replace(
+      typographyClasses,
+      typographyAfterClasses,
+    );
+    assert.notEqual(typographyAfter, typographyBefore);
+    assert.equal(await readFile(sourceFile, "utf8"), typographyAfter);
+    await writeFile(join(evidence, "typography-before.tsx"), typographyBefore);
+    await writeFile(join(evidence, "typography-after.tsx"), typographyAfter);
+    await page.screenshot({ path: join(evidence, "typography.png") });
+    pass(
+      "six typography controls save the exact JSX diff and confirm actual Electron rendering",
+    );
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(typographyBefore);
+    await toolbar(page, "Redo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(typographyAfter);
+    await expect
+      .poll(
+        () =>
+          preview.locator("h1").evaluate((el) => getComputedStyle(el).fontSize),
+        { timeout: 30000 },
+      )
+      .toBe("36px");
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(typographyBefore);
+    await expect
+      .poll(
+        () =>
+          preview.locator("h1").evaluate((el) => getComputedStyle(el).fontSize),
+        { timeout: 30000 },
+      )
+      .toBe("48px");
+    await preview.locator("h1").click();
+    await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
+      typographyClasses,
+    );
+    pass("typography undo/redo restores exact source and rendered output");
+  }
   const originalClasses = await page
     .getByLabel("Classes", { exact: true })
     .inputValue();
@@ -946,6 +1047,49 @@ try {
     assert.ok(!html.includes('data-oid="p:'));
     pass(
       "edited project builds outside Electron with the config wrapper inactive and no preview attributes",
+    );
+  }
+  if (fixtureName === "nextjs-site-fixture") {
+    await toolbar(page, "Reopen");
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    const savedPreview = page.frameLocator('iframe[title="Project preview"]');
+    await savedPreview.locator("h1").click();
+    await expect(
+      page.getByLabel("Font size preset", { exact: true }),
+    ).toBeEnabled();
+    await page
+      .getByLabel("Font size preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Font size px", { exact: true }).fill("36");
+    await toolbar(page, "Apply typography");
+    await expect(page.getByText(/Saved typography.*observed/)).toBeVisible({
+      timeout: 30000,
+    });
+    const persistedTypography = await readFile(sourceFile, "utf8");
+    await application.close();
+    application = undefined;
+    page = await launch();
+    await toolbar(page, "Reopen");
+    await expect
+      .poll(
+        () =>
+          page
+            .frameLocator('iframe[title="Project preview"]')
+            .locator("h1")
+            .evaluate((el) => getComputedStyle(el).fontSize),
+        { timeout: 60000 },
+      )
+      .toBe("36px");
+    assert.equal(await readFile(sourceFile, "utf8"), persistedTypography);
+    await writeFile(
+      join(evidence, "typography-reopened.tsx"),
+      persistedTypography,
+    );
+    await page.screenshot({ path: join(evidence, "typography-reopened.png") });
+    pass(
+      "typography source and actual appearance persist across full Electron quit and reopen",
     );
   }
   console.log(`${checks} local-workflow checks passed. Evidence: ${evidence}`);
