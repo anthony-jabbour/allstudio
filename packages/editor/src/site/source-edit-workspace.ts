@@ -4,6 +4,7 @@ import type {
   SourceLocation,
   SourceMapperError,
 } from "../source-mapper/types.ts";
+import type { DiscoveredRoute, UnsupportedRoute } from "./routes.ts";
 
 /**
  * Runtime-neutral contract the editor UI uses to resolve and edit source.
@@ -21,7 +22,24 @@ export interface SourceEditWorkspace {
   previewClassEdit(request: ClassEditRequest): Promise<TextEditResult>;
   /** Writes the `className` replacement if the file still matches. */
   applyClassEdit(request: ClassEditRequest): Promise<TextEditResult>;
+  /** Validates and resolves a discovered static route for preview navigation. */
+  selectRoute?(route: string): Promise<SelectRouteResult>;
 }
+
+export interface SelectRouteRequest {
+  route: string;
+}
+
+export interface SelectRouteSuccess {
+  ok: true;
+  route: string;
+  sourcePath: string;
+  previewUrl: string;
+  routes: DiscoveredRoute[];
+  unsupportedRoutes: UnsupportedRoute[];
+}
+
+export type SelectRouteResult = SelectRouteSuccess | SourceEditFailure;
 
 export interface SourceElementInfo {
   /** Workspace-relative POSIX path, e.g. `src/app/page.tsx`. */
@@ -54,6 +72,8 @@ export type SourceEditFailureReason =
   | "unauthorized"
   | "path-rejected"
   | "file-not-found"
+  | "route-not-found"
+  | "route-unsupported"
   | "stale-file"
   | "invalid-patch"
   | "write-failed"
@@ -105,6 +125,9 @@ const FAILURE_MESSAGES: Record<SourceEditFailureReason, string> = {
   unauthorized: "The workspace rejected the request.",
   "path-rejected": "That file is outside the approved workspace.",
   "file-not-found": "The source file no longer exists.",
+  "route-not-found": "The requested route does not exist in this project.",
+  "route-unsupported":
+    "The requested route uses an unsupported Next.js App Router convention.",
   "stale-file":
     "The file changed since this element was selected. Reselect the element and try again.",
   "invalid-patch":
@@ -133,5 +156,19 @@ export {
   hasExactKeys,
   parseClassEditBody,
   parseLocateBody,
+  parseSelectRouteBody,
   parseTextEditBody,
 } from "./requests.ts";
+export type {
+  DiscoveredRoute,
+  ProjectRoutesSnapshot,
+  ResolvePreviewRouteUrlResult,
+  UnsupportedRoute,
+  UnsupportedRouteReason,
+  ValidateRoutePathResult,
+} from "./routes.ts";
+export {
+  discoverAppRouterRoutes,
+  resolvePreviewRouteUrl,
+  validateRoutePath,
+} from "./routes.ts";

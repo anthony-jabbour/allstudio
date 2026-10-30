@@ -50,17 +50,30 @@ export {
 } from "./site/layout.ts";
 export type {
   ClassEditRequest,
+  DiscoveredRoute,
   LocateElementResult,
+  ProjectRoutesSnapshot,
+  ResolvePreviewRouteUrlResult,
+  SelectRouteRequest,
+  SelectRouteResult,
+  SelectRouteSuccess,
   SourceEditFailure,
   SourceEditFailureReason,
   SourceEditWorkspace,
   SourceElementInfo,
   TextEditRequest,
   TextEditResult,
+  UnsupportedRoute,
+  UnsupportedRouteReason,
+  ValidateRoutePathResult,
 } from "./site/source-edit-workspace.ts";
 export {
   describeSourceEditFailure,
+  discoverAppRouterRoutes,
+  parseSelectRouteBody,
+  resolvePreviewRouteUrl,
   sourceEditFailure,
+  validateRoutePath,
 } from "./site/source-edit-workspace.ts";
 export type {
   DescribeElementResult,
