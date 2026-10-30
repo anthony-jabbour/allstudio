@@ -1,6 +1,6 @@
 # Phase 3.5 — responsive frames, device widths, zoom, breakpoint-scoped edits
 
-Status: PROPOSED DESIGN — `BLOCKED — FOUNDER DECISION`. No production code changed.
+Status: FOUNDER APPROVED — implementation pending.
 Date: 2026-10-30. Base: `feat/phase-03-routes` (draft PR #22, stacked on #21).
 
 ## Research (parent-performed; the research subagent failed with a quota error)
@@ -45,3 +45,8 @@ Clarified proposal presented to the founder on resume: support Base/sm/md/lg/xl/
 Current base is `7eeec3c6baa62f4bbd093f90cc40da2719b9fc42`, protocolv7. All four helpers still edit Base only. `SourceElementEditor` renders iframe and selection overlay in the same `.preview-pane`, so automatic transform scaling can keep their geometry aligned without manual coordinate multiplication. Canvas scroll extent and Fit measurement still need real tests.
 
 The three fixtures contain no tailwind.config/screens or --breakpoint-* overrides; they are useful default-theme proofs, not proof of custom-theme detection. Desktop `NativeFiles.list()` lists only src JSX/TSX, and root metadata includes Tailwind config bytes for consent fingerprints but does not establish breakpoint values. Do not claim defaults were validated merely from absence of a discovered config or from preset width. Investigate a bounded proof/detection path and expose uncertainty; do not widen native CSS reads silently.
+
+## Founder decision recorded — 2026-10-30
+
+A: automatic width-to-scope mapping with visible override; all six default scopes, Clear override, custom320–2560px, Fit/50/75/100% zoom. A bounded read-only CSS/config metadata audit under the existing project grant is separately approved; no raw CSS to renderer, CSS writes, new grants or dependencies.
+The current human reply supersedes the earlier recommendations/options above. No merge or phase PASS is authorized.

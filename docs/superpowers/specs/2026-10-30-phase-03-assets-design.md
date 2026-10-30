@@ -1,6 +1,6 @@
 # Phase 3.7 — project-owned assets (view / select / associate)
 
-Status: PROPOSED DESIGN — `BLOCKED — FOUNDER DECISION`. No production code changed.
+Status: FOUNDER APPROVED — implementation pending.
 Date: 2026-10-30. Base: `feat/phase-03-routes`.
 
 ## Scope boundary
@@ -45,3 +45,8 @@ Secondary: (1) whether import/upload is a later separate slice (recommended: yes
 ## Resume clarification — 2026-10-30
 
 Option A includes both the metadata list and Use asset; a browsing-only list would not fulfill the requested association workflow. Any native-helper/IPC extension must remain hardcoded to bounded, allowlisted public/ metadata under the existing project grant, preserving traversal/symlink/hardlink protections. It is not authorization for arbitrary listing, binary reads, broader grants or editor CSP changes. This exact scope has been presented to the founder; approval is pending.
+
+## Founder decision recorded — 2026-10-30
+
+A: metadata list plus Use asset for static img/verified next/image src literals. No thumbnails, import/upload, binary read, CSP expansion or new grant.
+The current human reply supersedes the earlier recommendations/options above. No merge or phase PASS is authorized.

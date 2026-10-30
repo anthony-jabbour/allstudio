@@ -1,6 +1,6 @@
 # Phase 3.6 — bounded structural rearrange (sibling reorder)
 
-Status: PROPOSED DESIGN — `BLOCKED — FOUNDER DECISION`. No production code changed.
+Status: FOUNDER APPROVED — implementation pending.
 Date: 2026-10-30. Base: `feat/phase-03-routes`.
 
 ## Scope boundary
@@ -41,3 +41,8 @@ My recommendation: A first; B as a later UI-only increment on the same transform
 Blocked work: implementation of 3.6 (site/reorder.ts, layer-tree actions, requests, e2e).
 Secondary: whether reuse of a component instance (e.g. same card used in two places) must always be refused (recommended: yes).
 ```
+
+## Founder decision recorded — 2026-10-30
+
+B: both Move up/down buttons and layer drag/reorder, under the same adjacent static-sibling eligibility and source-safe transform. Drag does not expand supported structures or permit cross-parent moves.
+The current human reply supersedes the earlier recommendations/options above. No merge or phase PASS is authorized.
