@@ -1,8 +1,8 @@
 # Phase 3 Gate Inventory
 
-**Status:** IN PROGRESS — the Phase 3 gate is not approved.  
-**Snapshot date:** 2026-10-29 (America/Los_Angeles).  
-**Scope:** Public editor only; this inventory does not change product or architecture decisions.
+- **Status:** IN PROGRESS — the Phase 3 gate is not approved.
+- **Snapshot date:** 2026-10-29 (America/Los_Angeles).
+- **Scope:** Public editor only; this inventory does not change product or architecture decisions.
 
 ## Baseline and review state
 
@@ -23,7 +23,7 @@ The rows below map the [Phase 3 roadmap](../../RoadMap.md) to the latest impleme
 | Typography and typography tokens | **Implemented for Slice 3.3, within a bounded static utility subset.** [Typography inspector](../../packages/editor/src/shell/typography-inspector.tsx), [source transforms](../../packages/editor/src/site/typography.ts), [confirmation rules](../../packages/editor/src/shell/typography-confirmation.ts), and [typography browser scenarios](../../scripts/e2e/typography.e2e.mjs) support size, weight, line height, alignment, sRGB hex text color, and existing project font aliases. The report records source diffs, rendered measurement, undo/redo and reopen evidence. | Unsupported or ambiguous classes refuse changes. Exact font availability and wide-gamut color fidelity are not claimed. This does not close all color controls in the roadmap. |
 | Existing text/class editing, real source diffs, preview refresh, save, undo/redo and reopen | **Demonstrated for the supported operation subset.** [Desktop LocalWorkspace](../../apps/desktop/src/main/local-workspace.ts) implements source writes and history; [shared edit contract](../../packages/editor/src/site/source-edit-workspace.ts) defines hash-checked apply operations. [Phase 1 E2E](../../scripts/e2e/text-edit.e2e.mjs), [Phase 2 validation](../validation/PHASE-02.md), and [Phase 3 validation](../validation/PHASE-03.md) record real files, preview behavior, undo/redo, recovery and offline reopen. | The Phase 3 gate requires this comparison for every new operation. Evidence for the current subset cannot close work that has not been implemented. |
 | Static route/page navigation | **Not implemented.** The validation report identifies it as pending Slice 3.2b. | Implement and validate route eligibility, hostile route handling, selection invalidation and draft cancellation before claiming page navigation. |
-| Visual spacing and supported layout controls | **Not implemented as dedicated visual controls.** Existing manual class editing can change supported source classes, but does not provide the planned spacing/layout inspector. | A bounded source-safe design and implementation plus source-diff, rendered-result, history and persistence proof remain. |
+| Visual spacing and supported layout controls | **Not implemented as dedicated visual controls.** Existing manual class editing can change supported source classes, but does not provide the planned spacing/layout inspector. | Production controls and their source-diff, rendered-result, history and persistence proof remain. Resolve any material design decision before implementation. |
 | Color controls beyond typography text color | **Not demonstrated.** Slice 3.3 covers text color only. | The roadmap separately names color; no broader background, border, or other color inspector is evidenced here. |
 | Responsive frames, device widths, zoom and breakpoint tools | **Not implemented.** The Studio shell uses a fixed 1440px preview layout viewport; app layout was checked at the original window and 620px. | Preview device sizing, zoom and breakpoint editing remain pending (Slice 3.5). App-window resizing evidence does not establish responsive preview controls. |
 | Rearranging a supported component / structural edits | **Not implemented.** The layer tree represents rendered hierarchy and selection, not structure editing. | Bounded supported sibling rearrangement and its safe source transforms, tests and review remain pending (Slice 3.6); unrestricted insert/remove is not approved by this inventory. |

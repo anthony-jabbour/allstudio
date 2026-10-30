@@ -1,0 +1,30 @@
+{
+  "observedDate": "2026-10-29",
+  "tailwindVersion": "4.3.3",
+  "scope": "Installed compiler only; not source-transform, CSS cascade, runtime or persistence proof",
+  "candidates": [
+    "p-6",
+    "px-8",
+    "py-4",
+    "pt-[12px]",
+    "ms-auto",
+    "-mt-[8px]",
+    "gap-[12px]",
+    "gap-x-6",
+    "gap-y-4",
+    "bg-[#112233]/50",
+    "rounded-[12px]",
+    "flex",
+    "grid",
+    "flex-col",
+    "justify-between",
+    "items-center",
+    "grid-cols-3",
+    "grid-rows-2",
+    "w-[320px]",
+    "w-1/2",
+    "max-w-xl",
+    "size-[80px]"
+  ],
+  "css": "/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */\n:root, :host {\n  --spacing: 0.25rem;\n  --container-xl: 36rem;\n}\n.ms-auto {\n  margin-inline-start: auto;\n}\n.-mt-\\[8px\\] {\n  margin-top: calc(8px * -1);\n}\n.flex {\n  display: flex;\n}\n.grid {\n  display: grid;\n}\n.size-\\[80px\\] {\n  width: 80px;\n  height: 80px;\n}\n.w-1\\/2 {\n  width: calc(1 / 2 * 100%);\n}\n.w-\\[320px\\] {\n  width: 320px;\n}\n.max-w-xl {\n  max-width: var(--container-xl);\n}\n.grid-cols-3 {\n  grid-template-columns: repeat(3, minmax(0, 1fr));\n}\n.grid-rows-2 {\n  grid-template-rows: repeat(2, minmax(0, 1fr));\n}\n.flex-col {\n  flex-direction: column;\n}\n.items-center {\n  align-items: center;\n}\n.justify-between {\n  justify-content: space-between;\n}\n.gap-\\[12px\\] {\n  gap: 12px;\n}\n.gap-x-6 {\n  column-gap: calc(var(--spacing) * 6);\n}\n.gap-y-4 {\n  row-gap: calc(var(--spacing) * 4);\n}\n.rounded-\\[12px\\] {\n  border-radius: 12px;\n}\n.bg-\\[\\#112233\\]\\/50 {\n  background-color: color-mix(in oklab, #112233 50%, transparent);\n}\n.p-6 {\n  padding: calc(var(--spacing) * 6);\n}\n.px-8 {\n  padding-inline: calc(var(--spacing) * 8);\n}\n.py-4 {\n  padding-block: calc(var(--spacing) * 4);\n}\n.pt-\\[12px\\] {\n  padding-top: 12px;\n}\n"
+}
