@@ -29,6 +29,8 @@ export interface PreviewBridge {
   track(oid: string | null): void;
   /** Call from the iframe `load` event. */
   handleFrameLoad(): void;
+  /** Clears handshake state when switching routes before the new frame loads. */
+  reset(): void;
 }
 
 /**
@@ -160,6 +162,14 @@ export function usePreviewBridge(
     },
     [layers, post],
   );
+  const reset = useCallback(() => {
+    nonce.current = null;
+    connectedRef.current = false;
+    tracked.current = null;
+    setConnected(false);
+    setLayers(null);
+  }, []);
+
   return {
     connected,
     layers,
@@ -167,5 +177,6 @@ export function usePreviewBridge(
     lastRejection,
     track,
     handleFrameLoad,
+    reset,
   };
 }

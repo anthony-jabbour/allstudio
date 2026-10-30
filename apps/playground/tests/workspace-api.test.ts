@@ -285,4 +285,46 @@ describe("workspace API guard", () => {
       body: { reason: "stale-file" },
     });
   });
+
+  it("resolves valid static routes via select-route", async () => {
+    const result = await post("select-route", { route: "/about" });
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        ok: true,
+        route: "/about",
+        sourcePath: "src/app/about/page.tsx",
+        previewUrl: "http://localhost:3101/about",
+      },
+    });
+  });
+
+  it("returns 422 for unsupported routes via select-route", async () => {
+    const result = await post("select-route", { route: "/journal/[slug]" });
+    expect(result).toMatchObject({
+      status: 422,
+      body: { ok: false, reason: "route-unsupported" },
+    });
+  });
+
+  it("returns 404 for unknown routes via select-route", async () => {
+    const result = await post("select-route", { route: "/missing" });
+    expect(result).toMatchObject({
+      status: 404,
+      body: { ok: false, reason: "route-not-found" },
+    });
+  });
+
+  it.each([
+    ["protocol-relative URL", { route: "//evil.com" }],
+    ["external URL", { route: "http://evil.com" }],
+    ["query string", { route: "/about?x=1" }],
+    ["extra keys", { route: "/about", extra: 1 }],
+  ])("returns 400 for hostile or malformed select-route body: %s", async (_label, body) => {
+    const result = await post("select-route", body);
+    expect(result).toMatchObject({
+      status: 400,
+      body: { ok: false, reason: "invalid-request" },
+    });
+  });
 });

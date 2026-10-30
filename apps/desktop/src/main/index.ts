@@ -5,6 +5,7 @@ import {
   hasExactKeys,
   parseClassEditBody,
   parseLocateBody,
+  parseSelectRouteBody,
   parseTextEditBody,
   sourceEditFailure,
 } from "@allstudio/editor/site";
@@ -65,7 +66,17 @@ async function createWindow() {
     }
     try {
       const expected = projects.current?.info.previewUrl;
-      if (!expected || new URL(event.url).origin !== new URL(expected).origin)
+      if (!expected) {
+        event.preventDefault();
+        return;
+      }
+      const target = new URL(event.url);
+      const allowed = new URL(expected);
+      if (
+        target.origin !== allowed.origin ||
+        target.pathname !== allowed.pathname ||
+        target.search !== ""
+      )
         event.preventDefault();
     } catch {
       event.preventDefault();
@@ -80,7 +91,13 @@ async function createWindow() {
       if (!frame || !expected || frame.parent !== window.webContents.mainFrame)
         return;
       try {
-        if (new URL(frame.url).origin === new URL(expected).origin)
+        const target = new URL(frame.url);
+        const allowed = new URL(expected);
+        if (
+          target.origin === allowed.origin &&
+          target.pathname === allowed.pathname &&
+          target.search === ""
+        )
           void frame.executeJavaScript(bridgeScript).catch(() => {
             if (!window.isDestroyed())
               window.webContents.send(
@@ -190,6 +207,12 @@ app
         const parsed = parseLocateBody(value.request);
         return parsed
           ? current.workspace.locate(parsed.oid)
+          : sourceEditFailure("invalid-request");
+      }
+      if (value.action === "select-route") {
+        const parsed = parseSelectRouteBody(value.request);
+        return parsed
+          ? projects.selectRoute(parsed.route)
           : sourceEditFailure("invalid-request");
       }
       if (value.action === "preview-text" || value.action === "apply-text") {

@@ -654,6 +654,88 @@ try {
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       typographyClasses,
     );
+    const pagesList = page.getByRole("list", { name: "Pages", exact: true });
+    const rootPageBtn = pagesList.locator('button.page-item[data-route="/"]');
+    const aboutPageBtn = pagesList.locator(
+      'button.page-item[data-route="/about"]',
+    );
+    const unsupportedRow = pagesList.locator(
+      'li[data-unsupported-route="/journal/[slug]"]',
+    );
+    await expect(rootPageBtn).toHaveAttribute("aria-current", "page");
+    await expect(aboutPageBtn).toBeVisible();
+    await expect(unsupportedRow).toContainText("Dynamic");
+    await page
+      .getByLabel("Text", { exact: true })
+      .fill("Unsaved route guard draft");
+    await aboutPageBtn.click();
+    const confirmBox = page.getByTestId("route-draft-confirm");
+    await expect(confirmBox).toBeVisible();
+    await confirmBox
+      .getByRole("button", { name: "Keep editing", exact: true })
+      .click();
+    await expect(confirmBox).toBeHidden();
+    await expect(rootPageBtn).toHaveAttribute("aria-current", "page");
+    await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+      "Unsaved route guard draft",
+    );
+    await aboutPageBtn.click();
+    await expect(confirmBox).toBeVisible();
+    await confirmBox
+      .getByRole("button", { name: "Discard and switch", exact: true })
+      .click();
+    await expect(aboutPageBtn).toHaveAttribute("aria-current", "page");
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 30000 });
+    await expect(preview.locator("#about-heading")).toHaveText(
+      "About Aurora Atelier",
+      { timeout: 30000 },
+    );
+    const aboutSourceFile = join(project, "src/app/about/page.tsx");
+    const aboutBefore = await readFile(aboutSourceFile, "utf8");
+    await preview.locator("#about-heading").click();
+    await expect(page.getByTestId("source-location")).toContainText(
+      "src/app/about/page.tsx",
+    );
+    await page.getByLabel("Text", { exact: true }).fill("About Aurora Local");
+    await toolbar(page, "Apply text");
+    await expect(preview.locator("#about-heading")).toHaveText(
+      "About Aurora Local",
+      { timeout: 30000 },
+    );
+    await expect(
+      page.getByText(
+        /Saved to src\/app\/about\/page\.tsx and the preview shows the new text/,
+      ),
+    ).toBeVisible({ timeout: 30000 });
+    assert.equal(
+      await readFile(aboutSourceFile, "utf8"),
+      aboutBefore.replace("About Aurora Atelier", "About Aurora Local"),
+    );
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(aboutSourceFile, "utf8"), { timeout: 30000 })
+      .toBe(aboutBefore);
+    await expect(preview.locator("#about-heading")).toHaveText(
+      "About Aurora Atelier",
+      { timeout: 30000 },
+    );
+    await rootPageBtn.click();
+    await expect(rootPageBtn).toHaveAttribute("aria-current", "page");
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 30000 });
+    await expect(preview.locator("h1")).toHaveText(originalHeading, {
+      timeout: 30000,
+    });
+    await preview.locator("h1").click();
+    await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
+      typographyClasses,
+    );
+    pass(
+      "Pages route navigation, unsaved draft guard, /about source edit + undo, and return to /",
+    );
   }
   const originalClasses = await page
     .getByLabel("Classes", { exact: true })
@@ -943,6 +1025,19 @@ try {
     oid,
   );
   assert.equal(unauthorized.reason, "unauthorized");
+  for (const target of [
+    "http://evil.com",
+    "//evil.com",
+    "/../outside",
+    "/journal/[slug]",
+    "/missing",
+  ]) {
+    const routeRes = await page.evaluate(
+      ([id, route]) => window.allstudio.selectRoute(id, route),
+      [info.id, target],
+    );
+    assert.equal(routeRes.ok, false, target);
+  }
   pass(
     "IPC denies traversal, symlink/hardlink escapes, config writes and ungranted project IDs",
   );

@@ -16,7 +16,7 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { instrumentSource } from "@allstudio/editor/source-mapper";
 
 const COPIED_ENTRIES = [
@@ -103,8 +103,23 @@ export async function prepareWorkspace(
     await rm(workspaceDir, { recursive: true, force: true });
   }
   if (await exists(join(workspaceDir, MARKER_FILE))) {
+    const instrumentedFiles: string[] = [];
+    for (const relative of await listJsxFiles(join(fixtureDir, "src"))) {
+      const target = join(workspaceDir, "src", relative);
+      if (await exists(target)) {
+        continue;
+      }
+      await mkdir(dirname(target), { recursive: true });
+      const source = await readFile(join(fixtureDir, "src", relative), "utf8");
+      const result = instrumentSource(source, { preserveFormatting: true });
+      if (!result.ok) {
+        throw new Error(`Could not instrument ${target}: ${result.reason}`);
+      }
+      await writeFile(target, result.content, "utf8");
+      instrumentedFiles.push(`src/${relative}`);
+    }
     await writeGeneratedBridge(options);
-    return { created: false, instrumentedFiles: [] };
+    return { created: false, instrumentedFiles };
   }
   await rm(workspaceDir, { recursive: true, force: true });
   await mkdir(workspaceDir, { recursive: true });

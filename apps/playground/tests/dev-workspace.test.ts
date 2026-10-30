@@ -120,6 +120,29 @@ describe("prepareWorkspace", () => {
       'installPreviewBridge({ editorOrigin: "http://localhost:5174" })',
     );
   });
+
+  it("copies and instruments missing fixture JSX files in a reused workspace without overwriting edited files", async () => {
+    await writeFile(pageFile, "// edited\n", "utf8");
+    const aboutFile = join(workspaceDir, "src/app/about/page.tsx");
+    await rm(join(workspaceDir, "src/app/about"), {
+      recursive: true,
+      force: true,
+    });
+    const again = await prepareWorkspace({
+      fixtureDir,
+      workspaceDir,
+      bridgeSourceFile: join(
+        repoRoot,
+        "packages/editor/src/preview-bridge/client.ts",
+      ),
+      editorOrigin: "http://localhost:5173",
+    });
+    expect(again.created).toBe(false);
+    expect(await readFile(pageFile, "utf8")).toBe("// edited\n");
+    const restoredAbout = await readFile(aboutFile, "utf8");
+    expect(restoredAbout).toContain('id="about-heading"');
+    expect(restoredAbout).toContain('data-oid="');
+  });
 });
 
 describe("DevWorkspace text edits", () => {
@@ -576,6 +599,8 @@ describe("DevWorkspace path confinement", () => {
       reason: "path-rejected",
     });
     expect(await workspace.listSourceFiles()).toEqual([
+      "src/app/about/page.tsx",
+      "src/app/journal/[slug]/page.tsx",
       "src/app/layout.tsx",
       "src/app/page.tsx",
     ]);
@@ -587,5 +612,66 @@ describe("DevWorkspace path confinement", () => {
       ok: false,
       reason: "file-not-found",
     });
+  });
+});
+
+describe("DevWorkspace route discovery and selection", () => {
+  it("discovers static and unsupported routes and resolves preview URLs", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir, {
+      previewUrl: "http://localhost:3101",
+    });
+    const snapshot = await workspace.discoverRoutes();
+    expect(snapshot.routes).toEqual([
+      { route: "/", sourcePath: "src/app/page.tsx" },
+      { route: "/about", sourcePath: "src/app/about/page.tsx" },
+    ]);
+    expect(snapshot.unsupported).toEqual([
+      expect.objectContaining({
+        route: "/journal/[slug]",
+        sourcePath: "src/app/journal/[slug]/page.tsx",
+        reason: "dynamic-route",
+      }),
+    ]);
+
+    expect(await workspace.selectRoute("/")).toMatchObject({
+      ok: true,
+      route: "/",
+      sourcePath: "src/app/page.tsx",
+      previewUrl: "http://localhost:3101/",
+      routes: snapshot.routes,
+      unsupportedRoutes: snapshot.unsupported,
+    });
+
+    expect(await workspace.selectRoute("/about")).toMatchObject({
+      ok: true,
+      route: "/about",
+      sourcePath: "src/app/about/page.tsx",
+      previewUrl: "http://localhost:3101/about",
+      routes: snapshot.routes,
+      unsupportedRoutes: snapshot.unsupported,
+    });
+
+    expect(await workspace.selectRoute("/journal/[slug]")).toMatchObject({
+      ok: false,
+      reason: "route-unsupported",
+    });
+
+    await rm(join(workspaceDir, "src/app/about/page.tsx"));
+    expect(await workspace.selectRoute("/about")).toMatchObject({
+      ok: false,
+      reason: "route-not-found",
+    });
+
+    for (const hostile of [
+      "http://evil.com",
+      "//evil.com",
+      "/about/../secret",
+      "/about?x=1",
+    ]) {
+      expect(await workspace.selectRoute(hostile)).toMatchObject({
+        ok: false,
+        reason: "invalid-request",
+      });
+    }
   });
 });

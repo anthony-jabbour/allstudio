@@ -4,7 +4,11 @@ import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type ClassEditRequest,
+  discoverAppRouterRoutes,
   type LocateElementResult,
+  type ProjectRoutesSnapshot,
+  resolvePreviewRouteUrl,
+  type SelectRouteResult,
   type SourceEditFailure,
   type SourceEditFailureReason,
   type SourceEditWorkspace,
@@ -238,6 +242,33 @@ export class LocalWorkspace implements SourceEditWorkspace {
     this.watcher.on("error", () =>
       onChange("File watching stopped. Reopen the project before editing."),
     );
+  }
+
+  async discoverRoutes(): Promise<ProjectRoutesSnapshot> {
+    const paths = (await this.files.list()).filter(isSourcePath);
+    return discoverAppRouterRoutes(paths);
+  }
+
+  async selectRoute(
+    basePreviewUrl: string,
+    routeInput?: unknown,
+  ): Promise<SelectRouteResult> {
+    try {
+      const snapshot = await this.discoverRoutes();
+      const resolved = resolvePreviewRouteUrl(
+        basePreviewUrl,
+        routeInput,
+        snapshot,
+      );
+      if (!resolved.ok) return resolved;
+      return {
+        ...resolved,
+        routes: snapshot.routes,
+        unsupportedRoutes: snapshot.unsupported,
+      };
+    } catch (error) {
+      return failure(error);
+    }
   }
 
   async locate(oid: string): Promise<LocateElementResult> {

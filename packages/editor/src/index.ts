@@ -19,7 +19,11 @@ export {
   parsePreviewMessage,
 } from "./preview-bridge/protocol.ts";
 export type { EditorShellProps } from "./shell/editor-shell.tsx";
-export { EDITOR_STATUS, EditorShell } from "./shell/editor-shell.tsx";
+export {
+  EDITOR_STATUS,
+  EditorShell,
+  hasUnsavedInspectorDraft,
+} from "./shell/editor-shell.tsx";
 export type {
   LayoutConstraints,
   LayoutExpectation,
@@ -50,17 +54,30 @@ export {
 } from "./site/layout.ts";
 export type {
   ClassEditRequest,
+  DiscoveredRoute,
   LocateElementResult,
+  ProjectRoutesSnapshot,
+  ResolvePreviewRouteUrlResult,
+  SelectRouteRequest,
+  SelectRouteResult,
+  SelectRouteSuccess,
   SourceEditFailure,
   SourceEditFailureReason,
   SourceEditWorkspace,
   SourceElementInfo,
   TextEditRequest,
   TextEditResult,
+  UnsupportedRoute,
+  UnsupportedRouteReason,
+  ValidateRoutePathResult,
 } from "./site/source-edit-workspace.ts";
 export {
   describeSourceEditFailure,
+  discoverAppRouterRoutes,
+  parseSelectRouteBody,
+  resolvePreviewRouteUrl,
   sourceEditFailure,
+  validateRoutePath,
 } from "./site/source-edit-workspace.ts";
 export type {
   DescribeElementResult,

@@ -1,10 +1,12 @@
 import type {
   ClassEditRequest,
+  SelectRouteRequest,
   TextEditRequest,
 } from "./source-edit-workspace.ts";
 
 const MAX_TEXT_LENGTH = 500;
 const MAX_CLASS_LENGTH = 1000;
+const MAX_ROUTE_LENGTH = 256;
 const OID_PATTERN = /^[a-z0-9\-._:]{1,64}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -65,4 +67,14 @@ export function parseClassEditBody(body: unknown): ClassEditRequest | null {
     return null;
   }
   return { path, oid, expectedSha256, className };
+}
+
+export function parseSelectRouteBody(body: unknown): SelectRouteRequest | null {
+  if (!hasExactKeys(body, ["route"]) || typeof body.route !== "string") {
+    return null;
+  }
+  if (body.route.length < 1 || body.route.length > MAX_ROUTE_LENGTH) {
+    return null;
+  }
+  return { route: body.route };
 }

@@ -9,6 +9,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import type { DiscoveredRoute, UnsupportedRoute } from "@allstudio/editor/site";
 import type { Plugin } from "vite";
 import { DevWorkspace } from "./dev-workspace.ts";
 import { prepareWorkspace } from "./prepare-workspace.ts";
@@ -35,6 +36,9 @@ export interface PublicFixture {
   id: string;
   name: string;
   previewUrl: string;
+  activeRoute: string;
+  routes: DiscoveredRoute[];
+  unsupportedRoutes: UnsupportedRoute[];
 }
 
 export const SESSION_META_NAME = "allstudio-dev-session";
@@ -75,6 +79,9 @@ export function allstudioDevWorkspace(
     id: fixture.id,
     name: fixture.name,
     previewUrl: `http://localhost:${fixture.previewPort}`,
+    activeRoute: "/",
+    routes: [],
+    unsupportedRoutes: [],
   }));
   const previews: ChildProcess[] = [];
 
@@ -106,10 +113,31 @@ export function allstudioDevWorkspace(
         server.config.logger.info(
           `[allstudio] ${prepared.created ? "created" : "reusing"} ${fixture.id} workspace at ${fixture.workspaceDir}`,
         );
-        workspaces.set(
-          fixture.id,
-          await DevWorkspace.open(fixture.workspaceDir),
+        const previewUrl = `http://localhost:${fixture.previewPort}`;
+        const ws = await DevWorkspace.open(fixture.workspaceDir, {
+          previewUrl,
+        });
+        workspaces.set(fixture.id, ws);
+        const snapshot = await ws.discoverRoutes();
+        const publicFixture = publicFixtures.find(
+          (entry) => entry.id === fixture.id,
         );
+        if (publicFixture) {
+          const initialRoute = snapshot.routes[0]?.route ?? "/";
+          if (snapshot.routes.length > 0 && initialRoute !== "/") {
+            const selected = await ws.selectRoute(initialRoute);
+            if (selected.ok) {
+              publicFixture.previewUrl = selected.previewUrl;
+              publicFixture.activeRoute = selected.route;
+            } else {
+              publicFixture.activeRoute = initialRoute;
+            }
+          } else {
+            publicFixture.activeRoute = initialRoute;
+          }
+          publicFixture.routes = snapshot.routes;
+          publicFixture.unsupportedRoutes = snapshot.unsupported;
+        }
       }
       server.middlewares.use(
         createWorkspaceApiMiddleware({

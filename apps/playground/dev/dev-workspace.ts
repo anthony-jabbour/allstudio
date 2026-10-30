@@ -23,8 +23,13 @@ import {
 import { dirname, isAbsolute, join, sep } from "node:path";
 import {
   type ClassEditRequest,
+  discoverAppRouterRoutes,
   type LocateElementResult,
+  type ProjectRoutesSnapshot,
+  resolvePreviewRouteUrl,
+  type SelectRouteResult,
   type SourceEditFailureReason,
+  type SourceEditWorkspace,
   sourceEditFailure,
   type TextEditRequest,
   type TextEditResult,
@@ -55,6 +60,8 @@ export type EditFunction = (
 export interface DevWorkspaceOptions {
   /** Test seam: replaces the source-mapper edit functions. */
   editElement?: EditFunction;
+  /** Base preview URL for resolving discovered static routes. */
+  previewUrl?: string;
 }
 
 export type ResolvedPath =
@@ -90,8 +97,9 @@ export function isAllowedRelativePath(path: unknown): path is string {
   return EDITABLE_EXTENSIONS.some((extension) => path.endsWith(extension));
 }
 
-export class DevWorkspace {
+export class DevWorkspace implements SourceEditWorkspace {
   private readonly editElement: EditFunction;
+  private readonly previewUrl: string;
   private readonly writeLocks = new Map<string, Promise<void>>();
 
   private constructor(
@@ -99,6 +107,7 @@ export class DevWorkspace {
     options: DevWorkspaceOptions,
   ) {
     this.editElement = options.editElement ?? defaultEditElement;
+    this.previewUrl = options.previewUrl ?? "http://localhost:3101";
   }
 
   /** `rootDir` is canonicalized once; every later path must stay inside it. */
@@ -165,6 +174,27 @@ export class DevWorkspace {
     };
     await walk(SOURCE_DIRECTORY);
     return found.sort();
+  }
+
+  async discoverRoutes(): Promise<ProjectRoutesSnapshot> {
+    return discoverAppRouterRoutes(await this.listSourceFiles());
+  }
+
+  async selectRoute(routeInput: unknown): Promise<SelectRouteResult> {
+    const snapshot = await this.discoverRoutes();
+    const resolved = resolvePreviewRouteUrl(
+      this.previewUrl,
+      routeInput,
+      snapshot,
+    );
+    if (!resolved.ok) {
+      return resolved;
+    }
+    return {
+      ...resolved,
+      routes: snapshot.routes,
+      unsupportedRoutes: snapshot.unsupported,
+    };
   }
 
   async locate(oid: string): Promise<LocateElementResult> {

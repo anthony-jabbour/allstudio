@@ -54,6 +54,9 @@ export function App() {
         key={fixtureId}
         manifest={fixture ? manifestFor(fixture.id, fixture.name) : undefined}
         previewUrl={fixture?.previewUrl}
+        routes={fixture?.routes}
+        unsupportedRoutes={fixture?.unsupportedRoutes}
+        activeRoute={fixture?.activeRoute}
         workspace={workspace}
       />
       <section className="developer-notes">
