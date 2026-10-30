@@ -59,6 +59,10 @@ describe("EditorShell", () => {
     expect(html).toContain(
       '<button type="button" disabled="">Apply classes</button>',
     );
+    expect(html).toContain(
+      '<button type="button" disabled="">Apply appearance</button>',
+    );
+    expect(html).toContain('aria-label="Appearance"');
   });
   it("provides a Studio toolbar, appearance and honest navigation before layers exist", () => {
     const html = renderToStaticMarkup(

@@ -484,6 +484,98 @@ try {
       typographyClasses,
     );
     pass("typography undo/redo restores exact source and rendered output");
+    await preview.getByRole("button", { name: "Start a project" }).click();
+    await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
+      /rounded-full bg-zinc-950/,
+    );
+    await expect(
+      page.getByLabel("Background colour preset", { exact: true }),
+    ).toBeEnabled();
+    const appearanceBefore = await readFile(sourceFile, "utf8");
+    const appearanceClasses = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    await page
+      .getByLabel("Background colour preset", { exact: true })
+      .selectOption("custom:hex");
+    await page
+      .getByLabel("Background colour hex", { exact: true })
+      .pressSequentially("#112233");
+    await page
+      .getByLabel("Corner radius preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Corner radius px", { exact: true }).fill("12");
+    const appearanceClassesAfter = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    assert.equal(await readFile(sourceFile, "utf8"), appearanceBefore);
+    await toolbar(page, "Preview appearance patch");
+    await expect(page.locator(".diff")).toContainText("bg-[#112233]");
+    await toolbar(page, "Apply appearance");
+    await expect(page.getByText(/Saved appearance.*observed/)).toBeVisible({
+      timeout: 30000,
+    });
+    assert.deepEqual(
+      await preview
+        .getByRole("button", { name: "Start a project" })
+        .evaluate((el) => {
+          const css = getComputedStyle(el);
+          return [css.backgroundColor, css.borderRadius];
+        }),
+      ["rgb(17, 34, 51)", "12px"],
+    );
+    const appearanceAfter = appearanceBefore.replace(
+      appearanceClasses,
+      appearanceClassesAfter,
+    );
+    assert.notEqual(appearanceAfter, appearanceBefore);
+    assert.equal(await readFile(sourceFile, "utf8"), appearanceAfter);
+    await writeFile(join(evidence, "appearance-before.tsx"), appearanceBefore);
+    await writeFile(join(evidence, "appearance-after.tsx"), appearanceAfter);
+    await page.screenshot({ path: join(evidence, "appearance.png") });
+    pass(
+      "appearance inspector applies an exact persistent JSX colour and radius patch and observes rendered CSS",
+    );
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(appearanceBefore);
+    await toolbar(page, "Redo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(appearanceAfter);
+    await expect
+      .poll(
+        () =>
+          preview
+            .getByRole("button", { name: "Start a project" })
+            .evaluate((el) => getComputedStyle(el).backgroundColor),
+        { timeout: 30000 },
+      )
+      .toBe("rgb(17, 34, 51)");
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(appearanceBefore);
+    await expect
+      .poll(
+        () =>
+          preview
+            .getByRole("button", { name: "Start a project" })
+            .getAttribute("class"),
+        { timeout: 30000 },
+      )
+      .toContain("bg-zinc-950");
+    await preview.getByRole("button", { name: "Start a project" }).click();
+    await expect(page.getByTestId("source-location")).toBeVisible();
+    await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
+      appearanceClasses,
+    );
+    pass("appearance undo/redo restores exact source and rendered output");
+    await preview.locator("h1").click();
+    await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
+      typographyClasses,
+    );
   }
   const originalClasses = await page
     .getByLabel("Classes", { exact: true })
@@ -1210,6 +1302,72 @@ try {
     await page.screenshot({ path: join(evidence, "spacing-reopened.png") });
     pass(
       "Spacing source and actual appearance persist across full Electron quit and reopen",
+    );
+    const appearancePreview = page.frameLocator(
+      'iframe[title="Project preview"]',
+    );
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    await appearancePreview
+      .getByRole("button", { name: "Start a project" })
+      .click();
+    await expect(
+      page.getByLabel("Background colour preset", { exact: true }),
+    ).toBeEnabled();
+    await page
+      .getByLabel("Background colour preset", { exact: true })
+      .selectOption("custom:hex");
+    await page
+      .getByLabel("Background colour hex", { exact: true })
+      .pressSequentially("#112233");
+    await page
+      .getByLabel("Corner radius preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Corner radius px", { exact: true }).fill("12");
+    await toolbar(page, "Apply appearance");
+    await expect(page.getByText(/Saved appearance.*observed/)).toBeVisible({
+      timeout: 30000,
+    });
+    const persistedAppearance = await readFile(sourceFile, "utf8");
+    await application.close();
+    application = undefined;
+    page = await launch();
+    await toolbar(page, "Reopen");
+    await expect
+      .poll(
+        () =>
+          page
+            .frameLocator('iframe[title="Project preview"]')
+            .getByRole("button", { name: "Start a project" })
+            .evaluate((el) => {
+              const css = getComputedStyle(el);
+              return [css.backgroundColor, css.borderRadius];
+            }),
+        { timeout: 60000 },
+      )
+      .toEqual(["rgb(17, 34, 51)", "12px"]);
+    await expect
+      .poll(
+        () =>
+          page
+            .frameLocator('iframe[title="Project preview"]')
+            .locator("h1")
+            .evaluate((el) => {
+              const css = getComputedStyle(el);
+              return [css.fontSize, css.paddingInlineStart];
+            }),
+        { timeout: 60000 },
+      )
+      .toEqual(["36px", "16px"]);
+    assert.equal(await readFile(sourceFile, "utf8"), persistedAppearance);
+    await writeFile(
+      join(evidence, "appearance-reopened.tsx"),
+      persistedAppearance,
+    );
+    await page.screenshot({ path: join(evidence, "appearance-reopened.png") });
+    pass(
+      "appearance source and actual colour/radius persist across full Electron quit and reopen",
     );
   }
   console.log(`${checks} local-workflow checks passed. Evidence: ${evidence}`);

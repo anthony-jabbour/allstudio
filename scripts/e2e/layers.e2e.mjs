@@ -369,7 +369,13 @@ try {
       page.getByRole("button", { name: "Apply spacing", exact: true }),
     ).toBeDisabled();
     await expect(
+      page.getByRole("button", { name: "Apply appearance", exact: true }),
+    ).toBeDisabled();
+    await expect(
       page.getByLabel("Font size preset", { exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByLabel("Background colour preset", { exact: true }),
     ).toBeDisabled();
     await expect(page.getByRole("alert")).toContainText(/renders [23] times/);
     await align(target);
