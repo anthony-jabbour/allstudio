@@ -220,6 +220,7 @@ code,
   height: max(640px, calc(100dvh - 230px));
   border: 0;
   background: white;
+  color-scheme: light dark;
 }
 .selection-box {
   position: absolute;
