@@ -62,17 +62,30 @@ export function spacingTargets(
   }
   return { ok: true, targets };
 }
+
+function gapApplies(
+  observed: PreviewSpacing,
+  key: "rowGap" | "columnGap",
+): boolean {
+  const display = observed.display ?? "";
+  if (display === "grid" || display === "inline-grid") return true;
+  if (display !== "flex" && display !== "inline-flex") return false;
+  const direction = observed.flexDirection;
+  const wrap = observed.flexWrap;
+  if (!direction || !wrap) return false;
+  const row = direction === "row" || direction === "row-reverse";
+  const column = direction === "column" || direction === "column-reverse";
+  const wrapped = wrap === "wrap" || wrap === "wrap-reverse";
+  if ((!row && !column) || (wrap !== "nowrap" && !wrapped)) return false;
+  return key === "columnGap" ? row || wrapped : column || wrapped;
+}
+
 export function observesSpacing(
   observed: PreviewSpacing,
   targets: SpacingTarget[],
 ): boolean {
   return targets.every(({ key, expectation, before }) => {
-    if (
-      (key === "rowGap" || key === "columnGap") &&
-      !["flex", "inline-flex", "grid", "inline-grid"].includes(
-        observed.display ?? "",
-      )
-    )
+    if ((key === "rowGap" || key === "columnGap") && !gapApplies(observed, key))
       return false;
     const actual = observed[key];
     if (!actual || actual === before) return false;

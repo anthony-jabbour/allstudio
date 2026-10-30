@@ -32,6 +32,8 @@ const element = {
     marginBlockEnd: "0px",
     rowGap: "32px",
     columnGap: "32px",
+    flexDirection: "row",
+    flexWrap: "nowrap",
   },
   typography: {
     fontSize: "48px",
@@ -420,6 +422,7 @@ describe("bounded selected spacing measurement", () => {
     ["oversized", { ...element.spacing, rowGap: "x".repeat(257) }],
     ["non-string", { ...element.spacing, columnGap: 3 }],
     ["missing field", { ...element.spacing, marginInlineStart: undefined }],
+    ["missing flex axis", { ...element.spacing, flexDirection: undefined }],
   ])("rejects %s spacing", (_label, spacing) => {
     expect(
       parsePreviewMessage(

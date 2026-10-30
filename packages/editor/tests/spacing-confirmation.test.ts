@@ -16,6 +16,8 @@ const measured = {
   marginBlockEnd: "0px",
   rowGap: "24px",
   columnGap: "24px",
+  flexDirection: "row",
+  flexWrap: "nowrap",
 };
 describe("spacing rendered confirmation", () => {
   it("targets only the changed axis after shorthand expansion", () => {
@@ -102,6 +104,97 @@ describe("spacing rendered confirmation", () => {
       observesSpacing(
         { ...measured, display: "block", rowGap: "12px" },
         result.targets,
+      ),
+    ).toBe(false);
+  });
+  it("keeps an unused flex column gap unconfirmed even if computed columnGap changes", () => {
+    const before = {
+      ...measured,
+      display: "flex",
+      flexDirection: "column",
+      flexWrap: "nowrap",
+    };
+    const result = spacingTargets(
+      "flex flex-col gap-6",
+      "flex flex-col gap-x-[12px] gap-y-6",
+      before,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.targets.map((item) => item.key)).toEqual(["columnGap"]);
+    expect(
+      observesSpacing({ ...before, columnGap: "12px" }, result.targets),
+    ).toBe(false);
+    expect(
+      observesSpacing(
+        { ...before, flexWrap: "wrap", columnGap: "12px" },
+        result.targets,
+      ),
+    ).toBe(true);
+  });
+  it("confirms the active flex gap axis and wrapping cross-axis only", () => {
+    const row = spacingTargets("gap-6", "gap-x-6 gap-y-[12px]", {
+      ...measured,
+      display: "flex",
+      flexDirection: "row",
+      flexWrap: "nowrap",
+    });
+    expect(row.ok).toBe(true);
+    if (!row.ok) return;
+    expect(
+      observesSpacing(
+        {
+          ...measured,
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "nowrap",
+          rowGap: "12px",
+        },
+        row.targets,
+      ),
+    ).toBe(false);
+    expect(
+      observesSpacing(
+        {
+          ...measured,
+          display: "flex",
+          flexDirection: "column",
+          flexWrap: "nowrap",
+          rowGap: "12px",
+        },
+        row.targets,
+      ),
+    ).toBe(true);
+    const column = spacingTargets("gap-6", "gap-x-[12px] gap-y-6", {
+      ...measured,
+      display: "flex",
+      flexDirection: "row",
+      flexWrap: "nowrap",
+    });
+    expect(column.ok).toBe(true);
+    if (!column.ok) return;
+    expect(
+      observesSpacing(
+        {
+          ...measured,
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "nowrap",
+          columnGap: "12px",
+        },
+        column.targets,
+      ),
+    ).toBe(true);
+    expect(
+      observesSpacing(
+        {
+          ...measured,
+          display: "flex",
+          flexDirection: null,
+          flexWrap: null,
+          columnGap: "12px",
+        },
+        column.targets,
       ),
     ).toBe(false);
   });

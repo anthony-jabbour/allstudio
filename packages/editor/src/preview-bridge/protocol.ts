@@ -4,7 +4,7 @@
  * every inbound message is checked for the expected origin, the expected
  * window, the session nonce, and a strict shape before the editor acts on it.
  */
-export const PREVIEW_BRIDGE_VERSION = 4;
+export const PREVIEW_BRIDGE_VERSION = 5;
 export const EDITOR_MESSAGE_SOURCE = "allstudio-editor";
 export const PREVIEW_MESSAGE_SOURCE = "allstudio-preview";
 
@@ -74,6 +74,8 @@ export const SPACING_KEYS = [
   "marginBlockEnd",
   "rowGap",
   "columnGap",
+  "flexDirection",
+  "flexWrap",
 ] as const;
 export type PreviewSpacing = Record<
   (typeof SPACING_KEYS)[number],

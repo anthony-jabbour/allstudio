@@ -36,6 +36,8 @@ const selected = {
     marginBlockEnd: null,
     rowGap: null,
     columnGap: null,
+    flexDirection: null,
+    flexWrap: null,
   },
   typography: {
     fontSize: null,
