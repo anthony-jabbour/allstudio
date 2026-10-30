@@ -44,6 +44,18 @@ Use **Preview typography patch** to inspect the source diff, then **Apply typogr
 
 Dynamic expressions, repeated instances, ambiguous utilities and unsupported values stay read-only. An invalid custom value disables typography Apply. CSS may override the new source utility, or the result may be visually equivalent: the editor then reports **source saved, rendering unconfirmed** and keeps Undo available. A project font alias does not prove a downloaded face is available offline. The new hex control compares sRGB values; wide-gamut fidelity is not claimed.
 
+## Spacing (Phase 3.4a)
+
+Select a supported static element and open **Spacing · Base**. The nine controls are Padding All/Inline/Block, Margin All/Inline/Block, and Gap All/Columns/Rows. Inline and Block follow the page writing direction; they are logical axes, not fixed left/right or top/bottom labels.
+
+Choose a project spacing preset or enter a finite custom pixel value with up to three decimal places. Padding and gap accept 0–2048px; negative values are margin-only, within −2048–2048px. Margin also accepts `auto`. Preset names use the project utility scale. An absent Base utility is shown as unset, not as zero. Source settings and the last observed rendered values are shown separately. Editing a field only changes the draft; blur does not write source.
+
+Use **Preview spacing patch** to review the exact source diff, then **Apply spacing** to save through the existing hash, history, and preview-refresh path. When splitting a shorthand, its companion value is retained: changing Inline padding on `p-6` to `px-8` produces `px-8 py-6`; changing Row gap on `gap-6` to `gap-y-[12px]` produces `gap-x-6 gap-y-[12px]`. Valid typography and spacing drafts can be previewed and applied in the same source patch.
+
+Known unequal axes are shown as Mixed; choosing an explicit All value replaces those axes together. Conflicting or overlapping utilities, physical/logical edge conflicts, important or variable utilities, and arbitrary CSS spacing properties are unsupported for the affected group; the editor does not normalize them. If a gap utility is inactive for the element display, or a responsive rule wins at the current viewport, source may be saved while rendering remains unconfirmed. Undo stays available. Responsive/state classes remain in source and are not edited by this Base control.
+
+Spacing uses the existing project grant and source-save flow; it adds no native permission, filesystem access, or cloud requirement. This is Slice 3.4a only. Appearance and layout/sizing controls are follow-up slices 3.4b and 3.4c and are not implemented; breakpoint tools remain later work.
+
 ## Offline boundary
 
 Manual launch/open/preview/edit/save/quit/reopen/recovery was exercised with browser external HTTP blocked and OS egress denied for the preview child, retaining loopback and Chromium's Mac sandbox. The host's network settings were not changed. No Clerk/Railway or model-provider request is needed by the editor. BYOK model requests require network access and are not made by Phase 2.

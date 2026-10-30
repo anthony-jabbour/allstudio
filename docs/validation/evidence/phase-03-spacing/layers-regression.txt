@@ -1,0 +1,15 @@
+Evidence: /var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-layers-e2e-qq4RLA
+PASS layout-only scroll avoids recollecting an unchanged hierarchy
+PASS canvas and tree select the same source-backed heading and rectangle
+PASS button and supported container select through the same source inspector
+PASS tree keyboard navigation and disclosure preserve unapplied drafts
+PASS tree-selected edit persists to real source and HMR updates the selected row
+PASS stale layer generation is refused without changing selection, draft or source
+PASS malformed, stale-nonce and unauthorized layer commands cannot change selection or source
+PASS oversized untrusted layer payload is rejected before replacing the tree
+PASS reused component and mapped list rows select their own DOM instance while edits stay refused
+PASS the same shared tree works with the Tailwind variants fixture
+PASS truncation is explicit and a repeated source target beyond the displayed tree never becomes editable
+PASS DOM depth and visit budgets truncate explicitly and recover when the oversized subtree is removed
+PASS removed targets clear geometry and disable source edits instead of retaining a stale inspector
+13 layer checks passed.

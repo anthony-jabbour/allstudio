@@ -1,0 +1,16 @@
+{
+  "baseline": {
+    "inlineStart": "24px",
+    "inlineEnd": "24px",
+    "blockStart": "112px",
+    "blockEnd": "112px",
+    "childX": 232
+  },
+  "observed": {
+    "inlineStart": "32px",
+    "inlineEnd": "32px",
+    "blockStart": "112px",
+    "blockEnd": "112px",
+    "childX": 240
+  }
+}
