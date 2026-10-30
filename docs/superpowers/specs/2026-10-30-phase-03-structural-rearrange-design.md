@@ -19,7 +19,7 @@ Sibling reorder only: move one supported static element/component instance befor
 1. Eligibility: both siblings are JSXElements with unique `data-oid` mappings, in the same `children` array, separated only by whitespace-only JSXText (no expression containers, comments, or text between them that would change meaning).
 2. Operation: swap the two element source ranges plus preserve the original inter-element whitespace; output must reparse with identical element count and sibling set. Any mismatch → refuse, source untouched.
 3. UI: layer-tree "Move up / Move down" buttons (keyboard-accessible) for eligible rows; no drag-and-drop in the first slice.
-4. Confirmation: after HMR, the rendered order of the two DOM nodes changed (bounding-rect order along parent flow axis) — otherwise saved-but-unconfirmed.
+4. Confirmation: after HMR, the source-backed DOM sibling order changed as requested, with geometry used as additional evidence for supported normal-flow layouts (rect order alone is not identity/order proof, particularly with CSS order/reverse/positioning) — otherwise saved-but-unconfirmed.
 5. Undo/redo/reopen through the existing journal; e2e proves persisted file diff on Harbor and reopen.
 
 ## RED tests
