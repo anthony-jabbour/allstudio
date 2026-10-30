@@ -411,16 +411,16 @@ describe("parseSelectRouteBody and re-exports", () => {
   });
 
   it.each([
-    null,
-    undefined,
-    "not-an-object",
-    [],
-    {},
-    { route: "" },
-    { route: `/${"a".repeat(256)}` },
-    { route: 123 },
-    { route: "/about", extra: true },
-  ])("rejects malformed select-route request body %j", (body) => {
+    ["null", null],
+    ["undefined", undefined],
+    ["string", "not-an-object"],
+    ["array", []],
+    ["empty object", {}],
+    ["empty route", { route: "" }],
+    ["oversized route", { route: `/${"a".repeat(256)}` }],
+    ["numeric route", { route: 123 }],
+    ["unexpected extra key", { route: "/about", extra: true }],
+  ])("rejects malformed select-route request body (%s)", (_label, body) => {
     expect(parseSelectRouteBody(body)).toBeNull();
   });
 

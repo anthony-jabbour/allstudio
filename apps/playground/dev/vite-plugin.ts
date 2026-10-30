@@ -123,7 +123,18 @@ export function allstudioDevWorkspace(
           (entry) => entry.id === fixture.id,
         );
         if (publicFixture) {
-          publicFixture.activeRoute = snapshot.routes[0]?.route ?? "/";
+          const initialRoute = snapshot.routes[0]?.route ?? "/";
+          if (snapshot.routes.length > 0 && initialRoute !== "/") {
+            const selected = await ws.selectRoute(initialRoute);
+            if (selected.ok) {
+              publicFixture.previewUrl = selected.previewUrl;
+              publicFixture.activeRoute = selected.route;
+            } else {
+              publicFixture.activeRoute = initialRoute;
+            }
+          } else {
+            publicFixture.activeRoute = initialRoute;
+          }
           publicFixture.routes = snapshot.routes;
           publicFixture.unsupportedRoutes = snapshot.unsupported;
         }
