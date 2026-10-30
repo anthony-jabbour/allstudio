@@ -20,6 +20,34 @@ export {
 export type { EditorShellProps } from "./shell/editor-shell.tsx";
 export { EDITOR_STATUS, EditorShell } from "./shell/editor-shell.tsx";
 export type {
+  LayoutConstraints,
+  LayoutExpectation,
+  LayoutProperty,
+  LayoutSetting,
+  LayoutSettings,
+  LayoutUpdate,
+} from "./site/layout.ts";
+export {
+  ALIGN_ITEMS_PRESETS,
+  DISPLAY_PRESETS,
+  FLEX_DIRECTION_PRESETS,
+  GRID_COLUMNS_PRESETS,
+  GRID_ROWS_PRESETS,
+  HEIGHT_PRESETS,
+  inspectLayoutClasses,
+  inspectLayoutConstraints,
+  JUSTIFY_CONTENT_PRESETS,
+  LAYOUT_PRESETS,
+  LAYOUT_PROPERTIES,
+  MAX_SIZE_PX,
+  MIN_SIZE_PX,
+  SIZE_FRACTION_PRESETS,
+  SIZE_KEYWORD_PRESETS,
+  SIZE_SCALE_PRESETS,
+  setLayoutClass,
+  WIDTH_PRESETS,
+} from "./site/layout.ts";
+export type {
   ClassEditRequest,
   LocateElementResult,
   SourceEditFailure,
