@@ -1,3 +1,5 @@
+import { topLevelSeparator as separator } from "./class-tokens.ts";
+
 /** Static Base utilities only. Real source writes remain in SourceEditWorkspace. */
 export const TYPOGRAPHY_PROPERTIES = [
   "fontSize",
@@ -80,16 +82,6 @@ interface Token {
 const project: TypographyExpectation = { kind: "project" };
 const positive = (value: string) =>
   /^\d+(?:\.\d+)?$/.test(value) && Number.isFinite(Number(value));
-function separator(value: string, character: string): number {
-  let depth = 0;
-  for (let i = 0; i < value.length; i++) {
-    const ch = value[i];
-    if (ch === "[" || ch === "(") depth++;
-    else if (ch === "]" || ch === ")") depth--;
-    else if (ch === character && depth === 0) return i;
-  }
-  return -1;
-}
 function hex(value: string): string | null {
   if (!/^#[a-f\d]+$/i.test(value) || ![4, 5, 7, 9].includes(value.length))
     return null;
