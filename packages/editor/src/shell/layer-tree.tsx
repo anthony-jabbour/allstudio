@@ -20,6 +20,64 @@ interface LayerTreeProps {
   onSelect(id: string): void;
 }
 
+export function nearbyVisibleLayerId(
+  visible: readonly { id: string }[],
+  lostId: string,
+  nodes: readonly { id: string }[],
+): string | undefined {
+  const lostIndex = nodes.findIndex((node) => node.id === lostId);
+  if (lostIndex === -1) return visible[0]?.id;
+  const indexOf = (id: string) => nodes.findIndex((node) => node.id === id);
+  return (
+    [...visible].reverse().find((node) => {
+      const index = indexOf(node.id);
+      return index !== -1 && index < lostIndex;
+    })?.id ??
+    visible.find((node) => {
+      const index = indexOf(node.id);
+      return index !== -1 && index > lostIndex;
+    })?.id ??
+    visible[0]?.id
+  );
+}
+
+export function scrollLayerRowIntoView(
+  root: ParentNode | null,
+  id: string,
+): void {
+  root
+    ?.querySelector<HTMLElement>(`[data-layer-id="${id}"]`)
+    ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+export function layerTreeFocusRestoreId(options: {
+  focusedId: string | null;
+  visible: readonly { id: string }[];
+  treeHasFocus: boolean;
+}): string | null {
+  const { focusedId, visible, treeHasFocus } = options;
+  if (
+    !treeHasFocus ||
+    !focusedId ||
+    visible.some((node) => node.id === focusedId)
+  )
+    return null;
+  return focusedId;
+}
+
+export function restoreLayerTreeFocus(options: {
+  visible: readonly { id: string }[];
+  focusedId: string | null;
+  nodes: readonly { id: string }[];
+  treeHasFocus: boolean;
+  focus(id: string): void;
+}): void {
+  const lostId = layerTreeFocusRestoreId(options);
+  if (!lostId) return;
+  const next = nearbyVisibleLayerId(options.visible, lostId, options.nodes);
+  if (next) options.focus(next);
+}
+
 export function LayerTree({
   layers,
   selected,
@@ -28,6 +86,10 @@ export function LayerTree({
   onSelect,
 }: LayerTreeProps) {
   const tree = useRef<HTMLUListElement>(null);
+  const treeHasFocus = useRef(false);
+  const lostFocusId = useRef<string | null>(null);
+  const previousNodes = useRef<readonly { id: string }[]>([]);
+  const scrolledSelection = useRef("");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [focused, setFocused] = useState<string | null>(null);
   const selectedId = selected?.nodeId;
@@ -77,6 +139,43 @@ export function LayerTree({
       return true;
     });
   }, [layers, collapsed]);
+  // Snapshot before commit removes the focused row and blurs the tree.
+  lostFocusId.current = layerTreeFocusRestoreId({
+    focusedId: focused,
+    visible,
+    treeHasFocus: treeHasFocus.current,
+  });
+  useEffect(() => {
+    const lostId = lostFocusId.current;
+    if (lostId) {
+      lostFocusId.current = null;
+      restoreLayerTreeFocus({
+        visible,
+        focusedId: lostId,
+        nodes: previousNodes.current,
+        treeHasFocus: true,
+        focus: (id) => {
+          setFocused(id);
+          tree.current
+            ?.querySelector<HTMLElement>(`[data-layer-id="${id}"]`)
+            ?.focus();
+        },
+      });
+    }
+    previousNodes.current = layers?.nodes ?? [];
+  }, [visible, layers]);
+  const selectionKey = `${selectedId ?? ""}:${selectionVersion}`;
+  useEffect(() => {
+    const id = selectionKey.slice(0, selectionKey.lastIndexOf(":"));
+    if (
+      !id ||
+      scrolledSelection.current === selectionKey ||
+      !visible.some((node) => node.id === id)
+    )
+      return;
+    scrolledSelection.current = selectionKey;
+    scrollLayerRowIntoView(tree.current, id);
+  }, [selectionKey, visible]);
   const tabStop =
     visible.find((node) => node.id === focused)?.id ?? visible[0]?.id;
   const toggle = (id: string) =>
@@ -223,6 +322,18 @@ export function LayerTree({
               className="layer-tree"
               role="tree"
               aria-label="Rendered layers"
+              onFocusCapture={() => {
+                treeHasFocus.current = true;
+              }}
+              onBlurCapture={(event) => {
+                if (
+                  event.currentTarget.contains(
+                    event.relatedTarget as Node | null,
+                  )
+                )
+                  return;
+                treeHasFocus.current = false;
+              }}
             >
               {renderNodes(null)}
             </ul>
