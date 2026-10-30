@@ -572,6 +572,84 @@ try {
       appearanceClasses,
     );
     pass("appearance undo/redo restores exact source and rendered output");
+    const layoutBefore = await readFile(sourceFile, "utf8");
+    const layoutClasses = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    await page
+      .getByLabel("Width preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Width px", { exact: true }).fill("240");
+    await page
+      .getByLabel("Display preset", { exact: true })
+      .selectOption("flex");
+    await page
+      .getByLabel("Justify content preset", { exact: true })
+      .selectOption("justify-center");
+    const layoutClassesAfter = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    assert.equal(await readFile(sourceFile, "utf8"), layoutBefore);
+    await toolbar(page, "Preview layout patch");
+    await expect(page.locator(".diff")).toContainText("w-[240px]");
+    await toolbar(page, "Apply layout");
+    await expect(page.getByText(/Saved layout.*observed/)).toBeVisible({
+      timeout: 30000,
+    });
+    assert.deepEqual(
+      await preview
+        .getByRole("button", { name: "Start a project" })
+        .evaluate((el) => {
+          const css = getComputedStyle(el);
+          return [css.width, css.display, css.justifyContent];
+        }),
+      ["240px", "flex", "center"],
+    );
+    const layoutAfter = layoutBefore.replace(layoutClasses, layoutClassesAfter);
+    assert.notEqual(layoutAfter, layoutBefore);
+    assert.equal(await readFile(sourceFile, "utf8"), layoutAfter);
+    await writeFile(join(evidence, "layout-before.tsx"), layoutBefore);
+    await writeFile(join(evidence, "layout-after.tsx"), layoutAfter);
+    await page.screenshot({ path: join(evidence, "layout.png") });
+    pass(
+      "layout inspector applies an exact persistent JSX width/display/justify patch and observes rendered CSS",
+    );
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(layoutBefore);
+    await toolbar(page, "Redo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(layoutAfter);
+    await expect
+      .poll(
+        () =>
+          preview
+            .getByRole("button", { name: "Start a project" })
+            .evaluate((el) => getComputedStyle(el).width),
+        { timeout: 30000 },
+      )
+      .toBe("240px");
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(layoutBefore);
+    await expect
+      .poll(
+        () =>
+          preview
+            .getByRole("button", { name: "Start a project" })
+            .getAttribute("class"),
+        { timeout: 30000 },
+      )
+      .toContain("w-fit");
+    await preview.getByRole("button", { name: "Start a project" }).click();
+    await expect(page.getByTestId("source-location")).toBeVisible();
+    await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
+      layoutClasses,
+    );
+    pass("layout undo/redo restores exact source and rendered output");
     await preview.locator("h1").click();
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       typographyClasses,
@@ -1368,6 +1446,60 @@ try {
     await page.screenshot({ path: join(evidence, "appearance-reopened.png") });
     pass(
       "appearance source and actual colour/radius persist across full Electron quit and reopen",
+    );
+    const layoutPreview = page.frameLocator('iframe[title="Project preview"]');
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    await layoutPreview
+      .getByRole("button", { name: "Start a project" })
+      .click();
+    await expect(
+      page.getByLabel("Width preset", { exact: true }),
+    ).toBeEnabled();
+    await page
+      .getByLabel("Width preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Width px", { exact: true }).fill("240");
+    await page
+      .getByLabel("Display preset", { exact: true })
+      .selectOption("flex");
+    await page
+      .getByLabel("Justify content preset", { exact: true })
+      .selectOption("justify-center");
+    await toolbar(page, "Apply layout");
+    await expect(page.getByText(/Saved layout.*observed/)).toBeVisible({
+      timeout: 30000,
+    });
+    const persistedLayout = await readFile(sourceFile, "utf8");
+    await application.close();
+    application = undefined;
+    page = await launch();
+    await toolbar(page, "Reopen");
+    await expect
+      .poll(
+        () =>
+          page
+            .frameLocator('iframe[title="Project preview"]')
+            .getByRole("button", { name: "Start a project" })
+            .evaluate((el) => {
+              const css = getComputedStyle(el);
+              return [
+                css.width,
+                css.display,
+                css.justifyContent,
+                css.backgroundColor,
+                css.borderRadius,
+              ];
+            }),
+        { timeout: 60000 },
+      )
+      .toEqual(["240px", "flex", "center", "rgb(17, 34, 51)", "12px"]);
+    assert.equal(await readFile(sourceFile, "utf8"), persistedLayout);
+    await writeFile(join(evidence, "layout-reopened.tsx"), persistedLayout);
+    await page.screenshot({ path: join(evidence, "layout-reopened.png") });
+    pass(
+      "layout source and actual width/display/justify persist across full Electron quit and reopen",
     );
   }
   console.log(`${checks} local-workflow checks passed. Evidence: ${evidence}`);

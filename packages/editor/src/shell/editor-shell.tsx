@@ -14,6 +14,12 @@ import {
 import { AppearanceInspector } from "./appearance-inspector.tsx";
 import { LayerTree } from "./layer-tree.tsx";
 import {
+  type LayoutTarget,
+  layoutTargets,
+  observesLayout,
+} from "./layout-confirmation.ts";
+import { LayoutInspector } from "./layout-inspector.tsx";
+import {
   observesSpacing,
   type SpacingTarget,
   spacingTargets,
@@ -48,8 +54,14 @@ type EditKind = "text" | "className";
 
 interface PendingRefresh {
   appearance?: AppearanceTarget[];
+  layout?: LayoutTarget[];
   spacing?: SpacingTarget[];
-  propertyLabel?: "typography" | "spacing" | "appearance" | "design properties";
+  propertyLabel?:
+    | "typography"
+    | "spacing"
+    | "appearance"
+    | "layout"
+    | "design properties";
   typography?: TypographyTarget[];
   oid: string;
   kind: EditKind;
@@ -76,7 +88,8 @@ function previewShows(
     (!pending.spacing?.length ||
       observesSpacing(element.spacing, pending.spacing)) &&
     (!pending.appearance?.length ||
-      observesAppearance(element.appearance, pending.appearance))
+      observesAppearance(element.appearance, pending.appearance)) &&
+    (!pending.layout?.length || observesLayout(element.layout, pending.layout))
   );
 }
 
@@ -218,6 +231,7 @@ function SourceElementEditor({
   const [typographyValid, setTypographyValid] = useState(true);
   const [spacingValid, setSpacingValid] = useState(true);
   const [appearanceValid, setAppearanceValid] = useState(true);
+  const [layoutValid, setLayoutValid] = useState(true);
   const [pending, setPending] = useState<PendingRefresh | null>(null);
   const request = useRef(0);
   // Bumped on every selection so late edit responses for an older
@@ -416,6 +430,7 @@ function SourceElementEditor({
     let targets: TypographyTarget[] | undefined;
     let spacing: SpacingTarget[] | undefined;
     let appearance: AppearanceTarget[] | undefined;
+    let layout: LayoutTarget[] | undefined;
     let propertyLabel: PendingRefresh["propertyLabel"];
     if (design && apply) {
       const before = source.className.ok ? (source.className.value ?? "") : "";
@@ -442,10 +457,16 @@ function SourceElementEditor({
         setStatus({ kind: "error", text: appearanceResult.message });
         return;
       }
+      const layoutResult = layoutTargets(before, classDraft, selected.layout);
+      if (!layoutResult.ok) {
+        setStatus({ kind: "error", text: layoutResult.message });
+        return;
+      }
       if (
         !result.targets.length &&
         !spacingResult.targets.length &&
         !appearanceResult.targets.length &&
+        !layoutResult.targets.length &&
         before !== classDraft
       ) {
         setStatus({
@@ -457,10 +478,12 @@ function SourceElementEditor({
       targets = result.targets;
       spacing = spacingResult.targets;
       appearance = appearanceResult.targets;
+      layout = layoutResult.targets;
       const groups = [
         targets.length ? "typography" : null,
         spacing.length ? "spacing" : null,
         appearance.length ? "appearance" : null,
+        layout.length ? "layout" : null,
       ].filter((group) => group !== null);
       propertyLabel =
         groups.length > 1
@@ -532,6 +555,7 @@ function SourceElementEditor({
     });
     setPending({
       appearance,
+      layout,
       spacing,
       propertyLabel,
       typography: targets,
@@ -643,7 +667,7 @@ function SourceElementEditor({
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.typography ?? null}
             disabled={!classEditable}
-            applyDisabled={!spacingValid || !appearanceValid}
+            applyDisabled={!spacingValid || !appearanceValid || !layoutValid}
             onValidityChange={setTypographyValid}
             onChange={(value) => {
               setClassDraft(value);
@@ -659,7 +683,7 @@ function SourceElementEditor({
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.spacing ?? null}
             disabled={!classEditable}
-            applyDisabled={!typographyValid || !appearanceValid}
+            applyDisabled={!typographyValid || !appearanceValid || !layoutValid}
             onValidityChange={setSpacingValid}
             onChange={(value) => {
               setClassDraft(value);
@@ -675,8 +699,26 @@ function SourceElementEditor({
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.appearance ?? null}
             disabled={!classEditable}
-            applyDisabled={!typographyValid || !spacingValid}
+            applyDisabled={!typographyValid || !spacingValid || !layoutValid}
             onValidityChange={setAppearanceValid}
+            onChange={(value) => {
+              setClassDraft(value);
+              setDiff("");
+              setStatus(null);
+            }}
+            onPreview={() => void edit("className", false, true)}
+            onApply={() => void edit("className", true, true)}
+          />
+          <LayoutInspector
+            key={`layout-${selection.current}`}
+            className={classDraft}
+            sourceKnown={Boolean(source?.className.ok)}
+            rendered={selected?.layout ?? null}
+            disabled={!classEditable}
+            applyDisabled={
+              !typographyValid || !spacingValid || !appearanceValid
+            }
+            onValidityChange={setLayoutValid}
             onChange={(value) => {
               setClassDraft(value);
               setDiff("");
