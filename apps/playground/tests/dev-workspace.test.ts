@@ -91,6 +91,35 @@ describe("prepareWorkspace", () => {
     expect(again.created).toBe(false);
     expect(await readFile(pageFile, "utf8")).toBe("// edited\n");
   });
+
+  it("refreshes a stale generated bridge without resetting edited source", async () => {
+    await writeFile(pageFile, "// edited\n", "utf8");
+    const bridgePath = join(workspaceDir, "src/allstudio-preview-bridge.ts");
+    const instrumentationPath = join(
+      workspaceDir,
+      "src/instrumentation-client.ts",
+    );
+    await writeFile(bridgePath, "const VERSION = 1;\nexport {}\n", "utf8");
+    await writeFile(instrumentationPath, "stale-instrumentation\n", "utf8");
+    const source = join(
+      repoRoot,
+      "packages/editor/src/preview-bridge/client.ts",
+    );
+    const again = await prepareWorkspace({
+      fixtureDir,
+      workspaceDir,
+      bridgeSourceFile: source,
+      editorOrigin: "http://localhost:5174",
+    });
+    expect(again.created).toBe(false);
+    expect(await readFile(pageFile, "utf8")).toBe("// edited\n");
+    expect(await readFile(bridgePath, "utf8")).toBe(
+      await readFile(source, "utf8"),
+    );
+    expect(await readFile(instrumentationPath, "utf8")).toContain(
+      'installPreviewBridge({ editorOrigin: "http://localhost:5174" })',
+    );
+  });
 });
 
 describe("DevWorkspace text edits", () => {
