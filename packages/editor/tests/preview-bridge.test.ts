@@ -20,6 +20,20 @@ const expected = {
   nonce: "n".repeat(48),
 };
 const element = {
+  layout: {
+    display: "grid",
+    flexDirection: "row",
+    justifyContent: "normal",
+    alignItems: "normal",
+    gridTemplateColumns: "320px 320px",
+    gridTemplateRows: "none",
+    width: "672px",
+    height: "240px",
+    minWidth: "0px",
+    maxWidth: "1024px",
+    minHeight: "0px",
+    maxHeight: "none",
+  },
   spacing: {
     display: "grid",
     paddingInlineStart: "24px",
@@ -515,12 +529,70 @@ describe("bounded selected appearance measurement", () => {
       expect(result.message.element?.appearance).toEqual(appearance);
   });
   it("is part of the protocol version that the runtime copy reports", () => {
-    expect(PREVIEW_BRIDGE_VERSION).toBe(6);
+    expect(PREVIEW_BRIDGE_VERSION).toBe(7);
     expect(
       parsePreviewMessage(
         event({ type: "boot", version: PREVIEW_BRIDGE_VERSION - 1 }),
         expected,
       ),
     ).toEqual({ ok: false, reason: "malformed" });
+  });
+});
+
+describe("bounded selected layout measurement", () => {
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["array", []],
+    ["extra key", { ...element.layout, path: "/private/file" }],
+    ["oversized", { ...element.layout, gridTemplateColumns: "x".repeat(257) }],
+    ["non-string", { ...element.layout, width: 320 }],
+    ["missing field", { ...element.layout, display: undefined }],
+    ["missing constraint", { ...element.layout, maxWidth: undefined }],
+  ])("rejects %s layout", (_label, layout) => {
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "section",
+          element: { ...element, layout },
+        }),
+        expected,
+      ),
+    ).toEqual({ ok: false, reason: "malformed" });
+  });
+  it("accepts the exact length limit", () => {
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "section",
+          element: {
+            ...element,
+            layout: {
+              ...element.layout,
+              gridTemplateColumns: "x".repeat(256),
+            },
+          },
+        }),
+        expected,
+      ).ok,
+    ).toBe(true);
+  });
+  it("keeps unavailable fields null without fabricating defaults", () => {
+    const layout = Object.fromEntries(
+      Object.keys(element.layout).map((key) => [key, null]),
+    );
+    const result = parsePreviewMessage(
+      event({
+        type: "select",
+        clickedTag: "section",
+        element: { ...element, layout },
+      }),
+      expected,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok && result.message.type === "select")
+      expect(result.message.element?.layout).toEqual(layout);
   });
 });

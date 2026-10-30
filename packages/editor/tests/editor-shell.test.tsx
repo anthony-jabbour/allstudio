@@ -8,6 +8,7 @@ import {
   type SourceEditWorkspace,
   sourceEditFailure,
 } from "../src/index.ts";
+import { LayoutInspector } from "../src/shell/layout-inspector.tsx";
 
 const unusedWorkspace: SourceEditWorkspace = {
   locate: async () => sourceEditFailure("unavailable"),
@@ -62,6 +63,13 @@ describe("EditorShell", () => {
     expect(html).toContain(
       '<button type="button" disabled="">Apply appearance</button>',
     );
+    expect(html).toContain(
+      '<button type="button" disabled="">Preview layout patch</button>',
+    );
+    expect(html).toContain(
+      '<button type="button" disabled="">Apply layout</button>',
+    );
+    expect(html).toContain('aria-label="Layout"');
     expect(html).toContain('aria-label="Appearance"');
   });
   it("provides a Studio toolbar, appearance and honest navigation before layers exist", () => {
@@ -93,5 +101,51 @@ describe("EditorShell", () => {
     );
     expect(html).toContain("Open project");
     expect(html).not.toContain("<iframe");
+  });
+
+  it("renders LayoutInspector controls, rendered testids, and inactive/constraint notes", () => {
+    const html = renderToStaticMarkup(
+      createElement(LayoutInspector, {
+        className:
+          "mx-auto grid max-w-5xl w-[800px] size-20 gap-8 md:grid-cols-2",
+        sourceKnown: true,
+        disabled: false,
+        rendered: {
+          display: "grid",
+          flexDirection: "row",
+          justifyContent: "normal",
+          alignItems: "normal",
+          gridTemplateColumns: "480px 480px",
+          gridTemplateRows: "200px",
+          width: "800px",
+          height: "80px",
+          minWidth: "0px",
+          maxWidth: "1024px",
+          minHeight: "0px",
+          maxHeight: "none",
+        },
+        onChange: () => {},
+        onPreview: () => {},
+        onApply: () => {},
+        onValidityChange: () => {},
+      }),
+    );
+    expect(html).toContain('aria-label="Layout"');
+    expect(html).toContain('aria-label="Display preset"');
+    expect(html).toContain('aria-label="Flex direction preset"');
+    expect(html).toContain('aria-label="Justify content preset"');
+    expect(html).toContain('aria-label="Align items preset"');
+    expect(html).toContain('aria-label="Grid columns preset"');
+    expect(html).toContain('aria-label="Grid rows preset"');
+    expect(html).toContain('aria-label="Width preset"');
+    expect(html).toContain('aria-label="Height preset"');
+    expect(html).toContain(
+      "Flex direction is inactive for rendered display grid",
+    );
+    expect(html).toContain('data-testid="constraint-width"');
+    expect(html).toContain("source max-w-5xl · max 1024px");
+    expect(html).toContain(
+      "Conflicting base utilities make this property ambiguous. Resolve them in Classes first.",
+    );
   });
 });

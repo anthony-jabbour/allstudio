@@ -1,0 +1,104 @@
+{
+  "heroBaseline": {
+    "display": "grid",
+    "flexDirection": "row",
+    "gridTemplateColumns": "472px 472px",
+    "gridTemplateRows": "238px",
+    "width": "1024px",
+    "maxWidth": "1024px",
+    "rectWidth": 1024,
+    "rectHeight": 462
+  },
+  "observedRows": {
+    "display": "grid",
+    "flexDirection": "row",
+    "gridTemplateColumns": "472px 472px",
+    "gridTemplateRows": "238px 238px",
+    "width": "1024px",
+    "maxWidth": "1024px",
+    "rectWidth": 1024,
+    "rectHeight": 732
+  },
+  "observedWidth800": {
+    "display": "grid",
+    "flexDirection": "row",
+    "gridTemplateColumns": "360px 360px",
+    "gridTemplateRows": "266px 266px",
+    "width": "800px",
+    "maxWidth": "1024px",
+    "rectWidth": 800,
+    "rectHeight": 788
+  },
+  "observedWidth1200": {
+    "display": "grid",
+    "flexDirection": "row",
+    "gridTemplateColumns": "472px 472px",
+    "gridTemplateRows": "238px 238px",
+    "width": "1024px",
+    "maxWidth": "1024px",
+    "rectWidth": 1024,
+    "rectHeight": 732
+  },
+  "observedCols3": {
+    "display": "grid",
+    "flexDirection": "row",
+    "gridTemplateColumns": "472px 472px",
+    "gridTemplateRows": "238px 238px",
+    "width": "1024px",
+    "maxWidth": "1024px",
+    "rectWidth": 1024,
+    "rectHeight": 732
+  },
+  "flexBaseline": {
+    "display": "flex",
+    "flexDirection": "row",
+    "justifyContent": "normal",
+    "alignItems": "normal",
+    "cta": {
+      "x": 232,
+      "y": 248,
+      "width": 111.3125,
+      "height": 46,
+      "top": 248,
+      "right": 343.3125,
+      "bottom": 294,
+      "left": 232
+    },
+    "secondary": {
+      "x": 355.3125,
+      "y": 248,
+      "width": 126.546875,
+      "height": 46,
+      "top": 248,
+      "right": 481.859375,
+      "bottom": 294,
+      "left": 355.3125
+    }
+  },
+  "flexObserved": {
+    "display": "flex",
+    "flexDirection": "column",
+    "justifyContent": "space-between",
+    "alignItems": "flex-start",
+    "cta": {
+      "x": 232,
+      "y": 248,
+      "width": 111.3125,
+      "height": 44,
+      "top": 248,
+      "right": 343.3125,
+      "bottom": 292,
+      "left": 232
+    },
+    "secondary": {
+      "x": 232,
+      "y": 304,
+      "width": 126.546875,
+      "height": 46,
+      "top": 304,
+      "right": 358.546875,
+      "bottom": 350,
+      "left": 232
+    }
+  }
+}
