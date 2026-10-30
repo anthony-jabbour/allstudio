@@ -17,7 +17,7 @@ export interface PreviewBridgeConfig {
 
 const EDITOR_SOURCE = "allstudio-editor";
 const PREVIEW_SOURCE = "allstudio-preview";
-const VERSION = 3;
+const VERSION = 4;
 const OID_ATTRIBUTE = "data-oid";
 const MAX_TEXT_LENGTH = 2000;
 const MAX_LAYER_NODES = 1000;
@@ -31,6 +31,18 @@ const TYPOGRAPHY_KEYS = [
   "textAlign",
   "color",
   "fontFamily",
+] as const;
+const SPACING_KEYS = [
+  "paddingInlineStart",
+  "paddingInlineEnd",
+  "paddingBlockStart",
+  "paddingBlockEnd",
+  "marginInlineStart",
+  "marginInlineEnd",
+  "marginBlockStart",
+  "marginBlockEnd",
+  "rowGap",
+  "columnGap",
 ] as const;
 
 export function installPreviewBridge(config: PreviewBridgeConfig): void {
@@ -73,16 +85,24 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
     const typography = Object.fromEntries(
       TYPOGRAPHY_KEYS.map((key) => [key, null]),
     ) as Record<(typeof TYPOGRAPHY_KEYS)[number], string | null>;
+    const spacing = Object.fromEntries(
+      SPACING_KEYS.map((key) => [key, null]),
+    ) as Record<(typeof SPACING_KEYS)[number], string | null>;
     try {
       const style = getComputedStyle(element);
       for (const key of TYPOGRAPHY_KEYS) {
         const observed = style[key];
         typography[key] = observed && observed.length <= 256 ? observed : null;
       }
+      for (const key of SPACING_KEYS) {
+        const observed = style[key];
+        spacing[key] = observed && observed.length <= 256 ? observed : null;
+      }
     } catch {
       // A detached/unavailable measurement is not a default property value.
     }
     return {
+      spacing,
       typography,
       nodeId: nodeId(element),
       oid,

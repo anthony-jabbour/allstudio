@@ -24,6 +24,18 @@ const layers = {
   ],
 };
 const selected = {
+  spacing: {
+    paddingInlineStart: null,
+    paddingInlineEnd: null,
+    paddingBlockStart: null,
+    paddingBlockEnd: null,
+    marginInlineStart: null,
+    marginInlineEnd: null,
+    marginBlockStart: null,
+    marginBlockEnd: null,
+    rowGap: null,
+    columnGap: null,
+  },
   typography: {
     fontSize: null,
     fontWeight: null,

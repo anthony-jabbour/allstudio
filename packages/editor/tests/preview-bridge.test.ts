@@ -20,6 +20,18 @@ const expected = {
   nonce: "n".repeat(48),
 };
 const element = {
+  spacing: {
+    paddingInlineStart: "24px",
+    paddingInlineEnd: "24px",
+    paddingBlockStart: "80px",
+    paddingBlockEnd: "80px",
+    marginInlineStart: "0px",
+    marginInlineEnd: "0px",
+    marginBlockStart: "0px",
+    marginBlockEnd: "0px",
+    rowGap: "32px",
+    columnGap: "32px",
+  },
   typography: {
     fontSize: "48px",
     fontWeight: "600",
@@ -395,5 +407,44 @@ describe("bounded rendered layers protocol", () => {
         ),
       ).toEqual({ ok: false, reason: "malformed" });
     }
+  });
+});
+
+describe("bounded selected spacing measurement", () => {
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["array", []],
+    ["extra key", { ...element.spacing, path: "/private/file" }],
+    ["oversized", { ...element.spacing, rowGap: "x".repeat(257) }],
+    ["non-string", { ...element.spacing, columnGap: 3 }],
+    ["missing field", { ...element.spacing, marginInlineStart: undefined }],
+  ])("rejects %s spacing", (_label, spacing) => {
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "h1",
+          element: { ...element, spacing },
+        }),
+        expected,
+      ),
+    ).toEqual({ ok: false, reason: "malformed" });
+  });
+  it("keeps unavailable fields null without fabricating zero", () => {
+    const spacing = Object.fromEntries(
+      Object.keys(element.spacing).map((key) => [key, null]),
+    );
+    const result = parsePreviewMessage(
+      event({
+        type: "select",
+        clickedTag: "h1",
+        element: { ...element, spacing },
+      }),
+      expected,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok && result.message.type === "select")
+      expect(result.message.element?.spacing).toEqual(spacing);
   });
 });
