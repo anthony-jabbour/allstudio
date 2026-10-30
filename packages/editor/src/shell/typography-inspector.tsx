@@ -228,6 +228,8 @@ function TypographyField({
   );
 }
 interface Props {
+  applyDisabled?: boolean;
+  onValidityChange?(valid: boolean): void;
   className: string;
   rendered: PreviewTypography | null;
   disabled: boolean;
@@ -237,6 +239,8 @@ interface Props {
   onApply(): void;
 }
 export function TypographyInspector({
+  applyDisabled,
+  onValidityChange,
   className,
   rendered,
   disabled,
@@ -251,6 +255,10 @@ export function TypographyInspector({
   );
   const [invalid, setInvalid] = useState<Set<TypographyProperty>>(
     () => new Set(),
+  );
+  useEffect(
+    () => onValidityChange?.(invalid.size === 0),
+    [invalid.size, onValidityChange],
   );
   const validity = useCallback(
     (property: TypographyProperty, valid: boolean) =>
@@ -288,14 +296,14 @@ export function TypographyInspector({
       <div className="actions">
         <button
           type="button"
-          disabled={disabled || invalid.size > 0}
+          disabled={disabled || applyDisabled || invalid.size > 0}
           onClick={onPreview}
         >
           Preview typography patch
         </button>
         <button
           type="button"
-          disabled={disabled || invalid.size > 0}
+          disabled={disabled || applyDisabled || invalid.size > 0}
           onClick={onApply}
         >
           Apply typography

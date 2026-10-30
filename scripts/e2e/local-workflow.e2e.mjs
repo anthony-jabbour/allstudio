@@ -308,6 +308,83 @@ try {
     );
   }
   if (fixtureName === "nextjs-site-fixture") {
+    const spacingBefore = await readFile(sourceFile, "utf8");
+    const spacingClasses = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    await page
+      .getByLabel("Padding all preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Padding all px", { exact: true }).fill("24");
+    const spacingClassesAfter = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    assert.equal(await readFile(sourceFile, "utf8"), spacingBefore);
+    await toolbar(page, "Preview spacing patch");
+    await expect(page.locator(".diff")).toContainText("p-[24px]");
+    await toolbar(page, "Apply spacing");
+    await expect(page.getByText(/Saved spacing.*observed/)).toBeVisible({
+      timeout: 30000,
+    });
+    const spacingAfter = spacingBefore.replace(
+      spacingClasses,
+      spacingClassesAfter,
+    );
+    assert.notEqual(spacingBefore, spacingAfter);
+    assert.equal(await readFile(sourceFile, "utf8"), spacingAfter);
+    assert.deepEqual(
+      await preview.locator("h1").evaluate((el) => {
+        const css = getComputedStyle(el);
+        return [
+          css.paddingInlineStart,
+          css.paddingInlineEnd,
+          css.paddingBlockStart,
+          css.paddingBlockEnd,
+        ];
+      }),
+      ["24px", "24px", "24px", "24px"],
+    );
+    await writeFile(join(evidence, "spacing-before.tsx"), spacingBefore);
+    await writeFile(join(evidence, "spacing-after.tsx"), spacingAfter);
+    await page.screenshot({ path: join(evidence, "spacing.png") });
+    pass(
+      "Spacing inspector applies an exact persistent JSX patch and observes all four rendered padding sides",
+    );
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(spacingBefore);
+    await toolbar(page, "Redo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(spacingAfter);
+    await expect
+      .poll(
+        () =>
+          preview
+            .locator("h1")
+            .evaluate((el) => getComputedStyle(el).paddingInlineStart),
+        { timeout: 30000 },
+      )
+      .toBe("24px");
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"), { timeout: 30000 })
+      .toBe(spacingBefore);
+    await expect
+      .poll(
+        () =>
+          preview
+            .locator("h1")
+            .evaluate((el) => getComputedStyle(el).paddingInlineStart),
+        { timeout: 30000 },
+      )
+      .toBe("0px");
+    await preview.locator("h1").click();
+    await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
+      spacingClasses,
+    );
+    pass("Spacing undo/redo restores exact source and actual preview padding");
     const typographyBefore = await readFile(sourceFile, "utf8");
     const typographyClasses = await page
       .getByLabel("Classes", { exact: true })
@@ -1090,6 +1167,49 @@ try {
     await page.screenshot({ path: join(evidence, "typography-reopened.png") });
     pass(
       "typography source and actual appearance persist across full Electron quit and reopen",
+    );
+    const persistedPreview = page.frameLocator(
+      'iframe[title="Project preview"]',
+    );
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    await persistedPreview.locator("h1").click();
+    await page
+      .getByLabel("Padding all preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Padding all px", { exact: true }).fill("16");
+    await toolbar(page, "Apply spacing");
+    await expect(page.getByText(/Saved spacing.*observed/)).toBeVisible({
+      timeout: 30000,
+    });
+    const persistedSpacing = await readFile(sourceFile, "utf8");
+    await application.close();
+    application = undefined;
+    page = await launch();
+    await toolbar(page, "Reopen");
+    await expect
+      .poll(
+        () =>
+          page
+            .frameLocator('iframe[title="Project preview"]')
+            .locator("h1")
+            .evaluate((el) => {
+              const css = getComputedStyle(el);
+              return [
+                css.fontSize,
+                css.paddingInlineStart,
+                css.paddingBlockStart,
+              ];
+            }),
+        { timeout: 60000 },
+      )
+      .toEqual(["36px", "16px", "16px"]);
+    assert.equal(await readFile(sourceFile, "utf8"), persistedSpacing);
+    await writeFile(join(evidence, "spacing-reopened.tsx"), persistedSpacing);
+    await page.screenshot({ path: join(evidence, "spacing-reopened.png") });
+    pass(
+      "Spacing source and actual appearance persist across full Electron quit and reopen",
     );
   }
   console.log(`${checks} local-workflow checks passed. Evidence: ${evidence}`);

@@ -21,6 +21,7 @@ const expected = {
 };
 const element = {
   spacing: {
+    display: "grid",
     paddingInlineStart: "24px",
     paddingInlineEnd: "24px",
     paddingBlockStart: "80px",

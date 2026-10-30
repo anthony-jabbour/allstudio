@@ -63,6 +63,7 @@ export interface PreviewTypography {
   fontFamily: string | null;
 }
 export const SPACING_KEYS = [
+  "display",
   "paddingInlineStart",
   "paddingInlineEnd",
   "paddingBlockStart",

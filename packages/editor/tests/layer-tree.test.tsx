@@ -25,6 +25,7 @@ const layers = {
 };
 const selected = {
   spacing: {
+    display: null,
     paddingInlineStart: null,
     paddingInlineEnd: null,
     paddingBlockStart: null,

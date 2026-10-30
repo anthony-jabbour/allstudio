@@ -67,6 +67,13 @@ export function observesSpacing(
   targets: SpacingTarget[],
 ): boolean {
   return targets.every(({ key, expectation, before }) => {
+    if (
+      (key === "rowGap" || key === "columnGap") &&
+      !["flex", "inline-flex", "grid", "inline-grid"].includes(
+        observed.display ?? "",
+      )
+    )
+      return false;
     const actual = observed[key];
     if (!actual || actual === before) return false;
     if (expectation.kind === "project") return true;

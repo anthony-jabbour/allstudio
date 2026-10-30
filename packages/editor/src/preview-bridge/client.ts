@@ -33,6 +33,7 @@ const TYPOGRAPHY_KEYS = [
   "fontFamily",
 ] as const;
 const SPACING_KEYS = [
+  "display",
   "paddingInlineStart",
   "paddingInlineEnd",
   "paddingBlockStart",

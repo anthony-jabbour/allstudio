@@ -5,6 +5,7 @@ import {
 } from "../src/shell/spacing-confirmation.ts";
 
 const measured = {
+  display: "grid",
   paddingInlineStart: "24px",
   paddingInlineEnd: "24px",
   paddingBlockStart: "24px",
@@ -89,6 +90,20 @@ describe("spacing rendered confirmation", () => {
     expect(
       observesSpacing({ ...measured, rowGap: "12px" }, result.targets),
     ).toBe(true);
+  });
+  it("keeps inactive block gap visually unconfirmed even if its computed value changes", () => {
+    const result = spacingTargets("gap-6", "gap-y-[12px] gap-x-6", {
+      ...measured,
+      display: "block",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(
+      observesSpacing(
+        { ...measured, display: "block", rowGap: "12px" },
+        result.targets,
+      ),
+    ).toBe(false);
   });
   it("refuses missing baseline/unsupported output and ignores unrelated classes", () => {
     expect(
