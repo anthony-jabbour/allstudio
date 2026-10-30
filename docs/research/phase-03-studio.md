@@ -43,6 +43,10 @@ Source inventory inspected: shell and hook; source-mapper index/text/style/splic
 | Keyboard/feedback | Native buttons/inputs, save diff/status and host undo/redo | Tree keyboard behavior, focus management, context actions, shortcuts and palette contrast |
 | Phase gate | Founder-passed Phases 0–2; rerun baseline | Scenarios A–G for new controls plus unfamiliar-user observations and founder approval |
 
+## Implemented slice checkpoint — 2026-10-29
+
+Slice 3.1 is on draft PR #16 with successful quality/Electron CI at `92ac26d`. Founder-approved Slice 3.2 is implemented on stacked branch `feat/phase-03-layers`: real rendered hierarchy, instance-aware selection, bounded protocol 2, keyboard tree, explicit partial/outside-tree states and unchanged native source-write boundary. Evidence includes 252 unit tests, 13 layer browser scenarios, 34 prior browser checks, three connected fixture workflows and packaged offline/security traces. See [PHASE-03](../validation/PHASE-03.md) for exact results and limitations. This advances the initial gap table above; it does not close routes, visual typography/layout, responsive tooling, structure/assets or the Phase 3 human gate.
+
 ## Slice execution plan
 
 This refines the requested slices; it does not replace RoadMap gate definitions. Each implementation begins with a failing behavioral test and records exact evidence as produced. No deadlines or speculative packages.
@@ -94,5 +98,6 @@ Every case compares selection, inspector display, actual source, preview and per
 - [Source inventories, metadata, reuse matrix](phase-03-open-source-editor-audit.md)
 - [Architecture alternatives and two proof plans](phase-03-editor-architecture-recommendation.md)
 - [Screenshot analysis and component/theme map](phase-03-design-reference-analysis.md)
+- [Typography scope-preservation probes](phase-03-typography-transform.md)
 
 Recommendation: READY FOR REVIEW for the research/design package; Phase 3 INCOMPLETE. Slice 3.1 implementation followed explicit founder approval; no dependency install, cloud change, new source transform or third-party asset copy occurred.

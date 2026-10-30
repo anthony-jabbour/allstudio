@@ -3,6 +3,8 @@ export type {
   ParsedPreviewMessage,
   PreviewElementSnapshot,
   PreviewExpectation,
+  PreviewLayerNode,
+  PreviewLayersSnapshot,
   PreviewMessage,
   PreviewMessageRejection,
   PreviewRect,

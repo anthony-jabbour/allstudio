@@ -73,7 +73,7 @@ describe("EditorShell", () => {
     expect(html).toContain('value="light"');
     expect(html).toContain('value="dark"');
     expect(html).toContain('aria-label="Project navigator"');
-    expect(html).toContain("Layer navigation is not available in this slice.");
+    expect(html).toContain("Rendered source elements");
     expect(html).toContain('aria-label="Canvas"');
   });
 

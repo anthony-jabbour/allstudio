@@ -195,7 +195,7 @@ async function expectRefusal(locator, message, label) {
 }
 
 async function switchFixture(id, previewPort, readySelector) {
-  await page.getByLabel("Fixture").selectOption(id);
+  await page.getByRole("combobox", { name: /^Fixture/ }).selectOption(id);
   await page
     .getByText("Preview bridge: connected")
     .waitFor({ timeout: 60_000 });
@@ -366,7 +366,7 @@ try {
     window.parent.postMessage(
       {
         source: "allstudio-preview",
-        version: 1,
+        version: 2,
         type: "select",
         nonce: "forged",
         clickedTag: "h1",
@@ -381,7 +381,7 @@ try {
     window.postMessage(
       {
         source: "allstudio-preview",
-        version: 1,
+        version: 2,
         type: "select",
         nonce: "x",
         clickedTag: "h1",

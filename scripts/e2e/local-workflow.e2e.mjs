@@ -230,6 +230,31 @@ try {
   const preview = page.frameLocator('iframe[title="Project preview"]');
   await preview.locator("h1").click();
   const originalHeading = await preview.locator("h1").innerText();
+  const headingOid = await preview.locator("h1").getAttribute("data-oid");
+  const layers = page.getByRole("tree", { name: "Rendered layers" });
+  const headingLayer = layers.locator(`[data-source-oid="${headingOid}"]`);
+  await expect(headingLayer).toHaveAttribute("aria-selected", "true");
+  await headingLayer.locator(":scope > .layer-row").click();
+  await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+    originalHeading,
+  );
+  await expect
+    .poll(async () => {
+      const target = await preview.locator("h1").boundingBox(),
+        overlay = await page.locator(".selection-box").boundingBox();
+      return target && overlay
+        ? Math.max(
+            ...["x", "y", "width", "height"].map((key) =>
+              Math.abs(target[key] - overlay[key]),
+            ),
+          )
+        : Infinity;
+    })
+    .toBeLessThan(2);
+  pass(
+    "actual Electron layer and canvas selection resolve the same heading before persistent edits",
+  );
+
   assert.notEqual(
     new URL(
       page

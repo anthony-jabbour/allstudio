@@ -20,6 +20,7 @@ const expected = {
   nonce: "n".repeat(48),
 };
 const element = {
+  nodeId: "n1",
   oid: "5y3ukh6",
   tagName: "h1",
   text: "Aurora Atelier",
@@ -104,7 +105,7 @@ describe("preview bridge protocol", () => {
   it.each([
     ["non-object data", "hello"],
     ["wrong source tag", { source: "someone-else" }],
-    ["wrong version", { version: 2 }],
+    ["wrong version", { version: PREVIEW_BRIDGE_VERSION + 1 }],
     ["unknown type", { type: "write-file" }],
     [
       "invalid oid",
@@ -196,5 +197,142 @@ describe("preview bridge protocol", () => {
     // Replies go only to the configured editor origin, never "*".
     expect(client).toContain("config.editorOrigin,");
     expect(client).not.toContain('"*"');
+  });
+});
+
+const layer = {
+  id: "n1",
+  parentId: null,
+  oid: "heading1",
+  tagName: "h1",
+  label: "Hello",
+};
+const layers = {
+  type: "layers",
+  generation: 1,
+  nodes: [layer],
+  truncated: false,
+};
+const chain = (count: number) =>
+  Array.from({ length: count }, (_, i) => ({
+    ...layer,
+    id: `n${i + 1}`,
+    parentId: i === 0 ? null : `n${i}`,
+  }));
+
+describe("bounded rendered layers protocol", () => {
+  it("accepts a source-backed hierarchy with separate rendered instance IDs", () => {
+    const message = {
+      ...layers,
+      nodes: [layer, { ...layer, id: "n2", parentId: "n1" }],
+    };
+    expect(parsePreviewMessage(event(message), expected)).toEqual({
+      ok: true,
+      message: { ...message, nonce: expected.nonce },
+    });
+  });
+  it("accepts an empty tree, explicit truncation and exact node/label/depth limits", () => {
+    for (const nodes of [
+      [],
+      [{ ...layer, label: "x".repeat(80) }],
+      chain(64),
+      Array.from({ length: 1000 }, (_, i) => ({ ...layer, id: `n${i + 1}` })),
+    ]) {
+      expect(
+        parsePreviewMessage(
+          event({ ...layers, nodes, truncated: true }),
+          expected,
+        ).ok,
+      ).toBe(true);
+    }
+  });
+  it.each([
+    [
+      "oversized count",
+      {
+        nodes: Array.from({ length: 1001 }, (_, i) => ({
+          ...layer,
+          id: `n${i + 1}`,
+        })),
+      },
+    ],
+    ["oversized label", { nodes: [{ ...layer, label: "x".repeat(81) }] }],
+    ["duplicate IDs", { nodes: [layer, layer] }],
+    ["self parent", { nodes: [{ ...layer, parentId: "n1" }] }],
+    ["missing parent", { nodes: [{ ...layer, parentId: "n2" }] }],
+    [
+      "forward parent/cycle",
+      {
+        nodes: [
+          { ...layer, parentId: "n2" },
+          { ...layer, id: "n2", parentId: "n1" },
+        ],
+      },
+    ],
+    ["depth limit", { nodes: chain(65) }],
+    ["invalid instance ID", { nodes: [{ ...layer, id: "../file" }] }],
+    ["invalid source ID", { nodes: [{ ...layer, oid: "../file" }] }],
+    ["invalid tag", { nodes: [{ ...layer, tagName: "<script>" }] }],
+    ["non-string label", { nodes: [{ ...layer, label: 1 }] }],
+    [
+      "unexpected node payload",
+      { nodes: [{ ...layer, path: "/private/file" }] },
+    ],
+    ["missing truncation", { truncated: undefined }],
+    ["zero generation", { generation: 0 }],
+    ["fractional generation", { generation: 1.5 }],
+    ["unsafe generation", { generation: Number.MAX_SAFE_INTEGER + 1 }],
+    ["non-array tree", { nodes: {} }],
+    ["unexpected message payload", { command: "write-file" }],
+  ])("rejects %s", (_name, fields) => {
+    expect(
+      parsePreviewMessage(event({ ...layers, ...fields }), expected),
+    ).toEqual({ ok: false, reason: "malformed" });
+  });
+  it.each([
+    ["wrong frame", { source: {} }],
+    ["wrong origin", { origin: "null" }],
+  ])("keeps existing envelope checks for %s", (_name, overrides) => {
+    expect(parsePreviewMessage(event(layers, overrides), expected).ok).toBe(
+      false,
+    );
+  });
+  it("rejects stale nonces and accepts only fixed layer errors", () => {
+    expect(
+      parsePreviewMessage(event({ ...layers, nonce: "old" }), expected),
+    ).toEqual({ ok: false, reason: "stale-nonce" });
+    expect(
+      parsePreviewMessage(
+        event({ type: "layer-error", reason: "stale-layer" }),
+        expected,
+      ),
+    ).toEqual({
+      ok: true,
+      message: {
+        type: "layer-error",
+        nonce: expected.nonce,
+        reason: "stale-layer",
+      },
+    });
+    expect(
+      parsePreviewMessage(
+        event({ type: "layer-error", reason: "run-shell" }),
+        expected,
+      ),
+    ).toEqual({ ok: false, reason: "malformed" });
+  });
+  it("requires a valid rendered identity on selected elements", () => {
+    for (const nodeId of [undefined, "../file", "x".repeat(65)]) {
+      expect(
+        parsePreviewMessage(
+          event({
+            type: "select",
+            clickedTag: "h1",
+            element: { ...element, nodeId },
+          }),
+          expected,
+        ),
+      ).toEqual({ ok: false, reason: "malformed" });
+    }
   });
 });

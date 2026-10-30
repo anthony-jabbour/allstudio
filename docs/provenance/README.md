@@ -50,3 +50,7 @@ No upstream code was copied for this slice. Onlook's `apps/web/preload` (same co
 `packages/editor/src/source-mapper/splice.ts` (`insertOidsPreservingFormat`, `spliceElementText`, `spliceElementClassName`, `isConfinedEdit`) and `editElementText` / `editElementClassName` in `source-mapper/index.ts` are original allstudio code. They use the Babel parser already listed above, and no upstream code was copied. The fixtures `examples/nested-components-fixture` and `examples/tailwind-variants-fixture` are original test projects.
 
 Do not copy Onlook trademarks, `assets/`, UI, sandbox, or `EditorEngine`.
+
+## Phase 3.2 — rendered layers (original code)
+
+`packages/editor/src/shell/layer-tree.tsx` and extensions to the existing preview protocol/client/hook are original allstudio code. Onlook pin `423e2e924366419e418ee049093872d535eea41a`, specifically `apps/web/preload/script/api/dom.ts` and `packages/models/src/element/layers.ts`, was inspected for DOM traversal and rendered-versus-source identity concepts. No source, UI asset, manager, transport or dependency was incorporated. allstudio uses bounded snapshots and WeakMap identities instead of upstream DOM-attribute/state machinery. WAI-ARIA tree semantics informed keyboard/group behavior; no example implementation was copied. Existing source-mapper attribution remains unchanged.

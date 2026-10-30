@@ -6,6 +6,7 @@ import {
   type SourceEditWorkspace,
   type SourceElementInfo,
 } from "../site/source-edit-workspace.ts";
+import { LayerTree } from "./layer-tree.tsx";
 import { usePreviewBridge } from "./use-preview-bridge.ts";
 
 export const EDITOR_STATUS = "text-and-class-edit-slice" as const;
@@ -136,27 +137,11 @@ export function EditorShell({
       ) : null}
       {connected && previewUrl && workspace ? (
         <div className="studio-body" inert={disabled}>
-          <aside
-            className="studio-navigator"
-            aria-label="Project navigator"
-            hidden={!navigatorOpen}
-          >
-            <h2>Pages</h2>
-            <p className="current-page">
-              <span aria-hidden="true">▤</span> {new URL(previewUrl).pathname}
-            </p>
-            <p className="field-note">Current preview route</p>
-            <div className="navigator-section">
-              <h2>Layers</h2>
-              <p className="field-note">
-                Layer navigation is not available in this slice.
-              </p>
-              <p className="field-note">
-                Select an element directly on the canvas.
-              </p>
-            </div>
-          </aside>
-          <SourceElementEditor previewUrl={previewUrl} workspace={workspace} />
+          <SourceElementEditor
+            previewUrl={previewUrl}
+            workspace={workspace}
+            navigatorOpen={navigatorOpen}
+          />
         </div>
       ) : (
         <section className="studio-home" aria-label="Local workspace">
@@ -182,12 +167,16 @@ export function EditorShell({
 function SourceElementEditor({
   previewUrl,
   workspace,
+  navigatorOpen,
 }: {
   previewUrl: string;
   workspace: SourceEditWorkspace;
+  navigatorOpen: boolean;
 }) {
   const previewOrigin = new URL(previewUrl).origin;
   const frame = useRef<HTMLIFrameElement | null>(null);
+  const selectionBox = useRef<HTMLDivElement | null>(null);
+  const requestedLayer = useRef<string | null>(null);
   const [frameKey, setFrameKey] = useState(0);
   const [selected, setSelected] = useState<PreviewElementSnapshot | null>(null);
   const [source, setSource] = useState<SourceElementInfo | null>(null);
@@ -204,6 +193,7 @@ function SourceElementEditor({
   // Bumped on every edit and selection. A save confirmation only reports
   // success if no newer edit or selection started since that save.
   const editRun = useRef(0);
+  const applying = useRef<number | null>(null);
 
   const locate = useCallback(
     /**
@@ -239,6 +229,13 @@ function SourceElementEditor({
   );
 
   const bridge = usePreviewBridge(frame, previewOrigin, {
+    onLayerError() {
+      requestedLayer.current = null;
+      setStatus({
+        kind: "error",
+        text: "The layer tree changed. Select the element again.",
+      });
+    },
     onSelect(clickedTag, element) {
       selection.current += 1;
       request.current += 1;
@@ -274,6 +271,22 @@ function SourceElementEditor({
         return;
       }
       setSelected(element);
+      // A saved source ID may not exist in the DOM until HMR reaches the preview.
+      if (!element && (pending || applying.current === editRun.current)) return;
+      if (!element || element.instances !== 1) {
+        request.current += 1;
+        editRun.current += 1;
+        setSource(null);
+        setPending(null);
+        setBusy(false);
+        setStatus({
+          kind: "error",
+          text: element
+            ? `This source element renders ${element.instances} times. Editing one instance is not supported.`
+            : "The selected element is no longer available. Select it again.",
+        });
+        return;
+      }
       if (pending && element && previewShows(element, pending)) {
         setPending(null);
         // Report success only once the source details are refreshed, so
@@ -333,8 +346,25 @@ function SourceElementEditor({
     return () => window.clearTimeout(timer);
   }, [pending]);
 
-  const textEditable = Boolean(source?.text.ok) && !busy;
-  const classEditable = Boolean(source?.className.ok) && !busy;
+  useEffect(() => {
+    if (selected?.nodeId === requestedLayer.current) {
+      requestedLayer.current = null;
+      selectionBox.current?.scrollIntoView({
+        block: "nearest",
+        inline: "nearest",
+      });
+    }
+  }, [selected]);
+  const textEditable =
+    Boolean(source?.text.ok) &&
+    selected?.instances === 1 &&
+    bridge.connected &&
+    !busy;
+  const classEditable =
+    Boolean(source?.className.ok) &&
+    selected?.instances === 1 &&
+    bridge.connected &&
+    !busy;
 
   const edit = async (kind: EditKind, apply: boolean) => {
     if (!source || !selected) {
@@ -342,6 +372,7 @@ function SourceElementEditor({
     }
     const selectionAtStart = selection.current;
     const run = ++editRun.current;
+    if (apply) applying.current = run;
     setBusy(true);
     const target = {
       path: source.path,
@@ -357,6 +388,7 @@ function SourceElementEditor({
         : await (apply ? workspace.applyClassEdit : workspace.previewClassEdit)(
             { ...target, className: classDraft },
           );
+    if (applying.current === run) applying.current = null;
     if (selectionAtStart !== selection.current || run !== editRun.current) {
       return;
     }
@@ -414,141 +446,172 @@ function SourceElementEditor({
   const rect = selected?.rect;
 
   return (
-    <div className="editor-workspace">
-      <section className="studio-canvas" aria-label="Canvas">
-        <div className="canvas-label">Live preview · Desktop · 1440px</div>
-        <div className="preview-pane">
-          <iframe
-            key={frameKey}
-            ref={frame}
-            className="preview-frame"
-            title="Project preview"
-            src={previewUrl}
-            sandbox="allow-scripts allow-same-origin allow-forms"
-            onLoad={bridge.handleFrameLoad}
-          />
-          {rect ? (
-            <div
-              className="selection-box"
-              aria-hidden="true"
-              style={{
-                left: rect.x,
-                top: rect.y,
-                width: rect.width,
-                height: rect.height,
-              }}
-            />
-          ) : null}
-        </div>
-      </section>
-      <aside className="inspector" aria-label="Selection">
-        <h2>Design</h2>
-        <p className="bridge-status">
-          Preview bridge: {bridge.connected ? "connected" : "connecting…"}
-          {bridge.lastRejection
-            ? ` · rejected a preview message (${bridge.lastRejection})`
-            : ""}
+    <>
+      <aside
+        className="studio-navigator"
+        aria-label="Project navigator"
+        hidden={!navigatorOpen}
+      >
+        <h2>Pages</h2>
+        <p className="current-page">
+          <span aria-hidden="true">▤</span> {new URL(previewUrl).pathname}
         </p>
-        {selected ? (
-          <dl>
-            <dt>Element</dt>
-            <dd>
-              <code>&lt;{selected.tagName}&gt;</code> data-oid{" "}
-              <code>{selected.oid}</code>
-            </dd>
-            {source ? (
-              <>
-                <dt>Source</dt>
-                <dd>
-                  <code data-testid="source-location">
-                    {source.path}:{source.location.start.line}–
-                    {source.location.end.line}
-                  </code>
-                  {source.location.component
-                    ? ` in ${source.location.component}`
-                    : ""}
-                </dd>
-              </>
-            ) : null}
-          </dl>
-        ) : (
-          <p>Click an element in the preview to select it.</p>
-        )}
-        <label className="text-field">
-          Text
-          <input
-            type="text"
-            value={draft}
-            disabled={!textEditable}
-            onChange={(event) => setDraft(event.target.value)}
+        <p className="field-note">Current preview route</p>
+        <div className="navigator-section">
+          <h2>Layers</h2>
+          <LayerTree
+            layers={bridge.layers}
+            selected={selected}
+            selectionVersion={selection.current}
+            sourceLabel={
+              source
+                ? `${source.path}:${source.location.start.line}`
+                : undefined
+            }
+            onSelect={(id) => {
+              requestedLayer.current = id;
+              bridge.selectLayer(id);
+            }}
           />
-        </label>
-        {source && !source.text.ok ? (
-          <p className="field-note">
-            {describeSourceEditFailure(source.text.reason)}
-          </p>
-        ) : null}
-        <div className="actions">
-          <button
-            type="button"
-            disabled={!textEditable}
-            onClick={() => void edit("text", false)}
-          >
-            Preview text patch
-          </button>
-          <button
-            type="button"
-            disabled={!textEditable}
-            onClick={() => void edit("text", true)}
-          >
-            Apply text
-          </button>
         </div>
-        <label className="text-field">
-          Classes
-          <input
-            type="text"
-            value={classDraft}
-            disabled={!classEditable}
-            spellCheck={false}
-            onChange={(event) => setClassDraft(event.target.value)}
-          />
-        </label>
-        {source && !source.className.ok ? (
-          <p className="field-note">
-            {describeSourceEditFailure(source.className.reason)}
-          </p>
-        ) : null}
-        <div className="actions">
-          <button
-            type="button"
-            disabled={!classEditable}
-            onClick={() => void edit("className", false)}
-          >
-            Preview class patch
-          </button>
-          <button
-            type="button"
-            disabled={!classEditable}
-            onClick={() => void edit("className", true)}
-          >
-            Apply classes
-          </button>
-        </div>
-        {status ? (
-          <p
-            className={`status status-${status.kind}`}
-            role={status.kind === "error" ? "alert" : "status"}
-          >
-            {status.text}
-          </p>
-        ) : null}
-        {diff ? (
-          <pre className="diff" title="Source diff">
-            {diff}
-          </pre>
-        ) : null}
       </aside>
-    </div>
+      <div className="editor-workspace">
+        <section className="studio-canvas" aria-label="Canvas">
+          <div className="canvas-label">Live preview · Desktop · 1440px</div>
+          <div className="preview-pane">
+            <iframe
+              key={frameKey}
+              ref={frame}
+              className="preview-frame"
+              title="Project preview"
+              src={previewUrl}
+              sandbox="allow-scripts allow-same-origin allow-forms"
+              onLoad={bridge.handleFrameLoad}
+            />
+            {rect ? (
+              <div
+                ref={selectionBox}
+                className="selection-box"
+                aria-hidden="true"
+                style={{
+                  left: rect.x,
+                  top: rect.y,
+                  width: rect.width,
+                  height: rect.height,
+                }}
+              />
+            ) : null}
+          </div>
+        </section>
+        <aside className="inspector" aria-label="Selection">
+          <h2>Design</h2>
+          <p className="bridge-status">
+            Preview bridge: {bridge.connected ? "connected" : "connecting…"}
+            {bridge.lastRejection
+              ? ` · rejected a preview message (${bridge.lastRejection})`
+              : ""}
+          </p>
+          {selected ? (
+            <dl>
+              <dt>Element</dt>
+              <dd>
+                <code>&lt;{selected.tagName}&gt;</code> data-oid{" "}
+                <code>{selected.oid}</code>
+              </dd>
+              {source ? (
+                <>
+                  <dt>Source</dt>
+                  <dd>
+                    <code data-testid="source-location">
+                      {source.path}:{source.location.start.line}–
+                      {source.location.end.line}
+                    </code>
+                    {source.location.component
+                      ? ` in ${source.location.component}`
+                      : ""}
+                  </dd>
+                </>
+              ) : null}
+            </dl>
+          ) : (
+            <p>Click an element in the preview to select it.</p>
+          )}
+          <label className="text-field">
+            Text
+            <input
+              type="text"
+              value={draft}
+              disabled={!textEditable}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+          </label>
+          {source && !source.text.ok ? (
+            <p className="field-note">
+              {describeSourceEditFailure(source.text.reason)}
+            </p>
+          ) : null}
+          <div className="actions">
+            <button
+              type="button"
+              disabled={!textEditable}
+              onClick={() => void edit("text", false)}
+            >
+              Preview text patch
+            </button>
+            <button
+              type="button"
+              disabled={!textEditable}
+              onClick={() => void edit("text", true)}
+            >
+              Apply text
+            </button>
+          </div>
+          <label className="text-field">
+            Classes
+            <input
+              type="text"
+              value={classDraft}
+              disabled={!classEditable}
+              spellCheck={false}
+              onChange={(event) => setClassDraft(event.target.value)}
+            />
+          </label>
+          {source && !source.className.ok ? (
+            <p className="field-note">
+              {describeSourceEditFailure(source.className.reason)}
+            </p>
+          ) : null}
+          <div className="actions">
+            <button
+              type="button"
+              disabled={!classEditable}
+              onClick={() => void edit("className", false)}
+            >
+              Preview class patch
+            </button>
+            <button
+              type="button"
+              disabled={!classEditable}
+              onClick={() => void edit("className", true)}
+            >
+              Apply classes
+            </button>
+          </div>
+          {status ? (
+            <p
+              className={`status status-${status.kind}`}
+              role={status.kind === "error" ? "alert" : "status"}
+            >
+              {status.text}
+            </p>
+          ) : null}
+          {diff ? (
+            <pre className="diff" title="Source diff">
+              {diff}
+            </pre>
+          ) : null}
+        </aside>
+      </div>
+    </>
   );
 }

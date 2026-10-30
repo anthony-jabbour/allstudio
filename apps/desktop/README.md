@@ -28,6 +28,14 @@ The arm64 Mac result is `apps/desktop/dist/mac-arm64/allstudio.app`. The native 
 
 The config wrapper returns the original config outside the editor's preview environment. The edited project can build without Electron or an allstudio dependency. User-defined JSX/TSX loader rules are not silently replaced. Other framework/compiler versions and advanced configuration patterns need their own proof.
 
+## Layers and selection
+
+The navigator lists instrumented rendered source elements, nested under their nearest included DOM ancestor. Click a row or the preview to inspect the same instance and source target. Expand/collapse and keyboard focus do not save or discard field drafts; selecting a different element follows the existing canvas-selection behavior for unapplied drafts.
+
+Use Up/Down, Left/Right, Home/End and Enter/Space in the layer tree. Reused component/list instances have separate rows and rectangles; editing one repeated instance remains unsupported. Unmapped or dynamic source edits retain their existing refusal messages.
+
+The tree is explicitly partial when its node/depth/visit limits are reached. A canvas target outside that displayed subset retains its own inspector state without a false active layer. Stale layer requests require reselection and never write source. The actual source-instance count remains independent of any partial tree count.
+
 ## Offline boundary
 
 Manual launch/open/preview/edit/save/quit/reopen/recovery was exercised with browser external HTTP blocked and OS egress denied for the preview child, retaining loopback and Chromium's Mac sandbox. The host's network settings were not changed. No Clerk/Railway or model-provider request is needed by the editor. BYOK model requests require network access and are not made by Phase 2.

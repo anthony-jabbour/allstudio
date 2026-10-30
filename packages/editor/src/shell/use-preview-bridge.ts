@@ -9,6 +9,7 @@ import {
   createBridgeNonce,
   createEditorMessage,
   type PreviewElementSnapshot,
+  type PreviewLayersSnapshot,
   type PreviewMessageRejection,
   parsePreviewMessage,
 } from "../preview-bridge/protocol.ts";
@@ -16,10 +17,13 @@ import {
 export interface PreviewBridgeHandlers {
   onSelect(clickedTag: string, element: PreviewElementSnapshot | null): void;
   onElement(oid: string, element: PreviewElementSnapshot | null): void;
+  onLayerError(reason: "stale-layer" | "missing-layer"): void;
 }
 
 export interface PreviewBridge {
   connected: boolean;
+  layers: PreviewLayersSnapshot | null;
+  selectLayer(nodeId: string): void;
   /** Last message from the preview origin that failed validation. */
   lastRejection: PreviewMessageRejection | null;
   track(oid: string | null): void;
@@ -38,6 +42,7 @@ export function usePreviewBridge(
   handlers: PreviewBridgeHandlers,
 ): PreviewBridge {
   const [connected, setConnected] = useState(false);
+  const [layers, setLayers] = useState<PreviewLayersSnapshot | null>(null);
   const [lastRejection, setLastRejection] =
     useState<PreviewMessageRejection | null>(null);
   const nonce = useRef<string | null>(null);
@@ -61,6 +66,7 @@ export function usePreviewBridge(
     nonce.current = next;
     connectedRef.current = false;
     setConnected(false);
+    setLayers(null);
     post({ type: "hello", nonce: next });
   }, [post]);
 
@@ -96,6 +102,24 @@ export function usePreviewBridge(
         handlersRef.current.onSelect(message.clickedTag, message.element);
         return;
       }
+      if (message.type === "layers") {
+        if (connectedRef.current) {
+          setLayers((current) =>
+            current && current.generation >= message.generation
+              ? current
+              : {
+                  generation: message.generation,
+                  nodes: message.nodes,
+                  truncated: message.truncated,
+                },
+          );
+        }
+        return;
+      }
+      if (message.type === "layer-error") {
+        handlersRef.current.onLayerError(message.reason);
+        return;
+      }
       handlersRef.current.onElement(message.oid, message.element);
     };
     window.addEventListener("message", onMessage);
@@ -119,5 +143,29 @@ export function usePreviewBridge(
     }
   }, [sendHello]);
 
-  return { connected, lastRejection, track, handleFrameLoad };
+  const selectLayer = useCallback(
+    (nodeId: string) => {
+      if (
+        connectedRef.current &&
+        nonce.current &&
+        layers?.nodes.some((node) => node.id === nodeId)
+      ) {
+        post({
+          type: "select-layer",
+          nonce: nonce.current,
+          generation: layers.generation,
+          nodeId,
+        });
+      }
+    },
+    [layers, post],
+  );
+  return {
+    connected,
+    layers,
+    selectLayer,
+    lastRejection,
+    track,
+    handleFrameLoad,
+  };
 }
