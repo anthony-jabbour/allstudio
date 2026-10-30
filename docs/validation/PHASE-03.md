@@ -253,3 +253,66 @@ Remaining: founder review of this stacked slice and current PR head; unfamiliar-
 ### Typography review-stack readback and documentation audit
 
 Draft [PR #18](https://github.com/anthony-jabbour/allstudio/pull/18) opened stacked on #17; source head `2ea702cae970924c5e0a7be9579474cc4666a93f` had quality and Electron smoke SUCCESS, last completion2026-10-30T03:52:57Z. No merge. User requested GPT-6 Luna at extra-high for bounded ancillary tasks; it updated the stale root README and prepared `docs/research/phase-03-gate-inventory.md`. Parent checked its diff and roadmap scope, corrected structural/asset wording to avoid new requirements, and refreshed CI against the exact head. Its link/diff checks and the parent lint check passed. This documentation audit does not certify the phase or replace runtime evidence.
+
+## Slice 3.4 preparation — spacing, appearance and layout
+
+Status: IN PROGRESS, proposed design awaiting founder approval; no spacing/layout production code. In the same active checkout, `feat/phase-03-spacing-layout` starts at typography documentation head `14d1216`. Existing approved Onlook pin423e2e9 was re-inspected for spacing controls and engine coupling; missing upstream numbers rendered as zero, which does not satisfy our unknown/source semantics. Canonical observed metadata: Onlook27,042stars Apache-2.0 and existing tailwind-merge5,701stars MIT on2026-10-29Pacific. No new library selected or installed. Official Tailwind spacing/sizing docs were consulted.
+
+Executed installed Tailwind4.3.3 compiler proof for22 spacing/layout candidates and reproduced its exact output with assertions. `px`/`py` are logical axes, `size` couples width/height, and background slash alpha uses colour-mix. Compiler JSON and research are `docs/research/phase-03-spacing-layout-*`. This does not establish a visual control, cascade correctness or persistence. Proposed three-PR3.4a/b/c design covers the complete requested spacing/appearance/layout set and retains source/hash/history/unsupported boundaries. Fresh read-only GPT-6 Luna extra-high builder check found no material unanswered implementation question. No REA run, new permission or architecture change. Research docs pass lint/diff checks; implementation/runtime tests for3.4 remain NOT RUN.
+
+
+## Slice 3.4a — real source-backed spacing (2026-10-29 Pacific)
+
+**Status: READY FOR REVIEW for Slice 3.4a; Phase 3 and the full3.4 feature remain IN PROGRESS.** Founder approved the reviewed3.4 design with “Approve and implement Slice 3.4 (recommended).” Branch `feat/phase-03-spacing-layout` in the same active checkout starts at typography documentation head `14d1216`. Source implementation commits: `01b7ce0` scoped transformations, `a456313` measured protocol/confirmation, `2792ce2` shared inspector and actual save integration. No worktree, clone, new dependency, native permission, source-of-truth change, cloud edit, Phase4/5 feature or merge.
+
+### What works
+
+Nine controls cover margin/padding All/Inline/Block and gap All/Columns/Rows. Known source values, mixed/unset/unsupported states and actual last-observed logical sides are separate. Finite literals are bounded to padding/gap0–2048px, margin−2048–2048px, three decimals; margin supports auto and project presets remain project-defined. Shorthand expansion preserves its companion: `p-6`→`px-8 py-6`; `gap-6`→`gap-x-6 gap-y-[12px]`. Unrelated source bytes/whitespace, utilities and responsive/state scopes remain intact. Known unequal disjoint axes can be explicitly replaced with All; overlapping, physical/logical, important, variable/custom and arbitrary-property conflicts refuse the affected family.
+
+The shared inspector keeps transient drafts and uses the unchanged SourceEditWorkspace/className hash/splice/atomic/history/recovery path. Preview and Apply are explicit, blur never writes. Typography and spacing drafts can share a patch; invalid fields block both design Apply buttons. Collapsing the Spacing section preserves its draft. Mixed changes confirm both groups. Source-kept/unconfirmed feedback preserves Undo when a responsive rule overrides the request or rendered output stays unchanged.
+
+Protocol v4 adds a strict selected-only spacing record: ten spacing values plus display. The latter was required by a demonstrated inactive-gap failure: block elements can expose a changed computed row/column gap while gap is inactive. Display now prevents false success. One existing `getComputedStyle` read feeds both records; each fixed field is nullable and limited to256 characters, unknown keys/types/missing fields are rejected. No styles are collected on layer rows; no arbitrary keys/paths/native operations are exposed. Earlier version3 generated browser runtimes must be refreshed/reset; only byte-recognized editor-generated files were updated during restoration.
+
+### Exact executed checks and results
+
+| Command | Final observed result |
+|---|---|
+| `bun run lint` | exit0, no issues |
+| `bun run typecheck` | seven workspace checks exit0 |
+| `bun run test` | 346 tests /19 files passed |
+| `bun run validate:public-boundary` | exit0 |
+| `bun run build` | playground and all three fixtures exit0, online |
+| `bun run build:desktop` | exit0 |
+| `bun run package:desktop` | exit0, unsigned Mac arm64 |
+| `bun run test:desktop` | 6 development security checks passed |
+| `node scripts/e2e/desktop.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio` | 6 packaged security checks passed |
+| `bun run test:local` | 29 native workflows passed, including exact spacing diff/render/undo/redo and full quit/reopen |
+| `ALLSTUDIO_FIXTURE=nested-components-fixture bun run test:local` | 23 checks passed |
+| `ALLSTUDIO_FIXTURE=tailwind-variants-fixture bun run test:local` | 23 checks passed |
+| `node scripts/e2e/local-workflow.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio --offline` | 29 packaged offline workflows passed; OS preview egress denied and parent secret absent |
+| `node scripts/e2e/spacing.e2e.mjs` against disposable `bun run dev` copies | 12 isolated real-browser scenarios passed |
+| `node scripts/e2e/typography.e2e.mjs` against fresh copies | all 10 prior typography scenarios passed, run serially |
+| `NODE_PATH=/Users/jabbo/AllStudio/allstudio/node_modules/.bun/@playwright+test@1.64.1/node_modules node scripts/e2e/text-edit.e2e.mjs /tmp/allstudio-spacing-browser-regression` | all 34 prior text/class scenarios passed, three fixtures; no examples source changed |
+| `node scripts/e2e/layers.e2e.mjs` | all 13 layer scenarios passed, including repeated-instance spacing refusal |
+| `env -i PATH="$PATH" NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 CI=1 node node_modules/next/dist/bin/next build` in the final saved native project `apps/desktop/dist/local-workflow-evAE66/project` | exit0; generated HTML retains final `text-[36px] p-[16px]`, recovered heading and no preview OIDs |
+| `git diff --check` | clean |
+
+RED was observed for the absent spacing module, absent Spacing region, new selected-record schemas (9 failed/52 passed before implementation), absent confirmation module, and a new inactive-block-gap regression. Final unit/functional runs above are GREEN. A cold selection test interacted with old enabled controls before the new source lookup settled; it now waits for the selected source class before touching the heading's fields. A focused draft-only check reproduced the correct selection synchronization with no source write.
+
+Execution corrections are not hidden: one packaged security attempt overlapped package generation and the process exited SIGTRAP after two checks; the subsequent run after packaging completed passed all 6. Two browser harnesses were mistakenly run concurrently against one disposable source file, invalidating source assertions; these runs are excluded, and final harnesses were run serially on fresh copies. After a test-owned CSS override was removed, a typography regression saw its cached stylesheet; the harness now explicitly reloads after that external CSS teardown, and the full10-case fresh regression passes. A retained JSON measurement artifact needed only a trailing newline for formatter compliance; final lint passes. No product security or persistence behavior was relaxed to fix these harness issues.
+
+### Actual source, rendering and persistence
+
+Committed artifacts: [evidence/phase-03-spacing](evidence/phase-03-spacing/). `source-before/after.tsx.txt`, `spacing.png` and `measured.json` prove Harbor `#hero` Inline padding 24→32px, child x 232→240 (8px), original block sides112px and `py-20 lg:py-28` retained. Gap axis edits retain the companion, negative margins render−8px, and All margin resolves supported axes. All padding 40 retained lg block 112 and correctly remained unconfirmed. A block-heading gap change remained unconfirmed despite computed gap 16px. Mixed font-weight 500/padding 8 confirmed both groups in one exact patch. No-op retained inode/mtime; stale hashes preserved external bytes; dynamic expressions and repeated instances stayed refused. Dark/narrow native-focus order and collapse retained an unsaved draft without writes.
+
+Native snapshots are uninstrumented real project files. All padding 24 writes the exact JSX patch; Undo/Redo restores bytes and CSS. Final full quit/reopen preserves font 36px plus padding 16px and exact source, including in the packaged offline run. Its screenshot is before a new selection; the actual computed assertions and persisted file establish the result. The final saved online project also builds independently with the editor wrapper inactive; HTML assertions verify the edited utilities and absence of preview OIDs.
+
+Complete local traces: spacing `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-spacing-e2e-OhfeaJ/trace.zip`; typography `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-typography-e2e-4AVfY3/trace.zip`; browser regression `/tmp/allstudio-spacing-browser-regression/trace.zip` plus webm/diffs. Native directories: online `apps/desktop/dist/local-workflow-evAE66`, offline `local-workflow-1EzSfj`, nested `local-workflow-munkaS`, variants `local-workflow-LPz0iu`. Layer trace: `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-layers-e2e-qq4RLA/trace.zip`. Final edited disposable copies retained under `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-spacing-7kox3a7e/edited-workspaces`. Original copies restored; three recognized v3 runtime files refreshed to v4, original JSX preserved, unrelated legacy `nextjs-site-fixture` runtime left untouched.
+
+### Review, security and boundaries
+
+Fresh independent read-only implementation review found no actionable correctness/security/regression issues and independently passed98 spacing/confirmation/protocol tests. GPT-6 Luna extra-high handled fixture inventory and user documentation; the parent reviewed/integrated those edits. Serena was unavailable for the documentation agent, which used read-only shell fallback. Neither agent review nor green CI substitutes for founder approval.
+
+No Electron main/preload/IPC/path grant/atomic write/history/recovery code changed. Existing negative IPC, traversal, symlink/hardlink, nonce/origin/frame/schema, stale/ambiguous target and recovery tests passed. The subframe injection probe remains unavailable; its historical harness PASS line is not proof of a successful subframe denial. Offline production Next build remains NOT RUN in the offline harness, preserving the known next/font/google limitation; online portability was tested separately. Other OS/architectures, signing/notarization, unfamiliar-user sessions and assistive-technology validation remain pending/unclaimed.
+
+Next approved work:3.4b background colour/uniform radius, then3.4c flex/grid/layout/sizing through the same source pipeline. Responsive tools3.5, bounded structural edits3.6, assets/finishing3.7 and route navigation3.2b remain open. Material structural/assets permission decisions require their own founder approval. Recommendation: READY FOR REVIEW for Slice 3.4a; INCOMPLETE for Phase 3. No merge or PASS.

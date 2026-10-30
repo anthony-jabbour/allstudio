@@ -7,6 +7,7 @@ export type {
   PreviewLayersSnapshot,
   PreviewMessage,
   PreviewMessageRejection,
+  PreviewSpacing,
   PreviewTypography,
 } from "../preview-bridge/protocol.ts";
 export type {

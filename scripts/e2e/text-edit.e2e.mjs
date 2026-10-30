@@ -366,7 +366,7 @@ try {
     window.parent.postMessage(
       {
         source: "allstudio-preview",
-        version: 3,
+        version: 4,
         type: "select",
         nonce: "forged",
         clickedTag: "h1",
@@ -381,7 +381,7 @@ try {
     window.postMessage(
       {
         source: "allstudio-preview",
-        version: 3,
+        version: 4,
         type: "select",
         nonce: "x",
         clickedTag: "h1",

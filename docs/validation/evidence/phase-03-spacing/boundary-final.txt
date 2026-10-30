@@ -1,0 +1,2 @@
+$ bun scripts/validate-public-boundary.ts
+Public boundary check passed (305 files scanned).

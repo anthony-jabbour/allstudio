@@ -4,7 +4,7 @@
  * every inbound message is checked for the expected origin, the expected
  * window, the session nonce, and a strict shape before the editor acts on it.
  */
-export const PREVIEW_BRIDGE_VERSION = 3;
+export const PREVIEW_BRIDGE_VERSION = 5;
 export const EDITOR_MESSAGE_SOURCE = "allstudio-editor";
 export const PREVIEW_MESSAGE_SOURCE = "allstudio-preview";
 
@@ -40,6 +40,7 @@ export interface PreviewRect {
 }
 
 export interface PreviewElementSnapshot {
+  spacing: PreviewSpacing;
   typography: PreviewTypography;
   nodeId: string;
   oid: string;
@@ -60,6 +61,39 @@ export interface PreviewTypography {
   textAlign: string | null;
   color: string | null;
   fontFamily: string | null;
+}
+export const SPACING_KEYS = [
+  "display",
+  "paddingInlineStart",
+  "paddingInlineEnd",
+  "paddingBlockStart",
+  "paddingBlockEnd",
+  "marginInlineStart",
+  "marginInlineEnd",
+  "marginBlockStart",
+  "marginBlockEnd",
+  "rowGap",
+  "columnGap",
+  "flexDirection",
+  "flexWrap",
+] as const;
+export type PreviewSpacing = Record<
+  (typeof SPACING_KEYS)[number],
+  string | null
+>;
+
+function parseSpacing(value: unknown): PreviewSpacing | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, SPACING_KEYS)) return null;
+  for (const key of SPACING_KEYS) {
+    if (
+      value[key] !== null &&
+      (typeof value[key] !== "string" || value[key].length > 256)
+    )
+      return null;
+  }
+  return Object.fromEntries(
+    SPACING_KEYS.map((key) => [key, value[key]]),
+  ) as PreviewSpacing;
 }
 const TYPOGRAPHY_KEYS = [
   "fontSize",
@@ -177,6 +211,7 @@ function parseSnapshot(
   }
   const rect = parseRect(value.rect);
   const typography = parseTypography(value.typography);
+  const spacing = parseSpacing(value.spacing);
   const { nodeId, oid, tagName, text, className, instances } = value;
   if (
     typeof nodeId !== "string" ||
@@ -193,11 +228,22 @@ function parseSnapshot(
     instances < 1 ||
     instances > MAX_INSTANCES ||
     !rect ||
-    !typography
+    !typography ||
+    !spacing
   ) {
     return undefined;
   }
-  return { nodeId, oid, tagName, text, className, rect, instances, typography };
+  return {
+    nodeId,
+    oid,
+    tagName,
+    text,
+    className,
+    rect,
+    instances,
+    typography,
+    spacing,
+  };
 }
 
 function hasOnlyKeys(

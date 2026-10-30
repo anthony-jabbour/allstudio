@@ -207,7 +207,7 @@ try {
       iframe.contentWindow.postMessage(
         {
           source: "allstudio-editor",
-          version: 3,
+          version: 4,
           type: "select-layer",
           nonce,
           generation,
@@ -262,7 +262,7 @@ try {
       const iframe = document.querySelector("iframe");
       const request = {
         source: "allstudio-editor",
-        version: 3,
+        version: 4,
         type: "select-layer",
         nonce: base.nonce,
         generation: base.generation,
@@ -308,7 +308,7 @@ try {
     parent.postMessage(
       {
         source: "allstudio-preview",
-        version: 3,
+        version: 4,
         type: "layers",
         nonce: base.nonce,
         generation: base.generation + 1,
@@ -364,6 +364,9 @@ try {
     ).toBeDisabled();
     await expect(
       page.getByRole("button", { name: "Apply typography", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Apply spacing", exact: true }),
     ).toBeDisabled();
     await expect(
       page.getByLabel("Font size preset", { exact: true }),

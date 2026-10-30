@@ -1,0 +1,31 @@
+$ vitest run
+
+ RUN  v3.2.7 /Users/jabbo/AllStudio/allstudio
+
+ ✓ apps/desktop/tests/native-files.test.ts (7 tests) 751ms
+ ✓ tests/security/public-boundary.test.ts (2 tests) 332ms
+   ✓ public/private boundary > passes the public-boundary scanner  323ms
+ ✓ packages/editor/tests/editor-shell.test.tsx (5 tests) 211ms
+ ✓ packages/editor/tests/source-mapper.test.ts (24 tests) 205ms
+ ✓ packages/editor/tests/source-edit.test.ts (46 tests) 191ms
+ ✓ apps/playground/tests/workspace-api.test.ts (29 tests) 395ms
+ ✓ packages/editor/tests/typography.test.ts (35 tests) 9ms
+ ✓ apps/desktop/tests/security.test.ts (2 tests) 2ms
+ ✓ packages/editor/tests/layer-tree.test.tsx (2 tests) 13ms
+ ✓ apps/desktop/tests/config-integration.test.ts (3 tests) 819ms
+   ✓ consented Next config integration > preserves asynchronous CommonJS config outside the app, including a BOM package manifest  387ms
+ ✓ packages/editor/tests/typography-confirmation.test.ts (5 tests) 32ms
+ ✓ packages/editor/tests/spacing.test.ts (30 tests) 11ms
+ ✓ apps/desktop/tests/local-workspace.test.ts (9 tests) 1066ms
+ ✓ packages/editor/tests/spacing-confirmation.test.ts (7 tests) 6ms
+ ✓ packages/project/tests/manifest.test.ts (5 tests) 6ms
+ ✓ apps/playground/tests/fixtures.test.ts (33 tests) 1191ms
+ ✓ apps/desktop/tests/preview-source.test.ts (6 tests) 52ms
+ ✓ packages/editor/tests/preview-bridge.test.ts (61 tests) 7ms
+ ✓ apps/playground/tests/dev-workspace.test.ts (35 tests) 1612ms
+   ✓ prepareWorkspace > copies and instruments the fixture without touching examples/  308ms
+
+ Test Files  19 passed (19)
+      Tests  346 passed (346)
+   Start at  21:16:57
+   Duration  4.24s (transform 718ms, setup 0ms, collect 21.61s, tests 6.91s, environment 2ms, prepare 1.55s)

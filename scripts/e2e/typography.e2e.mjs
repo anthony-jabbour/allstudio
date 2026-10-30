@@ -270,6 +270,13 @@ try {
   } finally {
     await writeFile(cssFile, originalCss);
   }
+  // The external CSS override is test-owned. Reload after teardown so a
+  // cached stylesheet cannot leak into the remaining independent checks.
+  await page.reload();
+  await page
+    .getByText("Preview bridge: connected", { exact: false })
+    .waitFor({ timeout: 60000 });
+  await preview.locator("h1").click();
   await expect
     .poll(() =>
       preview

@@ -8,6 +8,12 @@ import {
 } from "../site/source-edit-workspace.ts";
 import { LayerTree } from "./layer-tree.tsx";
 import {
+  observesSpacing,
+  type SpacingTarget,
+  spacingTargets,
+} from "./spacing-confirmation.ts";
+import { SpacingInspector } from "./spacing-inspector.tsx";
+import {
   observesTypography,
   type TypographyTarget,
   typographyTargets,
@@ -35,6 +41,8 @@ type Status = { kind: "info" | "success" | "error"; text: string } | null;
 type EditKind = "text" | "className";
 
 interface PendingRefresh {
+  spacing?: SpacingTarget[];
+  propertyLabel?: "typography" | "spacing" | "design properties";
   typography?: TypographyTarget[];
   oid: string;
   kind: EditKind;
@@ -57,7 +65,9 @@ function previewShows(
   return (
     normalizeWhitespace(rendered) === normalizeWhitespace(pending.value) &&
     (!pending.typography?.length ||
-      observesTypography(element.typography, pending.typography))
+      observesTypography(element.typography, pending.typography)) &&
+    (!pending.spacing?.length ||
+      observesSpacing(element.spacing, pending.spacing))
   );
 }
 
@@ -196,6 +206,8 @@ function SourceElementEditor({
   const [diff, setDiff] = useState("");
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
+  const [typographyValid, setTypographyValid] = useState(true);
+  const [spacingValid, setSpacingValid] = useState(true);
   const [pending, setPending] = useState<PendingRefresh | null>(null);
   const request = useRef(0);
   // Bumped on every selection so late edit responses for an older
@@ -303,7 +315,7 @@ function SourceElementEditor({
         // Report success only once the source details are refreshed, so
         // the message also means the panel reflects the saved file. Editing
         // stays disabled until then, and a newer edit or selection wins.
-        const { kind, run, typography } = pending;
+        const { kind, run, propertyLabel } = pending;
         let settled = false;
         // The refresh gets the same deadline as the preview check, so a
         // stalled lookup cannot leave editing locked.
@@ -329,8 +341,8 @@ function SourceElementEditor({
           if (refreshed) {
             setStatus({
               kind: "success",
-              text: typography?.length
-                ? `Saved typography to ${refreshed.path}; observed the requested properties in the preview.`
+              text: propertyLabel
+                ? `Saved ${propertyLabel} to ${refreshed.path}; observed the requested properties in the preview.`
                 : `Saved to ${refreshed.path} and the preview shows the new ${KIND_LABEL[kind]}.`,
             });
           }
@@ -343,7 +355,7 @@ function SourceElementEditor({
     if (!pending) {
       return;
     }
-    const poll = pending.typography?.length
+    const poll = pending.propertyLabel
       ? window.setInterval(() => bridge.track(pending.oid), 250)
       : null;
     const timer = window.setTimeout(() => {
@@ -356,8 +368,8 @@ function SourceElementEditor({
       setBusy(false);
       setStatus({
         kind: "error",
-        text: pending.typography?.length
-          ? "Typography source saved, but rendering is unconfirmed or unchanged at this viewport. Other CSS or responsive rules may apply. Undo remains available."
+        text: pending.propertyLabel
+          ? `${pending.propertyLabel[0]?.toUpperCase()}${pending.propertyLabel.slice(1)} source saved, but rendering is unconfirmed or unchanged at this viewport. Other CSS or responsive rules may apply. Undo remains available.`
           : `The file was saved, but the preview did not show the new ${KIND_LABEL[pending.kind]}. Check the preview server log.`,
       });
     }, REFRESH_TIMEOUT_MS);
@@ -387,26 +399,50 @@ function SourceElementEditor({
     bridge.connected &&
     !busy;
 
-  const edit = async (kind: EditKind, apply: boolean, typography = false) => {
+  const edit = async (kind: EditKind, apply: boolean, design = false) => {
     if (!source || !selected) {
       return;
     }
     let targets: TypographyTarget[] | undefined;
-    if (typography && apply) {
+    let spacing: SpacingTarget[] | undefined;
+    let propertyLabel: PendingRefresh["propertyLabel"];
+    if (design && apply) {
       const before = source.className.ok ? (source.className.value ?? "") : "";
       const result = typographyTargets(before, classDraft, selected.typography);
       if (!result.ok) {
         setStatus({ kind: "error", text: result.message });
         return;
       }
-      if (!result.targets.length && before !== classDraft) {
+      const spacingResult = spacingTargets(
+        before,
+        classDraft,
+        selected.spacing,
+      );
+      if (!spacingResult.ok) {
+        setStatus({ kind: "error", text: spacingResult.message });
+        return;
+      }
+      if (
+        !result.targets.length &&
+        !spacingResult.targets.length &&
+        before !== classDraft
+      ) {
         setStatus({
           kind: "info",
-          text: "No supported typography setting changed. Review the draft in Classes.",
+          text: "No supported design setting changed. Review the draft in Classes.",
         });
         return;
       }
       targets = result.targets;
+      spacing = spacingResult.targets;
+      propertyLabel =
+        targets.length && spacing.length
+          ? "design properties"
+          : targets.length
+            ? "typography"
+            : spacing.length
+              ? "spacing"
+              : undefined;
     }
     const selectionAtStart = selection.current;
     const run = ++editRun.current;
@@ -472,6 +508,8 @@ function SourceElementEditor({
       text: `Saved to ${source.path}. Waiting for the preview to refresh…`,
     });
     setPending({
+      spacing,
+      propertyLabel,
       typography: targets,
       oid: savedOid,
       kind,
@@ -581,6 +619,24 @@ function SourceElementEditor({
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.typography ?? null}
             disabled={!classEditable}
+            applyDisabled={!spacingValid}
+            onValidityChange={setTypographyValid}
+            onChange={(value) => {
+              setClassDraft(value);
+              setDiff("");
+              setStatus(null);
+            }}
+            onPreview={() => void edit("className", false, true)}
+            onApply={() => void edit("className", true, true)}
+          />
+          <SpacingInspector
+            key={`spacing-${selection.current}`}
+            className={classDraft}
+            sourceKnown={Boolean(source?.className.ok)}
+            rendered={selected?.spacing ?? null}
+            disabled={!classEditable}
+            applyDisabled={!typographyValid}
+            onValidityChange={setSpacingValid}
             onChange={(value) => {
               setClassDraft(value);
               setDiff("");

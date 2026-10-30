@@ -30,6 +30,21 @@ const layers = {
   ],
 };
 const selected = {
+  spacing: {
+    display: null,
+    paddingInlineStart: null,
+    paddingInlineEnd: null,
+    paddingBlockStart: null,
+    paddingBlockEnd: null,
+    marginInlineStart: null,
+    marginInlineEnd: null,
+    marginBlockStart: null,
+    marginBlockEnd: null,
+    rowGap: null,
+    columnGap: null,
+    flexDirection: null,
+    flexWrap: null,
+  },
   typography: {
     fontSize: null,
     fontWeight: null,

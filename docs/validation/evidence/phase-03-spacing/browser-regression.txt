@@ -1,0 +1,37 @@
+PASS select heading resolves JSX source — src/app/page.tsx:7–12
+PASS patch preview shows diff without writing
+PASS apply writes JSX file and preview updates — Aurora Atelier — edited 1793333977085 (preview refreshed 334 ms after Apply)
+PASS no-op edit does not rewrite the file
+PASS old draft is cleared while a new selection is looked up
+PASS external change since selection reports a conflict
+PASS dynamic {children} element is refused
+PASS DOM oid missing from source is refused
+PASS ambiguous rendered oid is refused
+PASS forged preview messages are rejected
+PASS workspace API rejects unauthorized paths, tokens and the preview origin
+PASS aurora-button-text — src/app/page.tsx:18–23; lines changed 22; preview 223 ms
+PASS applying one field keeps the other field's unsaved draft
+PASS aurora-heading-classes — src/app/page.tsx:7–12; lines changed 9; preview 227 ms
+PASS new Tailwind class is compiled and rendered — lab(2.51107 0.242703 -0.886115) → lab(44.4871 -41.0396 11.0361)
+PASS editing is locked from Apply until the save is confirmed
+PASS a stalled post-save lookup times out and unlocks editing
+PASS aurora-layout-classes — src/app/page.tsx:3–24; lines changed 3; preview 325 ms
+PASS examples/ fixture file is unchanged
+PASS lumen-heading-text — src/app/page.tsx:12–17; lines changed 16; preview 364 ms
+PASS lumen-nested-button-text — src/components/new-note-button.tsx:3–9; lines changed 8; preview 229 ms
+PASS lumen-layout-classes — src/app/page.tsx:11–36; lines changed 11; preview 212 ms
+PASS lumen-ternary-branch-text — src/app/page.tsx:25–30; lines changed 29; preview 218 ms
+PASS ternary condition and other branch are preserved
+PASS reused component (NavLink) is refused — renders 2 times
+PASS .map() list item is refused — renders 3 times
+PASS expression text is refused — {notes.length} notes in this workspace
+PASS harbor-heading-text — src/app/page.tsx:14–19; lines changed 18; preview 873 ms
+PASS harbor-variant-classes — src/app/page.tsx:24–30; lines changed 27; preview 340 ms
+PASS harbor-layout-responsive-classes — src/app/page.tsx:9–50; lines changed 11; preview 319 ms
+PASS responsive variant edit changes the rendered grid — 2 → 3 columns
+PASS template-literal className is refused, its static text stays editable
+PASS footer text with {year} is refused
+PASS no file under examples/ changed
+
+34 checks passed. Trace: /tmp/allstudio-spacing-browser-regression/trace.zip
+final workspace sha256 4daa19aa16eaef1550a8d4edea58614f039af5f11ad9d6be29deca8bb7c2f498

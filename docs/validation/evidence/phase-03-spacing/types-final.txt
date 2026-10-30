@@ -1,0 +1,8 @@
+$ bun --filter @allstudio/project typecheck && bun --filter @allstudio/editor typecheck && bun --filter @allstudio/playground typecheck && bun --filter @allstudio/nextjs-site-fixture typecheck && bun --filter @allstudio/nested-components-fixture typecheck && bun --filter @allstudio/tailwind-variants-fixture typecheck && bun --filter @allstudio/desktop typecheck
+@allstudio/project typecheck: Exited with code 0
+@allstudio/editor typecheck: Exited with code 0
+@allstudio/playground typecheck: Exited with code 0
+@allstudio/nextjs-site-fixture typecheck: Exited with code 0
+@allstudio/nested-components-fixture typecheck: Exited with code 0
+@allstudio/tailwind-variants-fixture typecheck: Exited with code 0
+@allstudio/desktop typecheck: Exited with code 0

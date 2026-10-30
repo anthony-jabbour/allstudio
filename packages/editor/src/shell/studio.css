@@ -487,3 +487,20 @@ code,
   border-radius: 3px;
   vertical-align: -2px;
 }
+
+.spacing-inspector {
+  border-top: 1px solid var(--studio-border);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+.spacing-inspector summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.spacing-inspector .actions {
+  flex-direction: column;
+}
+.spacing-inspector .actions button {
+  width: 100%;
+}
