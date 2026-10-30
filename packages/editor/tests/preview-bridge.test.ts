@@ -35,6 +35,11 @@ const element = {
     flexDirection: "row",
     flexWrap: "nowrap",
   },
+  appearance: {
+    backgroundColor: "rgb(2, 132, 199)",
+    backgroundImage: "none",
+    borderRadius: "9999px",
+  },
   typography: {
     fontSize: "48px",
     fontWeight: "600",
@@ -450,5 +455,72 @@ describe("bounded selected spacing measurement", () => {
     expect(result.ok).toBe(true);
     if (result.ok && result.message.type === "select")
       expect(result.message.element?.spacing).toEqual(spacing);
+  });
+});
+
+describe("bounded selected appearance measurement", () => {
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["array", []],
+    ["extra key", { ...element.appearance, path: "/private/file" }],
+    ["oversized", { ...element.appearance, backgroundImage: "x".repeat(257) }],
+    ["non-string", { ...element.appearance, borderRadius: 3 }],
+    ["missing field", { ...element.appearance, backgroundColor: undefined }],
+    ["missing context", { backgroundColor: "red", borderRadius: "1px" }],
+  ])("rejects %s appearance", (_label, appearance) => {
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "a",
+          element: { ...element, appearance },
+        }),
+        expected,
+      ),
+    ).toEqual({ ok: false, reason: "malformed" });
+  });
+  it("accepts the exact length limit", () => {
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "a",
+          element: {
+            ...element,
+            appearance: {
+              ...element.appearance,
+              backgroundImage: "x".repeat(256),
+            },
+          },
+        }),
+        expected,
+      ).ok,
+    ).toBe(true);
+  });
+  it("keeps unavailable fields null without fabricating colours", () => {
+    const appearance = Object.fromEntries(
+      Object.keys(element.appearance).map((key) => [key, null]),
+    );
+    const result = parsePreviewMessage(
+      event({
+        type: "select",
+        clickedTag: "a",
+        element: { ...element, appearance },
+      }),
+      expected,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok && result.message.type === "select")
+      expect(result.message.element?.appearance).toEqual(appearance);
+  });
+  it("is part of the protocol version that the runtime copy reports", () => {
+    expect(PREVIEW_BRIDGE_VERSION).toBe(6);
+    expect(
+      parsePreviewMessage(
+        event({ type: "boot", version: PREVIEW_BRIDGE_VERSION - 1 }),
+        expected,
+      ),
+    ).toEqual({ ok: false, reason: "malformed" });
   });
 });

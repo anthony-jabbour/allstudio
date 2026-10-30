@@ -182,6 +182,9 @@ try {
   await expect(
     page.getByRole("button", { name: "Apply typography", exact: true }),
   ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Apply appearance", exact: true }),
+  ).toBeDisabled();
   assert.equal(await readFile(file, "utf8"), text);
   await page.getByLabel("Padding inline px", { exact: true }).fill("32");
   await page

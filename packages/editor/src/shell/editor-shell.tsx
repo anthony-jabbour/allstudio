@@ -6,6 +6,12 @@ import {
   type SourceEditWorkspace,
   type SourceElementInfo,
 } from "../site/source-edit-workspace.ts";
+import {
+  type AppearanceTarget,
+  appearanceTargets,
+  observesAppearance,
+} from "./appearance-confirmation.ts";
+import { AppearanceInspector } from "./appearance-inspector.tsx";
 import { LayerTree } from "./layer-tree.tsx";
 import {
   observesSpacing,
@@ -41,8 +47,9 @@ type Status = { kind: "info" | "success" | "error"; text: string } | null;
 type EditKind = "text" | "className";
 
 interface PendingRefresh {
+  appearance?: AppearanceTarget[];
   spacing?: SpacingTarget[];
-  propertyLabel?: "typography" | "spacing" | "design properties";
+  propertyLabel?: "typography" | "spacing" | "appearance" | "design properties";
   typography?: TypographyTarget[];
   oid: string;
   kind: EditKind;
@@ -67,7 +74,9 @@ function previewShows(
     (!pending.typography?.length ||
       observesTypography(element.typography, pending.typography)) &&
     (!pending.spacing?.length ||
-      observesSpacing(element.spacing, pending.spacing))
+      observesSpacing(element.spacing, pending.spacing)) &&
+    (!pending.appearance?.length ||
+      observesAppearance(element.appearance, pending.appearance))
   );
 }
 
@@ -208,6 +217,7 @@ function SourceElementEditor({
   const [busy, setBusy] = useState(false);
   const [typographyValid, setTypographyValid] = useState(true);
   const [spacingValid, setSpacingValid] = useState(true);
+  const [appearanceValid, setAppearanceValid] = useState(true);
   const [pending, setPending] = useState<PendingRefresh | null>(null);
   const request = useRef(0);
   // Bumped on every selection so late edit responses for an older
@@ -305,7 +315,7 @@ function SourceElementEditor({
         setStatus({
           kind: "error",
           text: element
-            ? `This source element renders ${element.instances} times. Editing one instance is not supported.`
+            ? `This source element renders ${element.instances} times (e.g. in a list or a reused component). Editing one instance is not supported.`
             : "The selected element is no longer available. Select it again.",
         });
         return;
@@ -405,6 +415,7 @@ function SourceElementEditor({
     }
     let targets: TypographyTarget[] | undefined;
     let spacing: SpacingTarget[] | undefined;
+    let appearance: AppearanceTarget[] | undefined;
     let propertyLabel: PendingRefresh["propertyLabel"];
     if (design && apply) {
       const before = source.className.ok ? (source.className.value ?? "") : "";
@@ -422,9 +433,19 @@ function SourceElementEditor({
         setStatus({ kind: "error", text: spacingResult.message });
         return;
       }
+      const appearanceResult = appearanceTargets(
+        before,
+        classDraft,
+        selected.appearance,
+      );
+      if (!appearanceResult.ok) {
+        setStatus({ kind: "error", text: appearanceResult.message });
+        return;
+      }
       if (
         !result.targets.length &&
         !spacingResult.targets.length &&
+        !appearanceResult.targets.length &&
         before !== classDraft
       ) {
         setStatus({
@@ -435,14 +456,16 @@ function SourceElementEditor({
       }
       targets = result.targets;
       spacing = spacingResult.targets;
+      appearance = appearanceResult.targets;
+      const groups = [
+        targets.length ? "typography" : null,
+        spacing.length ? "spacing" : null,
+        appearance.length ? "appearance" : null,
+      ].filter((group) => group !== null);
       propertyLabel =
-        targets.length && spacing.length
+        groups.length > 1
           ? "design properties"
-          : targets.length
-            ? "typography"
-            : spacing.length
-              ? "spacing"
-              : undefined;
+          : (groups[0] as PendingRefresh["propertyLabel"]);
     }
     const selectionAtStart = selection.current;
     const run = ++editRun.current;
@@ -508,6 +531,7 @@ function SourceElementEditor({
       text: `Saved to ${source.path}. Waiting for the preview to refresh…`,
     });
     setPending({
+      appearance,
       spacing,
       propertyLabel,
       typography: targets,
@@ -619,7 +643,7 @@ function SourceElementEditor({
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.typography ?? null}
             disabled={!classEditable}
-            applyDisabled={!spacingValid}
+            applyDisabled={!spacingValid || !appearanceValid}
             onValidityChange={setTypographyValid}
             onChange={(value) => {
               setClassDraft(value);
@@ -635,8 +659,24 @@ function SourceElementEditor({
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.spacing ?? null}
             disabled={!classEditable}
-            applyDisabled={!typographyValid}
+            applyDisabled={!typographyValid || !appearanceValid}
             onValidityChange={setSpacingValid}
+            onChange={(value) => {
+              setClassDraft(value);
+              setDiff("");
+              setStatus(null);
+            }}
+            onPreview={() => void edit("className", false, true)}
+            onApply={() => void edit("className", true, true)}
+          />
+          <AppearanceInspector
+            key={`appearance-${selection.current}`}
+            className={classDraft}
+            sourceKnown={Boolean(source?.className.ok)}
+            rendered={selected?.appearance ?? null}
+            disabled={!classEditable}
+            applyDisabled={!typographyValid || !spacingValid}
+            onValidityChange={setAppearanceValid}
             onChange={(value) => {
               setClassDraft(value);
               setDiff("");

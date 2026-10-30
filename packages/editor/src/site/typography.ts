@@ -1,4 +1,9 @@
 import { topLevelSeparator as separator } from "./class-tokens.ts";
+import {
+  normalizeHex as hex,
+  parseColorUtility,
+  positiveNumber as positive,
+} from "./color-tokens.ts";
 
 /** Static Base utilities only. Real source writes remain in SourceEditWorkspace. */
 export const TYPOGRAPHY_PROPERTIES = [
@@ -80,16 +85,6 @@ interface Token {
   unsupported: TypographyProperty[];
 }
 const project: TypographyExpectation = { kind: "project" };
-const positive = (value: string) =>
-  /^\d+(?:\.\d+)?$/.test(value) && Number.isFinite(Number(value));
-function hex(value: string): string | null {
-  if (!/^#[a-f\d]+$/i.test(value) || ![4, 5, 7, 9].includes(value.length))
-    return null;
-  const lower = value.toLowerCase();
-  return lower.length <= 5
-    ? `#${[...lower.slice(1)].map((ch) => ch + ch).join("")}`
-    : lower;
-}
 function size(
   value: string,
 ): { value: string; expectation: TypographyExpectation } | null {
@@ -120,41 +115,6 @@ function leading(
     expectation: literal[2]
       ? { kind: "literal", value: `${number}px` }
       : { kind: "ratio", value: number },
-  };
-}
-function alpha(value: string): number | null {
-  if (positive(value) && Number(value) <= 100) return Number(value);
-  const ratio = /^\[(\d+(?:\.\d+)?)\]$/.exec(value);
-  return ratio?.[1] && positive(ratio[1]) && Number(ratio[1]) <= 1
-    ? Number(ratio[1]) * 100
-    : null;
-}
-function color(
-  value: string,
-  suffix?: string,
-): { value: string; expectation: TypographyExpectation } | null {
-  if (!value.startsWith("text-")) return null;
-  const body = value.slice(5);
-  const percentage = suffix === undefined ? null : alpha(suffix);
-  if (suffix !== undefined && percentage === null) return null;
-  const literal = /^\[(#[a-f\d]+)\]$/i.exec(body);
-  const rgb = literal?.[1] ? hex(literal[1]) : null;
-  const palette =
-    /^(?:black|white|transparent|current|inherit|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|[1-9]00|950))$/.test(
-      body,
-    );
-  if (!rgb && !palette) return null;
-  return {
-    value: `text-${rgb ? `[${rgb}]` : body}${suffix === undefined ? "" : `/${percentage}`}`,
-    expectation: rgb
-      ? {
-          kind: "color",
-          value:
-            percentage === null
-              ? rgb
-              : `color-mix(in oklab, ${rgb} ${percentage}%, transparent)`,
-        }
-      : project,
   };
 }
 function token(raw: string, start: number): Token {
@@ -216,10 +176,10 @@ function token(raw: string, start: number): Token {
       });
     else result.unsupported.push("fontWeight");
   } else {
-    const textColor = color(body, suffix);
+    const textColor = parseColorUtility("text", body, suffix);
     if (textColor)
       result.matches.push({ property: "color", ...textColor, suffix });
-    else if (color(body)) result.unsupported.push("color");
+    else if (parseColorUtility("text", body)) result.unsupported.push("color");
     else if (
       /^\[(font-size|font-weight|line-height|text-align|color|font-family|font):/i.test(
         utility,

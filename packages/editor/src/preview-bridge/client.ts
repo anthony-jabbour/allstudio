@@ -17,7 +17,7 @@ export interface PreviewBridgeConfig {
 
 const EDITOR_SOURCE = "allstudio-editor";
 const PREVIEW_SOURCE = "allstudio-preview";
-const VERSION = 5;
+const VERSION = 6;
 const OID_ATTRIBUTE = "data-oid";
 const MAX_TEXT_LENGTH = 2000;
 const MAX_LAYER_NODES = 1000;
@@ -46,6 +46,12 @@ const SPACING_KEYS = [
   "columnGap",
   "flexDirection",
   "flexWrap",
+] as const;
+
+const APPEARANCE_KEYS = [
+  "backgroundColor",
+  "backgroundImage",
+  "borderRadius",
 ] as const;
 
 export function installPreviewBridge(config: PreviewBridgeConfig): void {
@@ -91,6 +97,9 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
     const spacing = Object.fromEntries(
       SPACING_KEYS.map((key) => [key, null]),
     ) as Record<(typeof SPACING_KEYS)[number], string | null>;
+    const appearance = Object.fromEntries(
+      APPEARANCE_KEYS.map((key) => [key, null]),
+    ) as Record<(typeof APPEARANCE_KEYS)[number], string | null>;
     try {
       const style = getComputedStyle(element);
       for (const key of TYPOGRAPHY_KEYS) {
@@ -101,10 +110,15 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
         const observed = style[key];
         spacing[key] = observed && observed.length <= 256 ? observed : null;
       }
+      for (const key of APPEARANCE_KEYS) {
+        const observed = style[key];
+        appearance[key] = observed && observed.length <= 256 ? observed : null;
+      }
     } catch {
       // A detached/unavailable measurement is not a default property value.
     }
     return {
+      appearance,
       spacing,
       typography,
       nodeId: nodeId(element),
