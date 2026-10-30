@@ -47,3 +47,5 @@ Approve this concrete extension of the existing property pipeline and three-PR d
 ## Independent builder check
 
 Fresh read-only GPT-6 Luna reviewer at extra-high found no material implementation blocker: scope, source safety, strict selected measurement bounds, compiler-proof limits and real fixture targets were coherent with current code and roadmap. No product code or runtime test was executed by this design review. Founder approval remains pending.
+
+Founder approved this design: “Approve and implement Slice 3.4 (recommended).” Implementation starts with the spacing sub-slice; appearance and layout/sizing follow as separate integrated PRs.
