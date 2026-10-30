@@ -51,7 +51,7 @@ function pixels(value: string | null): number | null {
     ? Number.parseFloat(value)
     : null;
 }
-function srgb(value: string): number[] | null {
+export function srgb(value: string): number[] | null {
   if (
     typeof document === "undefined" ||
     typeof CSS === "undefined" ||

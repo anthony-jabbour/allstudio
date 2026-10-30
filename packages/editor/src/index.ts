@@ -1,6 +1,7 @@
 export type {
   InboundMessageEvent,
   ParsedPreviewMessage,
+  PreviewAppearance,
   PreviewElementSnapshot,
   PreviewExpectation,
   PreviewLayerNode,

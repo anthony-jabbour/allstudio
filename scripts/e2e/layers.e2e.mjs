@@ -207,7 +207,7 @@ try {
       iframe.contentWindow.postMessage(
         {
           source: "allstudio-editor",
-          version: 4,
+          version: 5,
           type: "select-layer",
           nonce,
           generation,
@@ -262,7 +262,7 @@ try {
       const iframe = document.querySelector("iframe");
       const request = {
         source: "allstudio-editor",
-        version: 4,
+        version: 5,
         type: "select-layer",
         nonce: base.nonce,
         generation: base.generation,
@@ -308,7 +308,7 @@ try {
     parent.postMessage(
       {
         source: "allstudio-preview",
-        version: 4,
+        version: 5,
         type: "layers",
         nonce: base.nonce,
         generation: base.generation + 1,

@@ -24,6 +24,11 @@ const layers = {
   ],
 };
 const selected = {
+  appearance: {
+    backgroundColor: null,
+    backgroundImage: null,
+    borderRadius: null,
+  },
   spacing: {
     display: null,
     paddingInlineStart: null,

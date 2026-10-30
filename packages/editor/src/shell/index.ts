@@ -2,6 +2,7 @@
 // It must not import the Babel-based source mapper, which runs in the
 // workspace adapter (dev server today, Electron main process later).
 export type {
+  PreviewAppearance,
   PreviewElementSnapshot,
   PreviewLayerNode,
   PreviewLayersSnapshot,

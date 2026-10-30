@@ -4,7 +4,7 @@
  * every inbound message is checked for the expected origin, the expected
  * window, the session nonce, and a strict shape before the editor acts on it.
  */
-export const PREVIEW_BRIDGE_VERSION = 4;
+export const PREVIEW_BRIDGE_VERSION = 5;
 export const EDITOR_MESSAGE_SOURCE = "allstudio-editor";
 export const PREVIEW_MESSAGE_SOURCE = "allstudio-preview";
 
@@ -40,6 +40,7 @@ export interface PreviewRect {
 }
 
 export interface PreviewElementSnapshot {
+  appearance: PreviewAppearance;
   spacing: PreviewSpacing;
   typography: PreviewTypography;
   nodeId: string;
@@ -79,6 +80,31 @@ export type PreviewSpacing = Record<
   (typeof SPACING_KEYS)[number],
   string | null
 >;
+
+/** Fixed selected-element appearance measurement; each value is bounded or null. */
+export const APPEARANCE_KEYS = [
+  "backgroundColor",
+  "backgroundImage",
+  "borderRadius",
+] as const;
+export type PreviewAppearance = Record<
+  (typeof APPEARANCE_KEYS)[number],
+  string | null
+>;
+
+function parseAppearance(value: unknown): PreviewAppearance | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, APPEARANCE_KEYS)) return null;
+  for (const key of APPEARANCE_KEYS) {
+    if (
+      value[key] !== null &&
+      (typeof value[key] !== "string" || value[key].length > 256)
+    )
+      return null;
+  }
+  return Object.fromEntries(
+    APPEARANCE_KEYS.map((key) => [key, value[key]]),
+  ) as PreviewAppearance;
+}
 
 function parseSpacing(value: unknown): PreviewSpacing | null {
   if (!isRecord(value) || !hasOnlyKeys(value, SPACING_KEYS)) return null;
@@ -210,6 +236,7 @@ function parseSnapshot(
   const rect = parseRect(value.rect);
   const typography = parseTypography(value.typography);
   const spacing = parseSpacing(value.spacing);
+  const appearance = parseAppearance(value.appearance);
   const { nodeId, oid, tagName, text, className, instances } = value;
   if (
     typeof nodeId !== "string" ||
@@ -227,7 +254,8 @@ function parseSnapshot(
     instances > MAX_INSTANCES ||
     !rect ||
     !typography ||
-    !spacing
+    !spacing ||
+    !appearance
   ) {
     return undefined;
   }
@@ -241,6 +269,7 @@ function parseSnapshot(
     instances,
     typography,
     spacing,
+    appearance,
   };
 }
 
