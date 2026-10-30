@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 import {
   EDITOR_STATUS,
   EditorShell,
+  hasUnsavedInspectorDraft,
   type SourceEditWorkspace,
+  type SourceElementInfo,
   sourceEditFailure,
 } from "../src/index.ts";
 import { LayoutInspector } from "../src/shell/layout-inspector.tsx";
@@ -147,5 +149,116 @@ describe("EditorShell", () => {
     expect(html).toContain(
       "Conflicting base utilities make this property ambiguous. Resolve them in Classes first.",
     );
+  });
+
+  it("renders the discovered Pages list with eligible static routes and unsupported route badges", () => {
+    const html = renderToStaticMarkup(
+      createElement(EditorShell, {
+        previewUrl: "http://localhost:3101/",
+        workspace: unusedWorkspace,
+        activeRoute: "/",
+        routes: [
+          { route: "/", sourcePath: "src/app/page.tsx" },
+          { route: "/about", sourcePath: "src/app/about/page.tsx" },
+        ],
+        unsupportedRoutes: [
+          {
+            route: "/journal/[slug]",
+            sourcePath: "src/app/journal/[slug]/page.tsx",
+            reason: "dynamic-route",
+            message:
+              "Dynamic route /journal/[slug] (src/app/journal/[slug]/page.tsx) requires runtime parameters and cannot be previewed directly.",
+          },
+        ],
+      }),
+    );
+    expect(html).toContain('aria-label="Pages"');
+    expect(html).toContain('data-route="/"');
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain("src/app/page.tsx");
+    expect(html).toContain('data-route="/about"');
+    expect(html).toContain("src/app/about/page.tsx");
+    expect(html).toContain('data-unsupported-route="/journal/[slug]"');
+    expect(html).toContain("Dynamic");
+    expect(html).toContain(
+      "Dynamic route /journal/[slug] (src/app/journal/[slug]/page.tsx) requires runtime parameters and cannot be previewed directly.",
+    );
+  });
+
+  it("computes unsaved inspector draft state accurately for route navigation guards", () => {
+    const baseSource: SourceElementInfo = {
+      path: "src/app/page.tsx",
+      sha256: "a".repeat(64),
+      location: {
+        oid: "hero-heading",
+        path: "src/app/page.tsx",
+        start: { line: 7, column: 6 },
+        end: { line: 12, column: 11 },
+        component: "Home",
+      },
+      text: { ok: true, text: "Aurora Atelier" },
+      className: { ok: true, value: "text-5xl font-semibold" },
+    };
+    const cleanInput = {
+      source: baseSource,
+      draft: "Aurora Atelier",
+      classDraft: "text-5xl font-semibold",
+      typographyValid: true,
+      spacingValid: true,
+      appearanceValid: true,
+      layoutValid: true,
+      hasPendingRefresh: false,
+    };
+
+    expect(
+      hasUnsavedInspectorDraft({
+        ...cleanInput,
+        source: null,
+        draft: "Modified without selection",
+      }),
+    ).toBe(false);
+    expect(hasUnsavedInspectorDraft(cleanInput)).toBe(false);
+    expect(
+      hasUnsavedInspectorDraft({
+        ...cleanInput,
+        draft: "Unsaved heading draft",
+      }),
+    ).toBe(true);
+    expect(
+      hasUnsavedInspectorDraft({
+        ...cleanInput,
+        classDraft: "text-5xl font-bold",
+      }),
+    ).toBe(true);
+    expect(
+      hasUnsavedInspectorDraft({
+        ...cleanInput,
+        typographyValid: false,
+      }),
+    ).toBe(true);
+    expect(
+      hasUnsavedInspectorDraft({
+        ...cleanInput,
+        spacingValid: false,
+      }),
+    ).toBe(true);
+    expect(
+      hasUnsavedInspectorDraft({
+        ...cleanInput,
+        appearanceValid: false,
+      }),
+    ).toBe(true);
+    expect(
+      hasUnsavedInspectorDraft({
+        ...cleanInput,
+        layoutValid: false,
+      }),
+    ).toBe(true);
+    expect(
+      hasUnsavedInspectorDraft({
+        ...cleanInput,
+        hasPendingRefresh: true,
+      }),
+    ).toBe(true);
   });
 });

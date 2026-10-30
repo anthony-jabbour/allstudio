@@ -19,7 +19,11 @@ export {
   parsePreviewMessage,
 } from "./preview-bridge/protocol.ts";
 export type { EditorShellProps } from "./shell/editor-shell.tsx";
-export { EDITOR_STATUS, EditorShell } from "./shell/editor-shell.tsx";
+export {
+  EDITOR_STATUS,
+  EditorShell,
+  hasUnsavedInspectorDraft,
+} from "./shell/editor-shell.tsx";
 export type {
   LayoutConstraints,
   LayoutExpectation,

@@ -2,9 +2,12 @@ import type { ProjectManifestV1 } from "@allstudio/project";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PreviewElementSnapshot } from "../preview-bridge/protocol.ts";
 import {
+  type DiscoveredRoute,
   describeSourceEditFailure,
   type SourceEditWorkspace,
   type SourceElementInfo,
+  type UnsupportedRoute,
+  type UnsupportedRouteReason,
 } from "../site/source-edit-workspace.ts";
 import {
   type AppearanceTarget,
@@ -43,9 +46,66 @@ export interface EditorShellProps {
   /** Live preview of the workspace project, served from its own origin. */
   previewUrl?: string;
   workspace?: SourceEditWorkspace;
+  routes?: readonly DiscoveredRoute[];
+  unsupportedRoutes?: readonly UnsupportedRoute[];
+  activeRoute?: string;
   projectControls?: import("react").ReactNode;
   homeContent?: import("react").ReactNode;
   disabled?: boolean;
+}
+
+export function hasUnsavedInspectorDraft(input: {
+  source: SourceElementInfo | null;
+  draft: string;
+  classDraft: string;
+  typographyValid: boolean;
+  spacingValid: boolean;
+  appearanceValid: boolean;
+  layoutValid: boolean;
+  hasPendingRefresh: boolean;
+}): boolean {
+  const {
+    source,
+    draft,
+    classDraft,
+    typographyValid,
+    spacingValid,
+    appearanceValid,
+    layoutValid,
+    hasPendingRefresh,
+  } = input;
+  if (!source) {
+    return false;
+  }
+  if (source.text.ok && draft !== source.text.text) {
+    return true;
+  }
+  if (source.className.ok && classDraft !== (source.className.value ?? "")) {
+    return true;
+  }
+  if (!typographyValid || !spacingValid || !appearanceValid || !layoutValid) {
+    return true;
+  }
+  return hasPendingRefresh;
+}
+
+function unsupportedReasonBadge(reason: UnsupportedRouteReason): string {
+  switch (reason) {
+    case "dynamic-route":
+      return "Dynamic";
+    case "catch-all-route":
+      return "Catch-all";
+    case "parallel-route":
+      return "Parallel";
+    case "intercepting-route":
+      return "Intercepting";
+    case "private-route":
+      return "Private";
+    case "ambiguous-route":
+      return "Ambiguous";
+    case "invalid-segment":
+      return "Invalid";
+  }
 }
 
 type Status = { kind: "info" | "success" | "error"; text: string } | null;
@@ -107,6 +167,9 @@ export function EditorShell({
   manifest,
   previewUrl,
   workspace,
+  routes,
+  unsupportedRoutes,
+  activeRoute,
   projectControls,
   homeContent,
   disabled,
@@ -183,6 +246,9 @@ export function EditorShell({
           <SourceElementEditor
             previewUrl={previewUrl}
             workspace={workspace}
+            routes={routes}
+            unsupportedRoutes={unsupportedRoutes}
+            activeRoute={activeRoute}
             navigatorOpen={navigatorOpen}
           />
         </div>
@@ -210,13 +276,42 @@ export function EditorShell({
 function SourceElementEditor({
   previewUrl,
   workspace,
+  routes,
+  unsupportedRoutes,
+  activeRoute,
   navigatorOpen,
 }: {
   previewUrl: string;
   workspace: SourceEditWorkspace;
+  routes?: readonly DiscoveredRoute[];
+  unsupportedRoutes?: readonly UnsupportedRoute[];
+  activeRoute?: string;
   navigatorOpen: boolean;
 }) {
-  const previewOrigin = new URL(previewUrl).origin;
+  const [currentPreviewUrl, setCurrentPreviewUrl] = useState(previewUrl);
+  const [currentRoute, setCurrentRoute] = useState(
+    () => activeRoute ?? new URL(previewUrl).pathname,
+  );
+  const [currentRoutes, setCurrentRoutes] = useState<
+    readonly DiscoveredRoute[]
+  >(() =>
+    routes?.length
+      ? routes
+      : [
+          {
+            route: new URL(previewUrl).pathname,
+            sourcePath: "src/app/page.tsx",
+          },
+        ],
+  );
+  const [currentUnsupportedRoutes, setCurrentUnsupportedRoutes] = useState<
+    readonly UnsupportedRoute[]
+  >(() => unsupportedRoutes ?? []);
+  const [pendingRouteSwitch, setPendingRouteSwitch] = useState<string | null>(
+    null,
+  );
+  const [switchingRoute, setSwitchingRoute] = useState(false);
+  const previewOrigin = new URL(currentPreviewUrl).origin;
   const frame = useRef<HTMLIFrameElement | null>(null);
   const selectionBox = useRef<HTMLDivElement | null>(null);
   const requestedLayer = useRef<string | null>(null);
@@ -295,6 +390,7 @@ function SourceElementEditor({
       setClassDraft("");
       setDiff("");
       setPending(null);
+      setPendingRouteSwitch(null);
       setStatus(null);
       setSelected(element);
       if (!element) {
@@ -422,6 +518,74 @@ function SourceElementEditor({
     selected?.instances === 1 &&
     bridge.connected &&
     !busy;
+  const hasUnsavedDraft = hasUnsavedInspectorDraft({
+    source,
+    draft,
+    classDraft,
+    typographyValid,
+    spacingValid,
+    appearanceValid,
+    layoutValid,
+    hasPendingRefresh: pending !== null,
+  });
+
+  const executeRouteSwitch = async (targetRoute: string) => {
+    if (!workspace.selectRoute) {
+      setPendingRouteSwitch(null);
+      setStatus({
+        kind: "error",
+        text: "Route navigation is not supported by this workspace.",
+      });
+      return;
+    }
+    setSwitchingRoute(true);
+    const res = await workspace.selectRoute(targetRoute);
+    setSwitchingRoute(false);
+    if (!res.ok) {
+      setPendingRouteSwitch(null);
+      setStatus({ kind: "error", text: res.message });
+      return;
+    }
+    selection.current += 1;
+    request.current += 1;
+    editRun.current += 1;
+    applying.current = null;
+    requestedLayer.current = null;
+    bridge.reset();
+    setSelected(null);
+    setSource(null);
+    setDraft("");
+    setClassDraft("");
+    setDiff("");
+    setPending(null);
+    setPendingRouteSwitch(null);
+    setBusy(false);
+    setTypographyValid(true);
+    setSpacingValid(true);
+    setAppearanceValid(true);
+    setLayoutValid(true);
+    setCurrentRoute(res.route);
+    setCurrentPreviewUrl(res.previewUrl);
+    setCurrentRoutes(res.routes);
+    setCurrentUnsupportedRoutes(res.unsupportedRoutes);
+    setFrameKey((k) => k + 1);
+    setStatus({
+      kind: "info",
+      text: `Switched preview to ${res.route} (${res.sourcePath}).`,
+    });
+  };
+
+  const handleRouteClick = (targetRoute: string) => {
+    if (targetRoute === currentRoute) {
+      setPendingRouteSwitch(null);
+      return;
+    }
+    if (hasUnsavedDraft) {
+      setPendingRouteSwitch(targetRoute);
+      return;
+    }
+    void executeRouteSwitch(targetRoute);
+  };
 
   const edit = async (kind: EditKind, apply: boolean, design = false) => {
     if (!source || !selected) {
@@ -578,9 +742,71 @@ function SourceElementEditor({
         hidden={!navigatorOpen}
       >
         <h2>Pages</h2>
-        <p className="current-page">
-          <span aria-hidden="true">▤</span> {new URL(previewUrl).pathname}
-        </p>
+        <ul className="page-list" aria-label="Pages">
+          {currentRoutes.map((entry) => (
+            <li key={entry.route}>
+              <button
+                type="button"
+                className="page-item"
+                data-route={entry.route}
+                aria-current={entry.route === currentRoute ? "page" : undefined}
+                disabled={busy || switchingRoute}
+                onClick={() => handleRouteClick(entry.route)}
+              >
+                <span className="page-route">
+                  <span aria-hidden="true">▤</span> {entry.route}
+                </span>
+                <span className="page-source">{entry.sourcePath}</span>
+              </button>
+            </li>
+          ))}
+          {currentUnsupportedRoutes.map((item) => (
+            <li
+              key={`${item.sourcePath}:${item.route}`}
+              className="page-item page-item-unsupported"
+              data-unsupported-route={item.route}
+              title={item.message}
+            >
+              <div className="page-item-header">
+                <span className="page-route">{item.route}</span>
+                <span className="page-badge">
+                  {unsupportedReasonBadge(item.reason)}
+                </span>
+              </div>
+              <span className="page-source">{item.sourcePath}</span>
+              <span className="page-reason">{item.message}</span>
+            </li>
+          ))}
+        </ul>
+        {pendingRouteSwitch !== null ? (
+          <div
+            className="route-draft-confirm"
+            role="alert"
+            aria-label="Unsaved route draft confirmation"
+            data-testid="route-draft-confirm"
+          >
+            <p>
+              Unsaved inspector draft on <code>{currentRoute}</code>. Discard
+              changes and switch to <code>{pendingRouteSwitch}</code>?
+            </p>
+            <div className="route-draft-actions">
+              <button
+                type="button"
+                disabled={busy || switchingRoute}
+                onClick={() => void executeRouteSwitch(pendingRouteSwitch)}
+              >
+                Discard and switch
+              </button>
+              <button
+                type="button"
+                disabled={busy || switchingRoute}
+                onClick={() => setPendingRouteSwitch(null)}
+              >
+                Keep editing
+              </button>
+            </div>
+          </div>
+        ) : null}
         <p className="field-note">Current preview route</p>
         <div className="navigator-section">
           <h2>Layers</h2>
@@ -609,7 +835,7 @@ function SourceElementEditor({
               ref={frame}
               className="preview-frame"
               title="Project preview"
-              src={previewUrl}
+              src={currentPreviewUrl}
               sandbox="allow-scripts allow-same-origin allow-forms"
               onLoad={bridge.handleFrameLoad}
             />

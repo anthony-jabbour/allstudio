@@ -58,6 +58,7 @@ function App() {
       previewClassEdit: (request) =>
         window.allstudio.previewClassEdit(id, request),
       applyClassEdit: (request) => window.allstudio.applyClassEdit(id, request),
+      selectRoute: (route) => window.allstudio.selectRoute(id, route),
     };
   }, [project]);
   async function open(task: () => Promise<ProjectResult>) {
@@ -263,6 +264,9 @@ function App() {
             : undefined
         }
         previewUrl={project?.previewUrl}
+        routes={project?.routes}
+        unsupportedRoutes={project?.unsupportedRoutes}
+        activeRoute={project?.activeRoute}
         workspace={workspace}
       />
       <footer className="desktop-status">

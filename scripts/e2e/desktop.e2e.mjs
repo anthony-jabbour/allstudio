@@ -105,6 +105,7 @@ try {
         "applyTextEdit",
         "previewClassEdit",
         "applyClassEdit",
+        "selectRoute",
         "undo",
         "redo",
         "onChange",

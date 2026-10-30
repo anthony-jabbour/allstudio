@@ -40,4 +40,8 @@ export {
   validateRoutePath,
 } from "../site/source-edit-workspace.ts";
 export type { EditorShellProps } from "./editor-shell.tsx";
-export { EDITOR_STATUS, EditorShell } from "./editor-shell.tsx";
+export {
+  EDITOR_STATUS,
+  EditorShell,
+  hasUnsavedInspectorDraft,
+} from "./editor-shell.tsx";
