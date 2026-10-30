@@ -56,7 +56,7 @@ export function App() {
         previewUrl={fixture?.previewUrl}
         workspace={workspace}
       />
-      <section>
+      <section className="developer-notes">
         <h2>Developer notes</h2>
         <p>
           Each fixture is a git-ignored copy of a project in
