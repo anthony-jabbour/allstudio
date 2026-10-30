@@ -8,6 +8,7 @@ export type {
   PreviewMessage,
   PreviewMessageRejection,
   PreviewRect,
+  PreviewTypography,
 } from "./preview-bridge/protocol.ts";
 export {
   createBridgeNonce,

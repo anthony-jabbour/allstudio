@@ -30,6 +30,14 @@ const layers = {
   ],
 };
 const selected = {
+  typography: {
+    fontSize: null,
+    fontWeight: null,
+    lineHeight: null,
+    textAlign: null,
+    color: null,
+    fontFamily: null,
+  },
   nodeId: "n2",
   oid: "same-source",
   tagName: "span",

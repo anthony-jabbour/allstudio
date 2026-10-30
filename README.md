@@ -8,22 +8,11 @@ The hosted product lives in a separate private repository ([anthony-jabbour/alls
 
 ## Current status
 
-This is a **scaffold**, not the product.
+Phases 0–2 are **PASS, founder-approved**. The public editor opens supported Next.js/React/Tailwind projects in Electron, selects elements in the live preview, applies supported text and class changes to real source files, saves, supports undo/redo, and reopens offline. See [Phase 0 validation](docs/validation/PHASE-00.md), [Phase 1 validation](docs/validation/PHASE-01.md), and [Phase 2 validation](docs/validation/PHASE-02.md).
 
-Implemented:
+Phase 3 is **IN PROGRESS** and has not passed its phase gate. The current stacked draft review changes contain the shared Studio shell, rendered layers with synchronized selection, and bounded source-backed typography controls. These implementations remain in draft review and are not merged to `main` as of 2026-10-29. See the [Phase 3 gate inventory](docs/research/phase-03-gate-inventory.md) for implemented evidence, remaining features and human gates, and a dated PR/CI snapshot.
 
-- Bun workspace with `@allstudio/editor` and `@allstudio/project`
-- Browser playground for workspace/import verification
-- Minimal Next.js + React + Tailwind fixture
-- Lint, typecheck, unit tests, and a public-boundary check
-
-Not implemented:
-
-- Onlook source-editing
-- Electron desktop app
-- Creative boards
-- Cloud protocol package
-- AI, billing, or accounts
+This status does not claim Phase 4 boards, Phase 5 local AI/MCP, or private cloud capabilities in later roadmap phases.
 
 ## Setup
 

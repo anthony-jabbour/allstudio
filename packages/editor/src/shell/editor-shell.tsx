@@ -7,6 +7,12 @@ import {
   type SourceElementInfo,
 } from "../site/source-edit-workspace.ts";
 import { LayerTree } from "./layer-tree.tsx";
+import {
+  observesTypography,
+  type TypographyTarget,
+  typographyTargets,
+} from "./typography-confirmation.ts";
+import { TypographyInspector } from "./typography-inspector.tsx";
 import { usePreviewBridge } from "./use-preview-bridge.ts";
 
 export const EDITOR_STATUS = "text-and-class-edit-slice" as const;
@@ -29,6 +35,7 @@ type Status = { kind: "info" | "success" | "error"; text: string } | null;
 type EditKind = "text" | "className";
 
 interface PendingRefresh {
+  typography?: TypographyTarget[];
   oid: string;
   kind: EditKind;
   /** Value the preview must show before the edit counts as visible. */
@@ -47,7 +54,11 @@ function previewShows(
   pending: PendingRefresh,
 ): boolean {
   const rendered = pending.kind === "text" ? element.text : element.className;
-  return normalizeWhitespace(rendered) === normalizeWhitespace(pending.value);
+  return (
+    normalizeWhitespace(rendered) === normalizeWhitespace(pending.value) &&
+    (!pending.typography?.length ||
+      observesTypography(element.typography, pending.typography))
+  );
 }
 
 const NOOP_SUBJECT: Record<EditKind, string> = {
@@ -292,7 +303,7 @@ function SourceElementEditor({
         // Report success only once the source details are refreshed, so
         // the message also means the panel reflects the saved file. Editing
         // stays disabled until then, and a newer edit or selection wins.
-        const { kind, run } = pending;
+        const { kind, run, typography } = pending;
         let settled = false;
         // The refresh gets the same deadline as the preview check, so a
         // stalled lookup cannot leave editing locked.
@@ -318,7 +329,9 @@ function SourceElementEditor({
           if (refreshed) {
             setStatus({
               kind: "success",
-              text: `Saved to ${refreshed.path} and the preview shows the new ${KIND_LABEL[kind]}.`,
+              text: typography?.length
+                ? `Saved typography to ${refreshed.path}; observed the requested properties in the preview.`
+                : `Saved to ${refreshed.path} and the preview shows the new ${KIND_LABEL[kind]}.`,
             });
           }
         });
@@ -330,6 +343,9 @@ function SourceElementEditor({
     if (!pending) {
       return;
     }
+    const poll = pending.typography?.length
+      ? window.setInterval(() => bridge.track(pending.oid), 250)
+      : null;
     const timer = window.setTimeout(() => {
       if (!pending.reloaded) {
         setPending({ ...pending, reloaded: true });
@@ -340,11 +356,16 @@ function SourceElementEditor({
       setBusy(false);
       setStatus({
         kind: "error",
-        text: `The file was saved, but the preview did not show the new ${KIND_LABEL[pending.kind]}. Check the preview server log.`,
+        text: pending.typography?.length
+          ? "Typography source saved, but rendering is unconfirmed or unchanged at this viewport. Other CSS or responsive rules may apply. Undo remains available."
+          : `The file was saved, but the preview did not show the new ${KIND_LABEL[pending.kind]}. Check the preview server log.`,
       });
     }, REFRESH_TIMEOUT_MS);
-    return () => window.clearTimeout(timer);
-  }, [pending]);
+    return () => {
+      window.clearTimeout(timer);
+      if (poll !== null) window.clearInterval(poll);
+    };
+  }, [pending, bridge.track]);
 
   useEffect(() => {
     if (selected?.nodeId === requestedLayer.current) {
@@ -366,9 +387,26 @@ function SourceElementEditor({
     bridge.connected &&
     !busy;
 
-  const edit = async (kind: EditKind, apply: boolean) => {
+  const edit = async (kind: EditKind, apply: boolean, typography = false) => {
     if (!source || !selected) {
       return;
+    }
+    let targets: TypographyTarget[] | undefined;
+    if (typography && apply) {
+      const before = source.className.ok ? (source.className.value ?? "") : "";
+      const result = typographyTargets(before, classDraft, selected.typography);
+      if (!result.ok) {
+        setStatus({ kind: "error", text: result.message });
+        return;
+      }
+      if (!result.targets.length && before !== classDraft) {
+        setStatus({
+          kind: "info",
+          text: "No supported typography setting changed. Review the draft in Classes.",
+        });
+        return;
+      }
+      targets = result.targets;
     }
     const selectionAtStart = selection.current;
     const run = ++editRun.current;
@@ -434,6 +472,7 @@ function SourceElementEditor({
       text: `Saved to ${source.path}. Waiting for the preview to refresh…`,
     });
     setPending({
+      typography: targets,
       oid: savedOid,
       kind,
       value: kind === "text" ? draft : classDraft,
@@ -536,6 +575,20 @@ function SourceElementEditor({
           ) : (
             <p>Click an element in the preview to select it.</p>
           )}
+          <TypographyInspector
+            key={selection.current}
+            className={classDraft}
+            sourceKnown={Boolean(source?.className.ok)}
+            rendered={selected?.typography ?? null}
+            disabled={!classEditable}
+            onChange={(value) => {
+              setClassDraft(value);
+              setDiff("");
+              setStatus(null);
+            }}
+            onPreview={() => void edit("className", false, true)}
+            onApply={() => void edit("className", true, true)}
+          />
           <label className="text-field">
             Text
             <input

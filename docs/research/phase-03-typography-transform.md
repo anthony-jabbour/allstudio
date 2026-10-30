@@ -56,3 +56,9 @@ The assertions intentionally pin observed dependency behavior, including undesir
 ## Required implementation proof later
 
 Start with one selected hero property through a labeled control: exact minimal class/source diff, unchanged other utilities/variants, real computed rendering, no-op, unsupported expressions, stale hash, undo/redo and packaged offline reopen. Extend to the requested typography set only after that lifecycle works. A material grammar/font/cascade choice remains a founder decision if existing requirements do not settle it.
+
+## Compiler fit probe and reviewed design — 2026-10-29
+
+The installed Tailwind4.3.3 compiler generated rules for11 candidate utilities; captured output is in [phase-03-typography-compiler-probe.json](phase-03-typography-compiler-probe.json). This includes size/slash-leading preservation, numeric weight and line-height literals and hex/alpha colour. An assert-based repetition reproduced the exact captured CSS. This is installed default-theme compiler evidence only, not a visual inspector/cascade/persistence proof. No packages, production source or fixtures changed.
+
+The proposed [Slice3.3 design](../superpowers/specs/2026-10-29-phase-03-typography-design.md) covers all six requested groups and a read-only measured-style contract, with explicit source-origin states and saved-but-unconfirmed handling. A fresh independent local builder review found no material planning gaps. Founder approval is pending before source implementation. Reason cloud remains unauthenticated; no cloud review job or paid action was submitted.

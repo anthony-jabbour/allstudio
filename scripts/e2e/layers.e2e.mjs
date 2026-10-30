@@ -207,7 +207,7 @@ try {
       iframe.contentWindow.postMessage(
         {
           source: "allstudio-editor",
-          version: 2,
+          version: 3,
           type: "select-layer",
           nonce,
           generation,
@@ -262,7 +262,7 @@ try {
       const iframe = document.querySelector("iframe");
       const request = {
         source: "allstudio-editor",
-        version: 2,
+        version: 3,
         type: "select-layer",
         nonce: base.nonce,
         generation: base.generation,
@@ -308,7 +308,7 @@ try {
     parent.postMessage(
       {
         source: "allstudio-preview",
-        version: 2,
+        version: 3,
         type: "layers",
         nonce: base.nonce,
         generation: base.generation + 1,
@@ -361,6 +361,12 @@ try {
     await expect(row(oid, 1)).toHaveAttribute("aria-selected", "true");
     await expect(
       page.getByRole("button", { name: "Apply text", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Apply typography", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByLabel("Font size preset", { exact: true }),
     ).toBeDisabled();
     await expect(page.getByRole("alert")).toContainText(/renders [23] times/);
     await align(target);

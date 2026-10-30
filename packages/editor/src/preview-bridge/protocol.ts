@@ -4,7 +4,7 @@
  * every inbound message is checked for the expected origin, the expected
  * window, the session nonce, and a strict shape before the editor acts on it.
  */
-export const PREVIEW_BRIDGE_VERSION = 2;
+export const PREVIEW_BRIDGE_VERSION = 3;
 export const EDITOR_MESSAGE_SOURCE = "allstudio-editor";
 export const PREVIEW_MESSAGE_SOURCE = "allstudio-preview";
 
@@ -40,6 +40,7 @@ export interface PreviewRect {
 }
 
 export interface PreviewElementSnapshot {
+  typography: PreviewTypography;
   nodeId: string;
   oid: string;
   tagName: string;
@@ -50,6 +51,37 @@ export interface PreviewElementSnapshot {
   rect: PreviewRect;
   /** Number of rendered elements sharing this oid (e.g. `.map()` items). */
   instances: number;
+}
+
+export interface PreviewTypography {
+  fontSize: string | null;
+  fontWeight: string | null;
+  lineHeight: string | null;
+  textAlign: string | null;
+  color: string | null;
+  fontFamily: string | null;
+}
+const TYPOGRAPHY_KEYS = [
+  "fontSize",
+  "fontWeight",
+  "lineHeight",
+  "textAlign",
+  "color",
+  "fontFamily",
+] as const;
+
+function parseTypography(value: unknown): PreviewTypography | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, TYPOGRAPHY_KEYS)) return null;
+  for (const key of TYPOGRAPHY_KEYS) {
+    if (
+      value[key] !== null &&
+      (typeof value[key] !== "string" || value[key].length > 256)
+    )
+      return null;
+  }
+  return Object.fromEntries(
+    TYPOGRAPHY_KEYS.map((key) => [key, value[key]]),
+  ) as unknown as PreviewTypography;
 }
 
 export type PreviewMessage =
@@ -144,6 +176,7 @@ function parseSnapshot(
     return undefined;
   }
   const rect = parseRect(value.rect);
+  const typography = parseTypography(value.typography);
   const { nodeId, oid, tagName, text, className, instances } = value;
   if (
     typeof nodeId !== "string" ||
@@ -159,14 +192,18 @@ function parseSnapshot(
     !Number.isInteger(instances) ||
     instances < 1 ||
     instances > MAX_INSTANCES ||
-    !rect
+    !rect ||
+    !typography
   ) {
     return undefined;
   }
-  return { nodeId, oid, tagName, text, className, rect, instances };
+  return { nodeId, oid, tagName, text, className, rect, instances, typography };
 }
 
-function hasOnlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+): boolean {
   return Object.keys(value).every((key) => keys.includes(key));
 }
 

@@ -1,0 +1,19 @@
+{
+  "observedDate": "2026-10-29",
+  "tailwindVersion": "4.3.3",
+  "scope": "Existing installed default-theme compiler output only; no application, cascade, source-write or persistence proof",
+  "candidates": [
+    "text-[36px]",
+    "text-4xl/7",
+    "text-[36px]/7",
+    "text-4xl/[1.5]",
+    "font-[650]",
+    "leading-[1.25]",
+    "leading-[32px]",
+    "text-[#112233]/50",
+    "text-[#11223380]",
+    "font-mono",
+    "text-right"
+  ],
+  "css": "/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */\n@layer properties;\n:root, :host {\n  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',\n    monospace;\n  --spacing: 0.25rem;\n  --text-4xl: 2.25rem;\n}\n.text-right {\n  text-align: right;\n}\n.font-mono {\n  font-family: var(--font-mono);\n}\n.text-4xl\\/7 {\n  font-size: var(--text-4xl);\n  line-height: calc(var(--spacing) * 7);\n}\n.text-4xl\\/\\[1\\.5\\] {\n  font-size: var(--text-4xl);\n  line-height: 1.5;\n}\n.text-\\[36px\\]\\/7 {\n  font-size: 36px;\n  line-height: calc(var(--spacing) * 7);\n}\n.text-\\[36px\\] {\n  font-size: 36px;\n}\n.leading-\\[1\\.25\\] {\n  --tw-leading: 1.25;\n  line-height: 1.25;\n}\n.leading-\\[32px\\] {\n  --tw-leading: 32px;\n  line-height: 32px;\n}\n.font-\\[650\\] {\n  --tw-font-weight: 650;\n  font-weight: 650;\n}\n.text-\\[\\#112233\\]\\/50 {\n  color: color-mix(in oklab, #112233 50%, transparent);\n}\n.text-\\[\\#11223380\\] {\n  color: #11223380;\n}\n@property --tw-leading {\n  syntax: \"*\";\n  inherits: false;\n}\n@property --tw-font-weight {\n  syntax: \"*\";\n  inherits: false;\n}\n@layer properties {\n  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {\n    *, ::before, ::after, ::backdrop {\n      --tw-leading: initial;\n      --tw-font-weight: initial;\n    }\n  }\n}\n"
+}

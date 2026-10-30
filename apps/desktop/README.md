@@ -36,6 +36,14 @@ Use Up/Down, Left/Right, Home/End and Enter/Space in the layer tree. Reused comp
 
 The tree is explicitly partial when its node/depth/visit limits are reached. A canvas target outside that displayed subset retains its own inspector state without a false active layer. Stale layer requests require reselection and never write source. The actual source-instance count remains independent of any partial tree count.
 
+## Typography (Phase 3.3)
+
+Select a uniquely rendered static element, then use **Typography · Base** for font size, weight, line height, alignment, sRGB hex text colour and project sans/serif/mono aliases. Choose a preset or an explicit numeric/hex mode. The source draft and last observed rendered value are shown separately; a missing Base utility may originate elsewhere and is not a default value.
+
+Use **Preview typography patch** to inspect the source diff, then **Apply typography** to save through the existing source/hash/history pipeline. Blur changes only the draft. Other classes and responsive/state variants are preserved; breakpoint-specific editing is not included yet. Size edits retain explicit slash line height, and colour edits retain existing alpha.
+
+Dynamic expressions, repeated instances, ambiguous utilities and unsupported values stay read-only. An invalid custom value disables typography Apply. CSS may override the new source utility, or the result may be visually equivalent: the editor then reports **source saved, rendering unconfirmed** and keeps Undo available. A project font alias does not prove a downloaded face is available offline. The new hex control compares sRGB values; wide-gamut fidelity is not claimed.
+
 ## Offline boundary
 
 Manual launch/open/preview/edit/save/quit/reopen/recovery was exercised with browser external HTTP blocked and OS egress denied for the preview child, retaining loopback and Chromium's Mac sandbox. The host's network settings were not changed. No Clerk/Railway or model-provider request is needed by the editor. BYOK model requests require network access and are not made by Phase 2.
