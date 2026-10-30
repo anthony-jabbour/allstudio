@@ -427,6 +427,7 @@ describe("bounded selected spacing measurement", () => {
     ["oversized", { ...element.spacing, rowGap: "x".repeat(257) }],
     ["non-string", { ...element.spacing, columnGap: 3 }],
     ["missing field", { ...element.spacing, marginInlineStart: undefined }],
+    ["missing flex axis", { ...element.spacing, flexDirection: undefined }],
   ])("rejects %s spacing", (_label, spacing) => {
     expect(
       parsePreviewMessage(

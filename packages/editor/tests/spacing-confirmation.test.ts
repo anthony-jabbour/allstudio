@@ -136,12 +136,20 @@ describe("spacing rendered confirmation", () => {
     const row = spacingTargets("gap-6", "gap-x-6 gap-y-[12px]", {
       ...measured,
       display: "flex",
+      flexDirection: "row",
+      flexWrap: "nowrap",
     });
     expect(row.ok).toBe(true);
     if (!row.ok) return;
     expect(
       observesSpacing(
-        { ...measured, display: "flex", rowGap: "12px" },
+        {
+          ...measured,
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "nowrap",
+          rowGap: "12px",
+        },
         row.targets,
       ),
     ).toBe(false);
@@ -151,11 +159,44 @@ describe("spacing rendered confirmation", () => {
           ...measured,
           display: "flex",
           flexDirection: "column",
+          flexWrap: "nowrap",
           rowGap: "12px",
         },
         row.targets,
       ),
     ).toBe(true);
+    const column = spacingTargets("gap-6", "gap-x-[12px] gap-y-6", {
+      ...measured,
+      display: "flex",
+      flexDirection: "row",
+      flexWrap: "nowrap",
+    });
+    expect(column.ok).toBe(true);
+    if (!column.ok) return;
+    expect(
+      observesSpacing(
+        {
+          ...measured,
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "nowrap",
+          columnGap: "12px",
+        },
+        column.targets,
+      ),
+    ).toBe(true);
+    expect(
+      observesSpacing(
+        {
+          ...measured,
+          display: "flex",
+          flexDirection: null,
+          flexWrap: null,
+          columnGap: "12px",
+        },
+        column.targets,
+      ),
+    ).toBe(false);
   });
   it("refuses missing baseline/unsupported output and ignores unrelated classes", () => {
     expect(

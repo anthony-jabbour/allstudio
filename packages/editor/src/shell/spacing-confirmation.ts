@@ -73,9 +73,11 @@ function gapApplies(
   const direction = observed.flexDirection;
   const wrap = observed.flexWrap;
   if (!direction || !wrap) return false;
+  const row = direction === "row" || direction === "row-reverse";
+  const column = direction === "column" || direction === "column-reverse";
   const wrapped = wrap === "wrap" || wrap === "wrap-reverse";
-  const horizontal = direction === "row" || direction === "row-reverse";
-  return key === "columnGap" ? horizontal || wrapped : !horizontal || wrapped;
+  if ((!row && !column) || (wrap !== "nowrap" && !wrapped)) return false;
+  return key === "columnGap" ? row || wrapped : column || wrapped;
 }
 
 export function observesSpacing(

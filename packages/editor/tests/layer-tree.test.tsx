@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   LayerTree,
+  layerTreeFocusRestoreId,
   nearbyVisibleLayerId,
   restoreLayerTreeFocus,
   scrollLayerRowIntoView,
@@ -101,34 +102,67 @@ describe("LayerTree", () => {
     const focused: string[] = [];
     const scrolled: string[] = [];
     const row = {
-      focus: () => focused.push("n2"),
-      scrollIntoView: () => scrolled.push("n2"),
+      focus: () => focused.push("n4"),
+      scrollIntoView: (options?: ScrollIntoViewOptions) => {
+        scrolled.push(options?.block ?? "");
+      },
     };
     const root = {
       querySelector: (selector: string) =>
-        selector === '[data-layer-id="n2"]' ? row : null,
+        selector === '[data-layer-id="n4"]' ? row : null,
     };
-    scrollLayerRowIntoView(root as unknown as ParentNode, "n2");
-    expect(scrolled).toEqual(["n2"]);
+    scrollLayerRowIntoView(root as unknown as ParentNode, "n4");
+    expect(scrolled).toEqual(["nearest"]);
     expect(focused).toEqual([]);
   });
   it("restores keyboard focus to a nearby surviving row only when the tree had focus", () => {
-    const visible = layers.nodes.filter((node) => node.id !== "n2");
-    expect(nearbyVisibleLayerId(visible, "n2", layers.nodes)).toBe("n1");
+    const nodes = [{ id: "n1" }, { id: "n2" }, { id: "n3" }, { id: "n4" }];
+    const visible = nodes.filter((node) => node.id !== "n3");
+    expect(nearbyVisibleLayerId(visible, "n3", nodes)).toBe("n2");
+    expect(nearbyVisibleLayerId([{ id: "n4" }], "n1", nodes)).toBe("n4");
+    expect(
+      nearbyVisibleLayerId([{ id: "n1" }, { id: "n9" }], "n2", [
+        { id: "n1" },
+        { id: "n2" },
+        { id: "n3" },
+      ]),
+    ).toBe("n1");
+    expect(nearbyVisibleLayerId(visible, "gone", visible)).toBe("n1");
+    expect(
+      layerTreeFocusRestoreId({
+        focusedId: "n3",
+        visible,
+        treeHasFocus: true,
+      }),
+    ).toBe("n3");
+    expect(
+      layerTreeFocusRestoreId({
+        focusedId: "n3",
+        visible,
+        treeHasFocus: false,
+      }),
+    ).toBeNull();
+    expect(
+      layerTreeFocusRestoreId({
+        focusedId: "n2",
+        visible,
+        treeHasFocus: true,
+      }),
+    ).toBeNull();
     const restored: string[] = [];
     restoreLayerTreeFocus({
       visible,
-      focusedId: "n2",
-      nodes: layers.nodes,
+      focusedId: "n3",
+      nodes,
       treeHasFocus: true,
       focus: (id) => restored.push(id),
     });
-    expect(restored).toEqual(["n1"]);
+    expect(restored).toEqual(["n2"]);
     restored.length = 0;
     restoreLayerTreeFocus({
       visible,
-      focusedId: "n2",
-      nodes: layers.nodes,
+      focusedId: "n3",
+      nodes,
       treeHasFocus: false,
       focus: (id) => restored.push(id),
     });

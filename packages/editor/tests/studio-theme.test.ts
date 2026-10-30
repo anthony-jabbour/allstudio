@@ -19,8 +19,20 @@ describe("studio chrome theme isolation", () => {
   it("keeps the preview color-scheme independent of Appearance switches", () => {
     expect(rule(":root")).toMatch(/color-scheme:\s*light;/);
     expect(rule(':root[data-theme="dark"]')).toMatch(/color-scheme:\s*dark;/);
-    expect(rule(".preview-frame")).toMatch(/color-scheme:\s*light dark;/);
+    expect(rule(':root:not([data-theme="light"])')).toMatch(
+      /color-scheme:\s*dark;/,
+    );
+    expect(css).toMatch(
+      /@media\s*\(\s*prefers-color-scheme:\s*dark\s*\)\s*\{\s*:root:not\(\[data-theme="light"\]\)/,
+    );
+
+    const preview = rule(".preview-frame");
+    expect(preview).toMatch(/color-scheme:\s*light dark;/);
+    expect(preview).not.toMatch(/color-scheme:\s*(?:only\s+)?light\s*;/);
+    expect(preview).not.toMatch(/color-scheme:\s*(?:only\s+)?dark\s*;/);
+
     expect(css).not.toMatch(/\[data-theme[^\]]*\][^{]*\.preview-frame/);
     expect(css).not.toMatch(/\.preview-frame[^{]*\[data-theme/);
+    expect(css).not.toMatch(/prefers-color-scheme:[^{]*\.preview-frame/);
   });
 });
