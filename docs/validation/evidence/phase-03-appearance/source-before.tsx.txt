@@ -1,0 +1,54 @@
+import { ServiceBadge } from "@/components/service-badge";
+import { SiteFooter } from "@/components/site-footer";
+
+const highlightWork = true;
+
+export default function Home() {
+  return (
+    <main className="min-h-full text-slate-900 dark:text-slate-100" data-oid="i3bg1:n">
+      <section
+        id="hero"
+        className="mx-auto grid max-w-5xl gap-8 px-6 py-20 md:grid-cols-2 md:items-center lg:py-28" data-oid="4.vzehf"
+      >
+        <div className="flex flex-col gap-6" data-oid="7s-2yjo">
+          <h1
+            id="harbor-heading"
+            className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl" data-oid="zafkmtg"
+          >
+            Harbor Studio
+          </h1>
+          <p className="text-base text-slate-600 md:text-lg dark:text-slate-300" data-oid="tb0ckl7">
+            Brand and web design for independent makers.
+          </p>
+          <div className="flex flex-wrap gap-3" data-oid="yodiz1s">
+            <a
+              id="harbor-cta"
+              href="#services"
+              className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-2 focus-visible:outline-sky-600" data-oid="nmpvdqd"
+            >
+              Book a call
+            </a>
+            <button
+              id="harbor-secondary"
+              type="button"
+              className={`rounded-full border px-5 py-3 text-sm ${highlightWork ? "border-sky-600 text-sky-700" : "border-slate-300"}`} data-oid="9v3fqj9"
+            >
+              See our work
+            </button>
+          </div>
+        </div>
+        <ul id="services" className="grid gap-3 sm:grid-cols-2" data-oid="_:ik86g">
+          <li className="rounded-xl border border-slate-200 p-4 dark:border-slate-800" data-oid=":j4:f8o">
+            <ServiceBadge label="New" isNew data-oid="i9wvlod" />
+            <p className="mt-3 font-medium" data-oid="6t2rcsl">Identity systems</p>
+          </li>
+          <li className="rounded-xl border border-slate-200 p-4 dark:border-slate-800" data-oid="1k4d2u4">
+            <ServiceBadge label="Core" isNew={false} data-oid="o5_w-gc" />
+            <p className="mt-3 font-medium" data-oid="sp-jdxd">Marketing sites</p>
+          </li>
+        </ul>
+      </section>
+      <SiteFooter data-oid="7rbghw-" />
+    </main>
+  );
+}

@@ -54,7 +54,15 @@ Use **Preview spacing patch** to review the exact source diff, then **Apply spac
 
 Known unequal axes are shown as Mixed; choosing an explicit All value replaces those axes together. Conflicting or overlapping utilities, physical/logical edge conflicts, important or variable utilities, and arbitrary CSS spacing properties are unsupported for the affected group; the editor does not normalize them. If a gap utility is inactive for the element display, or a responsive rule wins at the current viewport, source may be saved while rendering remains unconfirmed. Undo stays available. Responsive/state classes remain in source and are not edited by this Base control.
 
-Spacing uses the existing project grant and source-save flow; it adds no native permission, filesystem access, or cloud requirement. This is Slice 3.4a only. Appearance and layout/sizing controls are follow-up slices 3.4b and 3.4c and are not implemented; breakpoint tools remain later work.
+Spacing uses the existing project grant and source-save flow; it adds no native permission, filesystem access, or cloud requirement. This is Slice 3.4a only. Layout/sizing controls remain follow-up slice 3.4c; breakpoint tools remain later work.
+
+## Appearance (Phase 3.4b)
+
+Select a supported static element and open **Appearance · Base**. The two controls are background colour (project presets plus explicit sRGB hex) and one uniform corner radius (project presets plus explicit px). Source settings and last observed rendered values stay separate. A missing Base utility is shown as unset, not as black or zero. Images, gradients, hover/focus variants and per-corner radii are preserved and not rewritten.
+
+Use **Preview appearance patch** to review the exact source diff, then **Apply appearance** to save through the existing hash, history, and preview-refresh path. Colour edits retain an existing slash or hex alpha when only the colour changes. Mixed corners, unknown background tokens, important or variable utilities, and arbitrary CSS properties refuse the affected group. If a background image or gradient covers the colour, or another CSS rule wins, source may be saved while rendering remains unconfirmed. Undo stays available.
+
+Appearance uses the existing project grant and source-save flow. This is Slice 3.4b only. Flex/grid/layout/sizing remain 3.4c.
 
 ## Offline boundary
 

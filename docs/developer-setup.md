@@ -113,7 +113,7 @@ bun --filter @allstudio/tailwind-variants-fixture dev     # Harbor Studio on :30
 
 This guide's `bun run dev` commands exercise the browser playground and disposable fixture copies. The Electron app and its offline workflow are documented in [apps/desktop/README.md](../apps/desktop/README.md).
 
-The current spacing work covers Slice 3.4a only. Appearance and layout/sizing controls are follow-ups 3.4b/c and are not implemented. Responsive device/breakpoint controls, creative boards, local AI/MCP, and hosted cloud belong to later roadmap work.
+The current appearance work covers Slice 3.4b only. Layout/sizing controls are follow-up 3.4c and are not implemented. Responsive device/breakpoint controls, creative boards, local AI/MCP, and hosted cloud belong to later roadmap work.
 
 ### Typography integration proof
 
@@ -135,4 +135,14 @@ node scripts/e2e/spacing.e2e.mjs
 
 The browser harness selects Harbor's `#hero` in `apps/playground/.workspace/harbor-studio/src/app/page.tsx`, checks the exact diff and rendered spacing, and writes traces/screenshots to its printed temporary evidence folder. It edits the generated workspace copy, not `examples/`. Regenerate a disposable copy as described above before rerunning; preserve any workspace edits you need first.
 
-See [Phase 3 validation](validation/PHASE-03.md) for exact executed checks and current slice evidence. Phase 3 remains IN PROGRESS; the spacing slice does not complete appearance/layout or human validation gates.
+See [Phase 3 validation](validation/PHASE-03.md) for exact executed checks and current slice evidence. Phase 3 remains IN PROGRESS; the appearance slice does not complete layout/sizing or human validation gates.
+
+### Appearance integration proof
+
+Start `bun run dev` with fresh disposable fixture copies, then run this from the repository root in another terminal:
+
+```sh
+node scripts/e2e/appearance.e2e.mjs
+```
+
+The browser harness selects Harbor's `#harbor-cta` in `apps/playground/.workspace/harbor-studio/src/app/page.tsx`, checks the exact colour/radius diffs and rendered CSS, and writes traces/screenshots to its printed temporary evidence folder. It edits the generated workspace copy, not `examples/`. Regenerate a disposable copy as described above before rerunning; preserve any workspace edits you need first.

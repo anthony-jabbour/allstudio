@@ -316,3 +316,60 @@ Fresh independent read-only implementation review found no actionable correctnes
 No Electron main/preload/IPC/path grant/atomic write/history/recovery code changed. Existing negative IPC, traversal, symlink/hardlink, nonce/origin/frame/schema, stale/ambiguous target and recovery tests passed. The subframe injection probe remains unavailable; its historical harness PASS line is not proof of a successful subframe denial. Offline production Next build remains NOT RUN in the offline harness, preserving the known next/font/google limitation; online portability was tested separately. Other OS/architectures, signing/notarization, unfamiliar-user sessions and assistive-technology validation remain pending/unclaimed.
 
 Next approved work:3.4b background colour/uniform radius, then3.4c flex/grid/layout/sizing through the same source pipeline. Responsive tools3.5, bounded structural edits3.6, assets/finishing3.7 and route navigation3.2b remain open. Material structural/assets permission decisions require their own founder approval. Recommendation: READY FOR REVIEW for Slice 3.4a; INCOMPLETE for Phase 3. No merge or PASS.
+
+## Slice 3.4b — real source-backed appearance (2026-10-29 Pacific)
+
+**Status: READY FOR REVIEW for Slice 3.4b; Phase 3 and the full 3.4 feature remain IN PROGRESS.** Founder approved the reviewed 3.4 design with “Approve and implement Slice 3.4 (recommended).” Branch `feat/phase-03-appearance` in the same active checkout starts at spacing evidence head `d7e7d46` / draft PR #19. Source implementation commits: `fe33abb` scoped colour/radius transformations, `5595636` measured protocol/confirmation. Inspector, native/browser proof and this report follow on the same branch. No worktree, clone, new dependency, native permission, source-of-truth change, cloud edit, Phase 4/5 feature or merge. Layout/sizing 3.4c is not started.
+
+### What works
+
+Two controls cover Base background colour (project presets plus explicit sRGB hex, slash/hex alpha retained) and one uniform corner radius (project presets plus `rounded-[Npx]` 0–2048px, three decimals). Source settings and last-observed computed values stay separate. A missing Base utility is unset, not black or zero. Images, gradients, position utilities, hover/focus variants and mixed/unknown per-corner radii are preserved; unknown `bg-*` refuses colour only, mixed corners refuse radius only.
+
+The shared inspector keeps transient drafts and uses the unchanged SourceEditWorkspace/className hash/splice/atomic/history/recovery path. Preview and Apply are explicit; blur never writes. Typography, spacing and appearance drafts can share one class patch; invalid fields block every design Apply. Collapsing Appearance preserves its draft. Mixed typography+appearance confirms both groups. Source-kept/unconfirmed feedback preserves Undo when a CSS override, background image/gradient, or unchanged computed colour/radius hides the requested result.
+
+Protocol v5 adds a strict selected-only appearance record: `backgroundColor`, `backgroundImage` and `borderRadius`. `backgroundImage` is required to prevent false success on image-backed or gradient backgrounds. One existing `getComputedStyle` read feeds typography, spacing and appearance. Each fixed field is nullable and limited to 256 characters; unknown keys/types/missing fields/wrong versions are rejected. No styles are collected on layer rows. Colour confirmation compares four-channel sRGB, not naive `rgb()` string equality, because Tailwind 4.3.3 slash-alpha emits colour-mix and some project presets report as `lab()`.
+
+Harbor `#harbor-cta` Base colour `bg-sky-600`→`bg-[#112233]` and `rounded-full`→`rounded-[12px]` retain `hover:bg-sky-500` and focus-visible bytes. Dynamic `#harbor-secondary` (template-literal className) stays refused. Native Aurora proof edits the static “Start a project” button the same way.
+
+### Exact executed checks and results
+
+| Command | Final observed result |
+|---|---|
+| `bun run lint` | exit 0, 142 files, no issues |
+| `bun run typecheck` | seven workspace checks exit 0 |
+| `bun run test` | 437 tests / 21 files passed |
+| `bun run validate:public-boundary` | exit 0, 318 files scanned |
+| `bun run build` | playground and all three fixtures exit 0, online |
+| `bun run build:desktop` | exit 0 |
+| `bun run package:desktop` | exit 0, unsigned Mac arm64 |
+| `bun run test:desktop` | 6 development security checks passed |
+| `node scripts/e2e/desktop.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio` | 6 packaged security checks passed |
+| `bun run test:local` | 32 native workflows passed, including exact appearance colour/radius diff/render/undo/redo and full quit/reopen |
+| `ALLSTUDIO_FIXTURE=nested-components-fixture bun run test:local` | 23 checks passed |
+| `ALLSTUDIO_FIXTURE=tailwind-variants-fixture bun run test:local` | 23 checks passed |
+| `node scripts/e2e/local-workflow.e2e.mjs apps/desktop/dist/mac-arm64/allstudio.app/Contents/MacOS/allstudio --offline` | 32 packaged offline workflows passed; OS preview egress denied and parent secret absent; production next build NOT RUN in this harness |
+| `node scripts/e2e/appearance.e2e.mjs` against disposable `bun run dev` copies | 10 isolated real-browser scenarios passed |
+| `node scripts/e2e/typography.e2e.mjs` against the same playground after appearance | all 10 prior typography scenarios passed, run serially |
+| `node scripts/e2e/spacing.e2e.mjs` after typography | all 12 prior spacing scenarios passed, run serially |
+| `node scripts/e2e/layers.e2e.mjs` after spacing | all 13 layer scenarios passed |
+| `NODE_PATH=/Users/jabbo/AllStudio/allstudio/node_modules/.bun/@playwright+test@1.64.1/node_modules node scripts/e2e/text-edit.e2e.mjs /tmp/allstudio-appearance-browser-regression` after a fresh workspace reset | all 34 prior text/class scenarios passed, three fixtures; no examples source changed |
+| `env -i PATH="$PATH" HOME="$HOME" NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 CI=1 node node_modules/next/dist/bin/next build` in the final saved native project `apps/desktop/dist/local-workflow-MZ9YEL/project` | exit 0; generated HTML retains `text-[36px] p-[16px] rounded-[12px] bg-[#112233]`, recovered heading and no preview OIDs |
+| `git diff --check` | clean |
+
+RED was observed for the absent appearance module, absent Appearance region (theme `aria-label="Appearance"` initially collided with the inspector group; the group is now `Appearance properties`), new selected-record schemas, and confirmation cases for colour-mix/image-backed backgrounds. Final unit/functional runs above are GREEN.
+
+Execution corrections are not hidden: native appearance undo immediately reselected the CTA before HMR restored `bg-zinc-950`, leaving Classes empty/disabled; the harness now waits for the restored class, source location, and then reselects `h1` so later overlay/theme checks stay on the heading. A first text-edit run failed because `onElement` used a shorter repeated-instance sentence than canvas selection; both paths now share the existing longer refusal copy. Those harness/copy fixes did not relax product security or persistence. Browser harnesses were run serially after 3.4a concurrent source races. Offline production build remains **NOT RUN** in the offline harness; historical `next/font/google` offline failure is unchanged. A subframe native IPC probe remains **unavailable**, not evidence of a successful denial.
+
+### Actual source, rendering and persistence
+
+Committed artifacts: [evidence/phase-03-appearance](evidence/phase-03-appearance/). Harbor browser snapshots prove `#harbor-cta` Base colour  `bg-sky-600`→`bg-[#112233]` with `hover:bg-sky-500` retained and rendered `rgb(17, 34, 51)`. Uniform radius 12px replaces `rounded-full` in the same harness. Overridden CSS kept the source edit and reported unconfirmed. Native Aurora snapshots write the exact uninstrumented JSX `rounded-[12px] bg-[#112233]`; Undo/Redo restore bytes and CSS. Full quit/reopen, including packaged offline, preserves colour `rgb(17, 34, 51)`, radius `12px`, heading `36px` / padding `16px` and exact source. The final saved online project also builds independently with the editor wrapper inactive; HTML assertions verify the edited utilities and absence of preview OIDs.
+
+Complete local traces: appearance `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-appearance-e2e-Jm2YQL/trace.zip`; typography `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-typography-e2e-OIXNsS/trace.zip`; spacing `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-spacing-e2e-MmZKl0/trace.zip`; layers `/var/folders/hr/xvx1mh7d68nfwk82tdspn3380000gn/T/allstudio-layers-e2e-tOvTif/trace.zip`; browser regression `/tmp/allstudio-appearance-browser-regression/trace.zip` plus webm/diffs. Native directories: online `apps/desktop/dist/local-workflow-MZ9YEL`, offline `local-workflow-FhZpyG`, nested `local-workflow-OotmIm`, variants `local-workflow-5PoVg9`.
+
+### Review, security and boundaries
+
+Fresh independent read-only implementation review ([code-reviewer](fcd74d5d-7f21-408a-a31d-1a7b9b5be06f)) found no actionable correctness/security/regression issues and independently passed 152 appearance/confirmation/protocol tests. It did not rerun browser/Electron proofs. Neither agent review nor green CI substitutes for founder approval.
+
+No Electron main/preload/IPC/path grant/atomic write/history/recovery code changed. Existing negative IPC, traversal, symlink/hardlink, nonce/origin/frame/schema, stale/ambiguous target and recovery tests passed. The subframe injection probe remains unavailable. Offline production Next build remains NOT RUN in the offline harness. Other OS/architectures, signing/notarization, unfamiliar-user sessions and assistive-technology validation remain pending/unclaimed.
+
+Next approved work: 3.4c flex/grid/layout/sizing through the same source pipeline. Responsive tools 3.5, bounded structural edits 3.6, assets/finishing 3.7 and route navigation 3.2b remain open. Entire 3.4 stays open until 3.4c exists. Recommendation: READY FOR REVIEW for Slice 3.4b; INCOMPLETE for Phase 3. No merge or PASS.
