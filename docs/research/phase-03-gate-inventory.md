@@ -1,0 +1,50 @@
+# Phase 3 Gate Inventory
+
+**Status:** IN PROGRESS — the Phase 3 gate is not approved.  
+**Snapshot date:** 2026-10-29 (America/Los_Angeles).  
+**Scope:** Public editor only; this inventory does not change product or architecture decisions.
+
+## Baseline and review state
+
+Phases 0, 1 and 2 have founder-approved `PASS` records in [Phase 0 validation](../validation/PHASE-00.md), [Phase 1 validation](../validation/PHASE-01.md) and [Phase 2 validation](../validation/PHASE-02.md). The approved local workflow is a real Electron editor for supported Next.js/React/Tailwind projects: it edits actual source, saves, supports undo/redo, and survives quit/reopen with the network disabled. Phase 1 and Phase 2 reports contain the runnable fixture and packaged offline evidence.
+
+Phase 3 adds work on top of that approved base. The latest dated entries in the [Phase 3 validation report](../validation/PHASE-03.md) describe the shared Studio shell (3.1), rendered layers and synchronized selection (3.2), and source-backed typography controls (3.3) as `READY FOR REVIEW` for their individual slices. That is not Phase 3 approval. The roadmap gate still requires the everyday editing feature set and its end-to-end and human validation.
+
+**Review-stack snapshot:** parent verified [draft PR #18](https://github.com/anthony-jabbour/allstudio/pull/18) at `2ea702cae970924c5e0a7be9579474cc4666a93f`, stacked on #17. Both quality and Electron smoke completed `SUCCESS` (last completion2026-10-30T03:52:57Z). This is a dated head-specific observation, not a promise for later commits. No merge or Phase3 `PASS` is implied.
+
+## Roadmap feature inventory
+
+The rows below map the [Phase 3 roadmap](../../RoadMap.md) to the latest implementation evidence. `Partial` means the behavior exists for the explicitly bounded subset but does not close the whole roadmap requirement.
+
+| Roadmap requirement | Current state and evidence | Remaining work or limit |
+|---|---|---|
+| Original shared Studio shell, Home/Studio layout, light/dark themes | **Implemented for Slice 3.1.** [EditorShell](../../packages/editor/src/shell/editor-shell.tsx) is shared by desktop and browser. The validation report records both themes, Home and Studio views, panel behavior, and app layout checks. | Design is an original Paper-inspired treatment, not an exact reproduction. Exact reference font/token export was unavailable. Review and Phase 3 approval are still pending. |
+| Layers and synchronized selection | **Implemented for Slice 3.2.** [LayerTree](../../packages/editor/src/shell/layer-tree.tsx), [preview protocol](../../packages/editor/src/preview-bridge/protocol.ts), [preview client](../../packages/editor/src/preview-bridge/client.ts), and [layer browser scenarios](../../scripts/e2e/layers.e2e.mjs) cover the rendered tree, selection, keyboard movement and bounded/stale-target behavior. | This is a derived tree for source-identified DOM nodes. Dynamic, ambiguous, and repeated-instance source edits remain refused. It is not a canonical board or structural editor. Assistive-technology certification is pending. |
+| Typography and typography tokens | **Implemented for Slice 3.3, within a bounded static utility subset.** [Typography inspector](../../packages/editor/src/shell/typography-inspector.tsx), [source transforms](../../packages/editor/src/site/typography.ts), [confirmation rules](../../packages/editor/src/shell/typography-confirmation.ts), and [typography browser scenarios](../../scripts/e2e/typography.e2e.mjs) support size, weight, line height, alignment, sRGB hex text color, and existing project font aliases. The report records source diffs, rendered measurement, undo/redo and reopen evidence. | Unsupported or ambiguous classes refuse changes. Exact font availability and wide-gamut color fidelity are not claimed. This does not close all color controls in the roadmap. |
+| Existing text/class editing, real source diffs, preview refresh, save, undo/redo and reopen | **Demonstrated for the supported operation subset.** [Desktop LocalWorkspace](../../apps/desktop/src/main/local-workspace.ts) implements source writes and history; [shared edit contract](../../packages/editor/src/site/source-edit-workspace.ts) defines hash-checked apply operations. [Phase 1 E2E](../../scripts/e2e/text-edit.e2e.mjs), [Phase 2 validation](../validation/PHASE-02.md), and [Phase 3 validation](../validation/PHASE-03.md) record real files, preview behavior, undo/redo, recovery and offline reopen. | The Phase 3 gate requires this comparison for every new operation. Evidence for the current subset cannot close work that has not been implemented. |
+| Static route/page navigation | **Not implemented.** The validation report identifies it as pending Slice 3.2b. | Implement and validate route eligibility, hostile route handling, selection invalidation and draft cancellation before claiming page navigation. |
+| Visual spacing and supported layout controls | **Not implemented as dedicated visual controls.** Existing manual class editing can change supported source classes, but does not provide the planned spacing/layout inspector. | A bounded source-safe design and implementation plus source-diff, rendered-result, history and persistence proof remain. |
+| Color controls beyond typography text color | **Not demonstrated.** Slice 3.3 covers text color only. | The roadmap separately names color; no broader background, border, or other color inspector is evidenced here. |
+| Responsive frames, device widths, zoom and breakpoint tools | **Not implemented.** The Studio shell uses a fixed 1440px preview layout viewport; app layout was checked at the original window and 620px. | Preview device sizing, zoom and breakpoint editing remain pending (Slice 3.5). App-window resizing evidence does not establish responsive preview controls. |
+| Rearranging a supported component / structural edits | **Not implemented.** The layer tree represents rendered hierarchy and selection, not structure editing. | Bounded supported sibling rearrangement and its safe source transforms, tests and review remain pending (Slice 3.6); unrestricted insert/remove is not approved by this inventory. |
+| Bounded project-owned asset workflow | **Not implemented.** | Viewing/selecting project-owned assets and a supported source association remain pending (Slice 3.7). Import and any broader filesystem permission require separate founder decisions. |
+
+## Roadmap validation gates
+
+| Gate test | Evidence so far | Still required for Phase 3 |
+|---|---|---|
+| Modify a hero, change typography, adjust a responsive section, rearrange a supported component, save/export | Text and manual class edits, bounded typography changes, actual source writes, preview refresh and offline save/reopen have evidence in [Phase 1](../validation/PHASE-01.md), [Phase 2](../validation/PHASE-02.md) and [Phase 3](../validation/PHASE-03.md). | The full task set has not been demonstrated. Responsive preview controls, structural rearrangement and asset work are incomplete; a Phase 3 export task is not separately evidenced. |
+| Compare each operation with the UI, source diff and refreshed preview; test undo/redo and restart | Proven for the implemented text/class, layer-selection and typography paths to the extent recorded in the validation report and linked E2E scripts. | Repeat the full comparison for every newly implemented spacing, color, responsive, structural and asset operation, including restart behavior. |
+| Keyboard, focus, accessibility, common viewports and interaction responsiveness | The layer tree implements its documented keyboard navigation; shell/inspector layouts were checked at desktop and 620px; layer collection bounds have focused tests. See [Slice 3.2 evidence](../validation/PHASE-03.md). | Formal accessibility/contrast and assistive-technology checks, broader common preview sizes and interaction responsiveness remain unverified. A bounded layer-collector check is not a general performance claim. |
+| Observe unfamiliar users attempting defined tasks | No unfamiliar-user study is recorded. | Observe several people unfamiliar with implementation, record friction and corrections, and incorporate findings. |
+
+## Cross-cutting limits and evidence boundaries
+
+- **Security and packaging:** existing preview/native-boundary negatives and a packaged unsigned Mac arm64 workflow are recorded. Signed/notarized public distribution, other operating systems/architectures and physical power-loss behavior remain unproven. The offline production build is explicitly not run in the recorded workflow because of the existing `next/font/google` boundary.
+- **Research:** the Phase 3 report says Onlook/Penpot/FigCraft fit tests were not run and REA runtime investigation was not performed. Selected upstream source was inspected; that does not establish competitor runtime behavior or private architecture.
+- **Chronological validation:** `docs/validation/PHASE-03.md` is append-only evidence. Its opening 2026-10-27 baseline and early preimplementation statements describe that earlier point in time; later dated Slice 3.1–3.3 entries supersede them for current implemented behavior. The report still concludes that the overall Phase 3 gate is incomplete.
+- **Scope:** Phase 4 board documents, Phase 5 local AI/MCP, and private cloud functionality are separate roadmap phases and are not implied by this inventory.
+
+## Decision and approval boundary
+
+Founder-approved slice implementation decisions authorize their bounded work; they do not approve the Phase 3 gate. Phase 3 remains `INCOMPLETE` until the remaining feature work, roadmap tests and required human review are complete and the founder or authorized maintainer records the gate decision. See [agent approval rules](../../AGENTS.md#6-small-vertical-slices-and-real-validation) and [roadmap execution rules](../../RoadMap.md).
