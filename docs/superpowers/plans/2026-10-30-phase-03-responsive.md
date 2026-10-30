@@ -30,10 +30,10 @@
 **Files:** site/class-tokens.ts (scope helpers/constants), typography.ts, spacing.ts, appearance.ts, layout.ts; new tests/responsive-classes.test.ts.
 **Interfaces:** EditBreakpoint enum union; scopedUtility(raw,scope) returns body only for exact selected scope (Base default), scopeUtilities(body,scope) adds the prefix to each generated companion token. Existing inspect/set helpers gain optional final scope argument default Base. Each family gets clear<PropertyFamily>Class(className,property,scope) returning the existing update union, non-Base only.
 
-- [ ] Write failing tests for all four families at md, scope insertion/all six scopes, byte preservation, stacked/state isolation, no-op, important/ambiguous refusal and invalid scope.
-- [ ] Implement minimal parser parameterization over original token ranges; do not mask/reformat unrelated source. Target utilities remain unprefixed validated bodies; raw source labels keep prefixes.
-- [ ] Write/run RED clear tests: font-size slash→scoped leading companion, leading slash→size; p/gap axes retain companions; size width→height; remove appearance/display only; no Base clear or dynamic/ambiguous rewrites. Implement family removers using existing parsed matches/ranges.
-- [ ] Run targeted helper and existing source tests, then full unit/type/lint. Commit task1.
+- [x] Write failing tests for all four families at md, scope insertion/all six scopes, byte preservation, stacked/state isolation, no-op, important/ambiguous refusal and invalid scope.
+- [x] Implement minimal parser parameterization over original token ranges; do not mask/reformat unrelated source. Target utilities remain unprefixed validated bodies; raw source labels keep prefixes.
+- [x] Write/run RED clear tests: font-size slash→scoped leading companion, leading slash→size; p/gap axes retain companions; size width→height; remove appearance/display only; no Base clear or dynamic/ambiguous rewrites. Implement family removers using existing parsed matches/ranges.
+- [x] Run targeted helper and existing source tests, then full unit/type/lint. Commit task1.
 
 ### Task2 — default breakpoint eligibility inside existing grants
 
