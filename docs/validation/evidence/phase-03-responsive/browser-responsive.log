@@ -1,0 +1,7 @@
+Evidence: allstudio-responsive-e2e-uTGz4T (local temporary trace directory)
+PASS true iframe widths auto-select exact edit scopes without source writes
+PASS guarded drafts, exact md source diff, actual rendering and scaled overlay
+PASS Clear removes only md override with source readback and rendered confirmation
+PASS scoped spacing, appearance and sizing share exact source diff and rendered confirmation
+PASS zoom modes, explicit scope override and reload preserve source
+PASS external custom breakpoint mutation refuses a scoped save and preserves source

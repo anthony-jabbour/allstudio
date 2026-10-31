@@ -1,4 +1,10 @@
-import { topLevelSeparator } from "./class-tokens.ts";
+import {
+  type EditBreakpoint,
+  isEditBreakpoint,
+  scopedUtility,
+  scopeUtilities,
+  topLevelSeparator,
+} from "./class-tokens.ts";
 
 /**
  * Static Base layout utilities. Real source writes remain in
@@ -273,7 +279,11 @@ function parseSizeSuffix(
   };
 }
 
-function token(raw: string, start: number): Token {
+function token(
+  raw: string,
+  start: number,
+  scope: EditBreakpoint = "base",
+): Token {
   const result: Token = {
     raw,
     start,
@@ -281,9 +291,10 @@ function token(raw: string, start: number): Token {
     matches: [],
     unsupported: [],
   };
-  if (topLevelSeparator(raw, ":") >= 0) return result;
-  const important = raw.startsWith("!") || raw.endsWith("!");
-  const utility = raw.replace(/^!|!$/g, "");
+  const selected = scopedUtility(raw, scope);
+  if (selected === null) return result;
+  const important = selected.startsWith("!") || selected.endsWith("!");
+  const utility = selected.replace(/^!|!$/g, "");
   if ((DISPLAY_PRESETS as readonly string[]).includes(utility)) {
     result.matches.push({
       property: "display",
@@ -414,9 +425,9 @@ function token(raw: string, start: number): Token {
   return result;
 }
 
-function tokens(className: string): Token[] {
+function tokens(className: string, scope: EditBreakpoint = "base"): Token[] {
   return [...className.matchAll(/\S+/g)].map((match) =>
-    token(match[0], match.index),
+    token(match[0], match.index, scope),
   );
 }
 
@@ -450,8 +461,12 @@ export function inspectLayoutConstraints(className: string): LayoutConstraints {
   return { width, height };
 }
 
-export function inspectLayoutClasses(className: string): LayoutSettings {
-  const parsed = className.length <= MAX_CLASS_LENGTH ? tokens(className) : [];
+export function inspectLayoutClasses(
+  className: string,
+  scope: EditBreakpoint = "base",
+): LayoutSettings {
+  const parsed =
+    className.length <= MAX_CLASS_LENGTH ? tokens(className, scope) : [];
   const hasSizeShorthand = parsed.some((item) => item.isSizeShorthand);
   const sizeTokenCount = parsed.filter((item) =>
     item.matches.some(
@@ -482,8 +497,7 @@ export function inspectLayoutClasses(className: string): LayoutSettings {
       )
         setting = {
           state: "ambiguous",
-          message:
-            "Conflicting base utilities make this property ambiguous. Resolve them in Classes first.",
+          message: `Conflicting ${scope} utilities make this property ambiguous. Resolve them in Classes first.`,
         };
       else if (matches[0])
         setting = {
@@ -501,16 +515,20 @@ export function setLayoutClass(
   className: string,
   property: LayoutProperty,
   utility: string,
+  scope: EditBreakpoint = "base",
 ): LayoutUpdate {
   const refused = (message: string): LayoutUpdate => ({
     ok: false,
     message,
   });
-  if (!(LAYOUT_PROPERTIES as readonly string[]).includes(property))
+  if (
+    !isEditBreakpoint(scope) ||
+    !(LAYOUT_PROPERTIES as readonly string[]).includes(property)
+  )
     return refused("Unknown layout property.");
   if (className.length > MAX_CLASS_LENGTH)
     return refused("The class value exceeds the supported edit size.");
-  const current = inspectLayoutClasses(className)[property];
+  const current = inspectLayoutClasses(className, scope)[property];
   if (current.state === "ambiguous" || current.state === "unsupported")
     return refused(current.message);
   const target = token(utility, 0);
@@ -525,7 +543,7 @@ export function setLayoutClass(
   if (current.state === "value" && current.value === match.value)
     return { ok: true, className };
   const edits: Array<{ start: number; end: number; value: string }> = [];
-  for (const item of tokens(className)) {
+  for (const item of tokens(className, scope)) {
     const source = item.matches.find(
       (candidate) => candidate.property === property,
     );
@@ -535,7 +553,11 @@ export function setLayoutClass(
       replacement = `${match.value} ${source.coupledHeight}`;
     else if (property === "height" && source.coupledWidth)
       replacement = `${source.coupledWidth} ${match.value}`;
-    edits.push({ start: item.start, end: item.end, value: replacement });
+    edits.push({
+      start: item.start,
+      end: item.end,
+      value: scopeUtilities(replacement, scope),
+    });
   }
   let result = className;
   for (const edit of edits.slice().reverse())
@@ -544,8 +566,43 @@ export function setLayoutClass(
     result =
       className +
       (className && !/\s$/.test(className) ? " " : "") +
-      match.value;
+      scopeUtilities(match.value, scope);
   return result.length <= MAX_CLASS_LENGTH
     ? { ok: true, className: result }
     : refused("The resulting class value exceeds the supported edit size.");
+}
+
+export function clearLayoutClass(
+  className: string,
+  property: LayoutProperty,
+  scope: EditBreakpoint,
+): LayoutUpdate {
+  if (
+    !isEditBreakpoint(scope) ||
+    scope === "base" ||
+    !(LAYOUT_PROPERTIES as readonly string[]).includes(property)
+  )
+    return {
+      ok: false,
+      message: "Choose a supported responsive property to clear.",
+    };
+  const current = inspectLayoutClasses(className, scope)[property];
+  if (current.state === "unsupported" || current.state === "ambiguous")
+    return { ok: false, message: current.message };
+  let result = className;
+  for (const item of tokens(className, scope).reverse()) {
+    const source = item.matches.find((match) => match.property === property);
+    if (!source) continue;
+    const companion =
+      property === "width" && source.coupledHeight
+        ? source.coupledHeight
+        : property === "height" && source.coupledWidth
+          ? source.coupledWidth
+          : "";
+    result =
+      result.slice(0, item.start) +
+      scopeUtilities(companion, scope) +
+      result.slice(item.end);
+  }
+  return { ok: true, className: result };
 }

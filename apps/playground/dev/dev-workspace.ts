@@ -10,9 +10,11 @@
  * expected-content hash check.
  */
 import { createHash, randomBytes } from "node:crypto";
+import { constants } from "node:fs";
 import {
   chmod,
   lstat,
+  open,
   readdir,
   readFile,
   realpath,
@@ -24,8 +26,11 @@ import { dirname, isAbsolute, join, sep } from "node:path";
 import {
   type ClassEditRequest,
   discoverAppRouterRoutes,
+  isEditBreakpoint,
   type LocateElementResult,
   type ProjectRoutesSnapshot,
+  type ResponsiveCapabilities,
+  readResponsiveMetadata,
   resolvePreviewRouteUrl,
   type SelectRouteResult,
   type SourceEditFailureReason,
@@ -43,6 +48,7 @@ import {
   editElementText,
   formatLineDiff,
   listOids,
+  validateResponsiveProject,
 } from "@allstudio/editor/source-mapper";
 
 const EDITABLE_EXTENSIONS = [".tsx", ".jsx"];
@@ -73,11 +79,14 @@ export function sha256(content: string): string {
 }
 
 /** Lexical checks only; `DevWorkspace.resolve` adds filesystem checks. */
-export function isAllowedRelativePath(path: unknown): path is string {
+export function isAllowedRelativePath(
+  path: unknown,
+  style = false,
+): path is string {
   if (typeof path !== "string" || path.length === 0) {
     return false;
   }
-  if (path.length > MAX_PATH_LENGTH || path.includes("\0")) {
+  if (path.length > (style ? 1024 : MAX_PATH_LENGTH) || path.includes("\0")) {
     return false;
   }
   if (path.includes("\\") || isAbsolute(path) || /^[a-zA-Z]:/.test(path)) {
@@ -94,7 +103,9 @@ export function isAllowedRelativePath(path: unknown): path is string {
   if (segments[0] !== SOURCE_DIRECTORY || segments.length < 2) {
     return false;
   }
-  return EDITABLE_EXTENSIONS.some((extension) => path.endsWith(extension));
+  return style
+    ? /\.css$/i.test(path)
+    : EDITABLE_EXTENSIONS.some((extension) => path.endsWith(extension));
 }
 
 export class DevWorkspace implements SourceEditWorkspace {
@@ -123,8 +134,8 @@ export class DevWorkspace implements SourceEditWorkspace {
     return new DevWorkspace(root, options);
   }
 
-  async resolve(path: unknown): Promise<ResolvedPath> {
-    if (!isAllowedRelativePath(path)) {
+  async resolve(path: unknown, style = false): Promise<ResolvedPath> {
+    if (!isAllowedRelativePath(path, style)) {
       return { ok: false, reason: "path-rejected" };
     }
     const absolute = join(this.root, ...path.split("/"));
@@ -140,7 +151,7 @@ export class DevWorkspace implements SourceEditWorkspace {
       return { ok: false, reason: "path-rejected" };
     }
     const stats = await lstat(real);
-    if (!stats.isFile()) {
+    if (!stats.isFile() || (style && stats.nlink !== 1)) {
       return { ok: false, reason: "path-rejected" };
     }
     if (stats.size > MAX_FILE_BYTES) {
@@ -242,13 +253,154 @@ export class DevWorkspace implements SourceEditWorkspace {
     );
   }
 
+  async getResponsiveCapabilities(): Promise<ResponsiveCapabilities> {
+    const readBounded = async (
+      relative: string,
+      metadata = false,
+    ): Promise<Uint8Array | null> => {
+      const absolute = join(this.root, relative);
+      try {
+        if (metadata) {
+          if ((await realpath(absolute)) !== absolute)
+            throw new Error("Symlink metadata");
+        } else {
+          const resolved = await this.resolve(relative, true);
+          if (!resolved.ok) throw new Error("Unsafe CSS");
+        }
+        const file = await open(
+          absolute,
+          constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+        );
+        try {
+          const before = await file.stat();
+          if (
+            !before.isFile() ||
+            before.nlink !== 1 ||
+            before.size > MAX_FILE_BYTES
+          )
+            throw new Error("Unsafe metadata");
+          const bytes = Buffer.alloc(before.size + 1);
+          let count = 0;
+          while (count < bytes.length) {
+            const { bytesRead } = await file.read(
+              bytes,
+              count,
+              bytes.length - count,
+              count,
+            );
+            if (!bytesRead) break;
+            count += bytesRead;
+          }
+          const after = await file.stat();
+          if (
+            count !== before.size ||
+            after.size !== before.size ||
+            after.nlink !== 1 ||
+            after.mtimeMs !== before.mtimeMs
+          )
+            throw new Error("Metadata changed");
+          return bytes.subarray(0, count);
+        } finally {
+          await file.close();
+        }
+      } catch (error) {
+        if (metadata && (error as NodeJS.ErrnoException).code === "ENOENT")
+          return null;
+        throw error;
+      }
+    };
+    const listMetadata = async (sources = false) => {
+      const paths: string[] = [];
+      let entries = 0;
+      const walk = async (relative: string, depth: number): Promise<void> => {
+        const absolute = join(this.root, relative);
+        if (depth > 32 || (await realpath(absolute)) !== absolute)
+          throw new Error("Unsafe directory");
+        for (const entry of await readdir(absolute, {
+          withFileTypes: true,
+        })) {
+          if (++entries > 10000) throw new Error("Style entry limit");
+          const path = relative ? `${relative}/${entry.name}` : entry.name;
+          if (SKIPPED_DIRECTORIES.has(entry.name)) continue;
+          if (entry.isSymbolicLink()) throw new Error("Symlink in styles");
+          if (entry.isDirectory()) {
+            if (!SKIPPED_DIRECTORIES.has(entry.name))
+              await walk(path, depth + 1);
+          } else if (
+            sources
+              ? /\.(tsx|jsx|ts|js|mjs|cjs)$/.test(entry.name)
+              : /\.(css|scss|sass|less|pcss|postcss|styl|stylus)$/i.test(
+                  entry.name,
+                ) ||
+                /^(?:postcss\.config\.|\.postcssrc|tailwind\.config\.|babel\.config\.|\.babelrc|\.swcrc$)/.test(
+                  entry.name,
+                )
+          ) {
+            const info = await lstat(join(this.root, path));
+            if (
+              !info.isFile() ||
+              info.nlink !== 1 ||
+              info.size > MAX_FILE_BYTES ||
+              path.length > 1024 ||
+              paths.length >= 1000
+            )
+              throw new Error("Unsafe style");
+            paths.push(path);
+          }
+        }
+      };
+      await walk(sources ? "src" : "", 0);
+      return paths.sort();
+    };
+    return readResponsiveMetadata({
+      listStyles: () => listMetadata(),
+      validateProject: (styles) =>
+        validateResponsiveProject(
+          {
+            listSources: () => listMetadata(true),
+            readSource: async (path) => {
+              const value = await readBounded(path, true);
+              if (!value) throw new Error("Missing module");
+              return value;
+            },
+            readConfig: (path) => readBounded(path, true),
+          },
+          styles,
+        ),
+      readRootMetadata: (path) => readBounded(path, true),
+      readCss: async (path) => {
+        const bytes = await readBounded(path);
+        if (!bytes) throw new Error("Missing CSS");
+        return bytes;
+      },
+    });
+  }
+
+  private async editScopedClass(
+    request: ClassEditRequest,
+    apply: boolean,
+  ): Promise<TextEditResult> {
+    if (!isAllowedRelativePath(request.path))
+      return sourceEditFailure("path-rejected");
+    if (request.breakpoint !== undefined) {
+      if (!isEditBreakpoint(request.breakpoint))
+        return sourceEditFailure("invalid-request");
+      if (
+        request.breakpoint !== "base" &&
+        (await this.getResponsiveCapabilities()).status !== "supported-defaults"
+      )
+        return sourceEditFailure("unsupported-breakpoints");
+    }
+    return this.edit(request.path, toClassEdit(request), apply);
+  }
+
   previewClassEdit(request: ClassEditRequest): Promise<TextEditResult> {
-    return this.edit(request.path, toClassEdit(request), false);
+    return this.editScopedClass(request, false);
   }
 
   applyClassEdit(request: ClassEditRequest): Promise<TextEditResult> {
     return this.serialized(request.path, () =>
-      this.edit(request.path, toClassEdit(request), true),
+      this.editScopedClass(request, true),
     );
   }
 

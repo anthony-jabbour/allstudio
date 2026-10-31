@@ -1,4 +1,5 @@
 import type { PreviewTypography } from "../preview-bridge/protocol.ts";
+import type { EditBreakpoint } from "../site/class-tokens.ts";
 import {
   inspectTypographyClasses,
   TYPOGRAPHY_PROPERTIES,
@@ -8,16 +9,17 @@ import {
 
 export interface TypographyTarget {
   property: TypographyProperty;
-  expectation: TypographyExpectation;
+  expectation: TypographyExpectation | { kind: "removed" };
   before: string;
 }
 export function typographyTargets(
   before: string,
   after: string,
   observed: PreviewTypography,
+  scope: EditBreakpoint = "base",
 ): { ok: true; targets: TypographyTarget[] } | { ok: false; message: string } {
-  const previous = inspectTypographyClasses(before),
-    next = inspectTypographyClasses(after);
+  const previous = inspectTypographyClasses(before, scope),
+    next = inspectTypographyClasses(after, scope);
   const targets: TypographyTarget[] = [];
   for (const property of TYPOGRAPHY_PROPERTIES) {
     const old = previous[property],
@@ -25,7 +27,10 @@ export function typographyTargets(
     const oldValue = old.state === "value" ? old.value : old.state;
     const newValue = setting.state === "value" ? setting.value : setting.state;
     if (oldValue === newValue) continue;
-    if (setting.state !== "value")
+    if (
+      setting.state !== "value" &&
+      !(scope !== "base" && setting.state === "unset" && old.state === "value")
+    )
       return {
         ok: false,
         message:
@@ -40,7 +45,8 @@ export function typographyTargets(
       };
     targets.push({
       property,
-      expectation: setting.expectation,
+      expectation:
+        setting.state === "value" ? setting.expectation : { kind: "removed" },
       before: baseline,
     });
   }
@@ -75,7 +81,8 @@ export function observesTypography(
   return targets.every(({ property, expectation, before }) => {
     const actual = observed[property];
     if (!actual || actual === before) return false;
-    if (expectation.kind === "project") return actual !== before;
+    if (expectation.kind === "removed" || expectation.kind === "project")
+      return actual !== before;
     if (expectation.kind === "color") {
       const target = srgb(expectation.value),
         rendered = srgb(actual);

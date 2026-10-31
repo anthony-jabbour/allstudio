@@ -1,4 +1,10 @@
-import { topLevelSeparator as separator } from "./class-tokens.ts";
+import {
+  type EditBreakpoint,
+  isEditBreakpoint,
+  scopedUtility,
+  scopeUtilities,
+  topLevelSeparator as separator,
+} from "./class-tokens.ts";
 import {
   normalizeHex as hex,
   parseColorUtility,
@@ -117,7 +123,11 @@ function leading(
       : { kind: "ratio", value: number },
   };
 }
-function token(raw: string, start: number): Token {
+function token(
+  raw: string,
+  start: number,
+  scope: EditBreakpoint = "base",
+): Token {
   const result: Token = {
     raw,
     start,
@@ -125,9 +135,10 @@ function token(raw: string, start: number): Token {
     matches: [],
     unsupported: [],
   };
-  if (separator(raw, ":") >= 0) return result;
-  const important = raw.startsWith("!") || raw.endsWith("!");
-  const utility = raw.replace(/^!|!$/g, "");
+  const bodyAtScope = scopedUtility(raw, scope);
+  if (bodyAtScope === null) return result;
+  const important = bodyAtScope.startsWith("!") || bodyAtScope.endsWith("!");
+  const utility = bodyAtScope.replace(/^!|!$/g, "");
   const slash = separator(utility, "/");
   const body = slash < 0 ? utility : utility.slice(0, slash),
     suffix = slash < 0 ? undefined : utility.slice(slash + 1);
@@ -214,15 +225,16 @@ function token(raw: string, start: number): Token {
     result.unsupported.push(...result.matches.map((match) => match.property));
   return result;
 }
-function tokens(className: string): Token[] {
+function tokens(className: string, scope: EditBreakpoint = "base"): Token[] {
   return [...className.matchAll(/\S+/g)].map((match) =>
-    token(match[0], match.index),
+    token(match[0], match.index, scope),
   );
 }
 export function inspectTypographyClasses(
   className: string,
+  scope: EditBreakpoint = "base",
 ): TypographySettings {
-  const parsed = className.length <= 2000 ? tokens(className) : [];
+  const parsed = className.length <= 2000 ? tokens(className, scope) : [];
   return Object.fromEntries(
     TYPOGRAPHY_PROPERTIES.map((property) => {
       const matches = parsed.flatMap((item) =>
@@ -243,8 +255,7 @@ export function inspectTypographyClasses(
       else if (new Set(matches.map((match) => match.value)).size > 1)
         setting = {
           state: "ambiguous",
-          message:
-            "Conflicting base utilities make this property ambiguous. Resolve them in Classes first.",
+          message: `Conflicting ${scope} utilities make this property ambiguous. Resolve them in Classes first.`,
         };
       else if (matches[0]) {
         const match = matches[0];
@@ -280,14 +291,20 @@ export function setTypographyClass(
   className: string,
   property: TypographyProperty,
   utility: string,
+  scope: EditBreakpoint = "base",
 ): TypographyUpdate {
   const refused = (message: string): TypographyUpdate => ({
     ok: false,
     message,
   });
+  if (
+    !isEditBreakpoint(scope) ||
+    !(TYPOGRAPHY_PROPERTIES as readonly string[]).includes(property)
+  )
+    return refused("Unsupported breakpoint or typography property.");
   if (className.length > 2000)
     return refused("The class value exceeds the supported edit size.");
-  const current = inspectTypographyClasses(className)[property];
+  const current = inspectTypographyClasses(className, scope)[property];
   if (current.state === "ambiguous" || current.state === "unsupported")
     return refused(current.message);
   const target = token(utility, 0),
@@ -306,7 +323,7 @@ export function setTypographyClass(
       "The value or unit is outside this property's supported range.",
     );
   const edits: Array<{ start: number; end: number; value: string }> = [];
-  for (const item of tokens(className)) {
+  for (const item of tokens(className, scope)) {
     const source = item.matches.find(
       (candidate) => candidate.property === property,
     );
@@ -317,7 +334,9 @@ export function setTypographyClass(
     if (property === "lineHeight" && source.coupledSize)
       replacement = `${source.coupledSize} ${match.value}`;
     if (property === "color") {
-      const oldHex = /^text-\[(#[a-f\d]+)\]/i.exec(item.raw),
+      const oldHex = /^text-\[(#[a-f\d]+)\]/i.exec(
+          scopedUtility(item.raw, scope) ?? "",
+        ),
         newHex = /^text-\[(#[a-f\d]+)\]$/i.exec(match.value);
       const oldRgb = oldHex?.[1] ? hex(oldHex[1]) : null,
         newRgb = newHex?.[1] ? hex(newHex[1]) : null;
@@ -335,7 +354,14 @@ export function setTypographyClass(
       );
       if (next?.value === source.value) replacement = item.raw;
     }
-    edits.push({ start: item.start, end: item.end, value: replacement });
+    edits.push({
+      start: item.start,
+      end: item.end,
+      value:
+        replacement === item.raw
+          ? item.raw
+          : scopeUtilities(replacement, scope),
+    });
   }
   let result = className;
   for (const edit of edits.slice().reverse())
@@ -344,8 +370,43 @@ export function setTypographyClass(
     result =
       className +
       (className && !/\s$/.test(className) ? " " : "") +
-      match.value;
+      scopeUtilities(match.value, scope);
   return result.length <= 2000
     ? { ok: true, className: result }
     : refused("The resulting class value exceeds the supported edit size.");
+}
+
+export function clearTypographyClass(
+  className: string,
+  property: TypographyProperty,
+  scope: EditBreakpoint,
+): TypographyUpdate {
+  if (
+    !isEditBreakpoint(scope) ||
+    scope === "base" ||
+    !(TYPOGRAPHY_PROPERTIES as readonly string[]).includes(property)
+  )
+    return {
+      ok: false,
+      message: "Choose a supported responsive property to clear.",
+    };
+  const current = inspectTypographyClasses(className, scope)[property];
+  if (current.state === "unsupported" || current.state === "ambiguous")
+    return { ok: false, message: current.message };
+  let result = className;
+  for (const item of tokens(className, scope).reverse()) {
+    const source = item.matches.find((match) => match.property === property);
+    if (!source) continue;
+    const companion =
+      property === "fontSize" && source.suffix !== undefined
+        ? `leading-${source.suffix}`
+        : property === "lineHeight" && source.coupledSize
+          ? source.coupledSize
+          : "";
+    result =
+      result.slice(0, item.start) +
+      scopeUtilities(companion, scope) +
+      result.slice(item.end);
+  }
+  return { ok: true, className: result };
 }

@@ -1,6 +1,6 @@
 # Phase 3.6 — bounded structural rearrange (sibling reorder)
 
-Status: PROPOSED DESIGN — `BLOCKED — FOUNDER DECISION`. No production code changed.
+Status: FOUNDER APPROVED — implementation pending.
 Date: 2026-10-30. Base: `feat/phase-03-routes`.
 
 ## Scope boundary
@@ -19,7 +19,7 @@ Sibling reorder only: move one supported static element/component instance befor
 1. Eligibility: both siblings are JSXElements with unique `data-oid` mappings, in the same `children` array, separated only by whitespace-only JSXText (no expression containers, comments, or text between them that would change meaning).
 2. Operation: swap the two element source ranges plus preserve the original inter-element whitespace; output must reparse with identical element count and sibling set. Any mismatch → refuse, source untouched.
 3. UI: layer-tree "Move up / Move down" buttons (keyboard-accessible) for eligible rows; no drag-and-drop in the first slice.
-4. Confirmation: after HMR, the rendered order of the two DOM nodes changed (bounding-rect order along parent flow axis) — otherwise saved-but-unconfirmed.
+4. Confirmation: after HMR, the source-backed DOM sibling order changed as requested, with geometry used as additional evidence for supported normal-flow layouts (rect order alone is not identity/order proof, particularly with CSS order/reverse/positioning) — otherwise saved-but-unconfirmed.
 5. Undo/redo/reopen through the existing journal; e2e proves persisted file diff on Harbor and reopen.
 
 ## RED tests
@@ -41,3 +41,8 @@ My recommendation: A first; B as a later UI-only increment on the same transform
 Blocked work: implementation of 3.6 (site/reorder.ts, layer-tree actions, requests, e2e).
 Secondary: whether reuse of a component instance (e.g. same card used in two places) must always be refused (recommended: yes).
 ```
+
+## Founder decision recorded — 2026-10-30
+
+B: both Move up/down buttons and layer drag/reorder, under the same adjacent static-sibling eligibility and source-safe transform. Drag does not expand supported structures or permit cross-parent moves.
+The current human reply supersedes the earlier recommendations/options above. No merge or phase PASS is authorized.

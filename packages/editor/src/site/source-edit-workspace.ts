@@ -4,7 +4,7 @@ import type {
   SourceLocation,
   SourceMapperError,
 } from "../source-mapper/types.ts";
-import type { DiscoveredRoute, UnsupportedRoute } from "./routes.ts";
+import type { ResponsiveCapabilities } from "./breakpoints.ts";
 
 /**
  * Runtime-neutral contract the editor UI uses to resolve and edit source.
@@ -12,7 +12,11 @@ import type { DiscoveredRoute, UnsupportedRoute } from "./routes.ts";
  * the Electron app implements it over validated IPC. The editor never
  * receives raw filesystem access.
  */
+import type { EditBreakpoint } from "./class-tokens.ts";
+import type { DiscoveredRoute, UnsupportedRoute } from "./routes.ts";
+
 export interface SourceEditWorkspace {
+  getResponsiveCapabilities?(): Promise<ResponsiveCapabilities>;
   locate(oid: string): Promise<LocateElementResult>;
   /** Computes the patch for review. Never writes. */
   previewTextEdit(request: TextEditRequest): Promise<TextEditResult>;
@@ -59,6 +63,8 @@ export interface TextEditRequest {
 }
 
 export interface ClassEditRequest {
+  /** Present only for property controls; raw class editing retains its existing behavior. */
+  breakpoint?: EditBreakpoint;
   path: string;
   oid: string;
   expectedSha256: string;
@@ -69,6 +75,7 @@ export interface ClassEditRequest {
 export type SourceEditFailureReason =
   | SourceMapperError
   | "invalid-request"
+  | "unsupported-breakpoints"
   | "unauthorized"
   | "path-rejected"
   | "file-not-found"
@@ -122,6 +129,8 @@ const FAILURE_MESSAGES: Record<SourceEditFailureReason, string> = {
   "unconfined-patch":
     "This edit would change code outside the selected element (for example by reformatting). Nothing was written.",
   "invalid-request": "The edit request was malformed.",
+  "unsupported-breakpoints":
+    "Default project breakpoints could not be validated. Scoped changes were not written; Base editing remains available.",
   unauthorized: "The workspace rejected the request.",
   "path-rejected": "That file is outside the approved workspace.",
   "file-not-found": "The source file no longer exists.",
@@ -152,6 +161,20 @@ export function sourceEditFailure(
   return { ok: false, reason, message: describeSourceEditFailure(reason) };
 }
 
+export type {
+  ResponsiveCapabilities,
+  ResponsiveMetadataReader,
+  ResponsiveRootMetadata,
+} from "./breakpoints.ts";
+export {
+  auditDefaultBreakpoints,
+  MAX_STYLE_FILE_BYTES,
+  MAX_STYLE_FILES,
+  MAX_STYLE_TOTAL_BYTES,
+  readResponsiveMetadata,
+} from "./breakpoints.ts";
+export type { EditBreakpoint } from "./class-tokens.ts";
+export { isEditBreakpoint } from "./class-tokens.ts";
 export {
   hasExactKeys,
   parseClassEditBody,

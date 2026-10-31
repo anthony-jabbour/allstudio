@@ -1,6 +1,8 @@
 import type { ProjectManifestV1 } from "@allstudio/project";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PreviewElementSnapshot } from "../preview-bridge/protocol.ts";
+import type { ResponsiveCapabilities } from "../site/breakpoints.ts";
+import type { EditBreakpoint } from "../site/class-tokens.ts";
 import {
   type DiscoveredRoute,
   describeSourceEditFailure,
@@ -35,6 +37,8 @@ import {
 } from "./typography-confirmation.ts";
 import { TypographyInspector } from "./typography-inspector.tsx";
 import { usePreviewBridge } from "./use-preview-bridge.ts";
+import { breakpointForWidth, fitScale } from "./viewport.ts";
+import { ViewportControls } from "./viewport-controls.tsx";
 
 export const EDITOR_STATUS = "text-and-class-edit-slice" as const;
 
@@ -289,6 +293,23 @@ function SourceElementEditor({
   navigatorOpen: boolean;
 }) {
   const [currentPreviewUrl, setCurrentPreviewUrl] = useState(previewUrl);
+  const [viewportWidth, setViewportWidth] = useState(1440);
+  const [scope, setScope] = useState<EditBreakpoint>("xl");
+  const [manualScope, setManualScope] = useState(false);
+  const [zoom, setZoom] = useState("1");
+  const [scale, setScale] = useState(1);
+  const [viewportHeight, setViewportHeight] = useState(800);
+  const canvas = useRef<HTMLElement | null>(null);
+  const [responsive, setResponsive] = useState<ResponsiveCapabilities>({
+    status: "unavailable",
+    reason: "read-failed",
+  });
+  const [contextVersion, setContextVersion] = useState(0);
+  const [pendingContext, setPendingContext] = useState<{
+    width: number;
+    scope: EditBreakpoint;
+    manual: boolean;
+  } | null>(null);
   const [currentRoute, setCurrentRoute] = useState(
     () => activeRoute ?? new URL(previewUrl).pathname,
   );
@@ -336,6 +357,51 @@ function SourceElementEditor({
   // success if no newer edit or selection started since that save.
   const editRun = useRef(0);
   const applying = useRef<number | null>(null);
+
+  // Re-audit when the user changes scope; writes independently recheck in the adapter.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scope is the explicit audit refresh trigger.
+  useEffect(() => {
+    let active = true;
+    setResponsive({ status: "unavailable", reason: "read-failed" });
+    void workspace
+      .getResponsiveCapabilities?.()
+      .then((result) => {
+        if (active) setResponsive(result);
+      })
+      .catch(() => {
+        if (active)
+          setResponsive({ status: "unavailable", reason: "read-failed" });
+      });
+    return () => {
+      active = false;
+    };
+  }, [workspace, scope]);
+  useEffect(() => {
+    const element = canvas.current;
+    if (!element) return;
+    const resize = () => {
+      const height = Math.max(640, window.innerHeight - 230);
+      setViewportHeight(height);
+      setScale(
+        zoom === "fit"
+          ? (fitScale(
+              viewportWidth,
+              height,
+              element.clientWidth - 56,
+              element.clientHeight - 150,
+            ) ?? 0.1)
+          : Number(zoom),
+      );
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(element);
+    window.addEventListener("resize", resize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", resize);
+    };
+  }, [viewportWidth, zoom]);
 
   const locate = useCallback(
     /**
@@ -391,6 +457,7 @@ function SourceElementEditor({
       setDiff("");
       setPending(null);
       setPendingRouteSwitch(null);
+      setPendingContext(null);
       setStatus(null);
       setSelected(element);
       if (!element) {
@@ -528,6 +595,47 @@ function SourceElementEditor({
     layoutValid,
     hasPendingRefresh: pending !== null,
   });
+  const switchContext = (
+    next: { width: number; scope: EditBreakpoint; manual: boolean },
+    discard = false,
+  ) => {
+    if (busy || pending || switchingRoute) return;
+    if (next.width === viewportWidth && next.scope === scope) {
+      setManualScope(next.manual);
+      setPendingContext(null);
+      return;
+    }
+    const styleDirty =
+      Boolean(
+        source?.className.ok && classDraft !== (source.className.value ?? ""),
+      ) ||
+      !typographyValid ||
+      !spacingValid ||
+      !appearanceValid ||
+      !layoutValid;
+    if (styleDirty && !discard) {
+      setPendingContext(next);
+      return;
+    }
+    if (discard) {
+      setClassDraft(source?.className.ok ? (source.className.value ?? "") : "");
+      setTypographyValid(true);
+      setSpacingValid(true);
+      setAppearanceValid(true);
+      setLayoutValid(true);
+    }
+    setPendingContext(null);
+    setPendingRouteSwitch(null);
+    setDiff("");
+    setViewportWidth(next.width);
+    setScope(next.scope);
+    setManualScope(next.manual);
+    setContextVersion((value) => value + 1);
+    if (selected) bridge.track(selected.oid);
+  };
+  const designEditable =
+    classEditable &&
+    (scope === "base" || responsive.status === "supported-defaults");
 
   const executeRouteSwitch = async (targetRoute: string) => {
     if (!workspace.selectRoute) {
@@ -598,7 +706,12 @@ function SourceElementEditor({
     let propertyLabel: PendingRefresh["propertyLabel"];
     if (design && apply) {
       const before = source.className.ok ? (source.className.value ?? "") : "";
-      const result = typographyTargets(before, classDraft, selected.typography);
+      const result = typographyTargets(
+        before,
+        classDraft,
+        selected.typography,
+        scope,
+      );
       if (!result.ok) {
         setStatus({ kind: "error", text: result.message });
         return;
@@ -607,6 +720,7 @@ function SourceElementEditor({
         before,
         classDraft,
         selected.spacing,
+        scope,
       );
       if (!spacingResult.ok) {
         setStatus({ kind: "error", text: spacingResult.message });
@@ -616,12 +730,18 @@ function SourceElementEditor({
         before,
         classDraft,
         selected.appearance,
+        scope,
       );
       if (!appearanceResult.ok) {
         setStatus({ kind: "error", text: appearanceResult.message });
         return;
       }
-      const layoutResult = layoutTargets(before, classDraft, selected.layout);
+      const layoutResult = layoutTargets(
+        before,
+        classDraft,
+        selected.layout,
+        scope,
+      );
       if (!layoutResult.ok) {
         setStatus({ kind: "error", text: layoutResult.message });
         return;
@@ -670,7 +790,11 @@ function SourceElementEditor({
             text: draft,
           })
         : await (apply ? workspace.applyClassEdit : workspace.previewClassEdit)(
-            { ...target, className: classDraft },
+            {
+              ...target,
+              className: classDraft,
+              ...(design ? { breakpoint: scope } : {}),
+            },
           );
     if (applying.current === run) applying.current = null;
     if (selectionAtStart !== selection.current || run !== editRun.current) {
@@ -827,35 +951,106 @@ function SourceElementEditor({
         </div>
       </aside>
       <div className="editor-workspace">
-        <section className="studio-canvas" aria-label="Canvas">
-          <div className="canvas-label">Live preview · Desktop · 1440px</div>
-          <div className="preview-pane">
-            <iframe
-              key={frameKey}
-              ref={frame}
-              className="preview-frame"
-              title="Project preview"
-              src={currentPreviewUrl}
-              sandbox="allow-scripts allow-same-origin allow-forms"
-              onLoad={bridge.handleFrameLoad}
-            />
-            {rect ? (
-              <div
-                ref={selectionBox}
-                className="selection-box"
-                aria-hidden="true"
-                style={{
-                  left: rect.x,
-                  top: rect.y,
-                  width: rect.width,
-                  height: rect.height,
-                }}
+        <section ref={canvas} className="studio-canvas" aria-label="Canvas">
+          <ViewportControls
+            width={viewportWidth}
+            scope={scope}
+            manual={manualScope}
+            zoom={zoom}
+            disabled={busy || switchingRoute || pending !== null}
+            onWidth={(width) =>
+              switchContext({
+                width,
+                scope: breakpointForWidth(width),
+                manual: false,
+              })
+            }
+            onScope={(scope) =>
+              switchContext({ width: viewportWidth, scope, manual: true })
+            }
+            onZoom={setZoom}
+          />
+          {pendingContext ? (
+            <div
+              role="alert"
+              aria-label="Unsaved responsive draft confirmation"
+              className="route-draft-confirm"
+            >
+              <p>
+                Discard the unapplied design draft before changing width or edit
+                scope? Text drafts are retained.
+              </p>
+              <button
+                type="button"
+                onClick={() => switchContext(pendingContext, true)}
+              >
+                Discard design draft
+              </button>
+              <button type="button" onClick={() => setPendingContext(null)}>
+                Keep responsive editing
+              </button>
+            </div>
+          ) : null}
+          <div className="canvas-label">
+            Live preview · {viewportWidth}px × {viewportHeight}px ·{" "}
+            {Math.round(scale * 100)}% · Edit{" "}
+            {scope === "base" ? "Base" : scope}
+          </div>
+          <div
+            className="preview-stage"
+            style={{
+              width: viewportWidth * scale,
+              height: viewportHeight * scale,
+            }}
+          >
+            <div
+              className="preview-pane"
+              style={{
+                width: viewportWidth,
+                height: viewportHeight,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <iframe
+                key={frameKey}
+                ref={frame}
+                className="preview-frame"
+                style={{ height: viewportHeight }}
+                title="Project preview"
+                src={currentPreviewUrl}
+                sandbox="allow-scripts allow-same-origin allow-forms"
+                onLoad={bridge.handleFrameLoad}
               />
-            ) : null}
+              {rect ? (
+                <div
+                  ref={selectionBox}
+                  className="selection-box"
+                  aria-hidden="true"
+                  style={{
+                    left: rect.x,
+                    top: rect.y,
+                    width: rect.width,
+                    height: rect.height,
+                  }}
+                />
+              ) : null}
+            </div>
           </div>
         </section>
         <aside className="inspector" aria-label="Selection">
           <h2>Design</h2>
+          <p className="field-note">
+            Source edit scope: {scope === "base" ? "Base" : scope}. Preview
+            width and source scope are separate. Unset values do not imply
+            inheritance.
+          </p>
+          {scope !== "base" && responsive.status !== "supported-defaults" ? (
+            <output>
+              Scoped property edits are unavailable: default project breakpoints
+              could not be validated. Base edits remain available.
+            </output>
+          ) : null}
           <p className="bridge-status">
             Preview bridge: {bridge.connected ? "connected" : "connecting…"}
             {bridge.lastRejection
@@ -888,11 +1083,12 @@ function SourceElementEditor({
             <p>Click an element in the preview to select it.</p>
           )}
           <TypographyInspector
-            key={selection.current}
+            scope={scope}
+            key={`${selection.current}-${contextVersion}`}
             className={classDraft}
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.typography ?? null}
-            disabled={!classEditable}
+            disabled={!designEditable}
             applyDisabled={!spacingValid || !appearanceValid || !layoutValid}
             onValidityChange={setTypographyValid}
             onChange={(value) => {
@@ -904,11 +1100,12 @@ function SourceElementEditor({
             onApply={() => void edit("className", true, true)}
           />
           <SpacingInspector
-            key={`spacing-${selection.current}`}
+            scope={scope}
+            key={`spacing-${selection.current}-${contextVersion}`}
             className={classDraft}
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.spacing ?? null}
-            disabled={!classEditable}
+            disabled={!designEditable}
             applyDisabled={!typographyValid || !appearanceValid || !layoutValid}
             onValidityChange={setSpacingValid}
             onChange={(value) => {
@@ -920,11 +1117,12 @@ function SourceElementEditor({
             onApply={() => void edit("className", true, true)}
           />
           <AppearanceInspector
-            key={`appearance-${selection.current}`}
+            scope={scope}
+            key={`appearance-${selection.current}-${contextVersion}`}
             className={classDraft}
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.appearance ?? null}
-            disabled={!classEditable}
+            disabled={!designEditable}
             applyDisabled={!typographyValid || !spacingValid || !layoutValid}
             onValidityChange={setAppearanceValid}
             onChange={(value) => {
@@ -936,11 +1134,12 @@ function SourceElementEditor({
             onApply={() => void edit("className", true, true)}
           />
           <LayoutInspector
-            key={`layout-${selection.current}`}
+            scope={scope}
+            key={`layout-${selection.current}-${contextVersion}`}
             className={classDraft}
             sourceKnown={Boolean(source?.className.ok)}
             rendered={selected?.layout ?? null}
-            disabled={!classEditable}
+            disabled={!designEditable}
             applyDisabled={
               !typographyValid || !spacingValid || !appearanceValid
             }

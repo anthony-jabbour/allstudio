@@ -1,0 +1,14 @@
+Evidence: allstudio-spacing-e2e-GGUE7F (local temporary trace directory)
+PASS inline padding changes exact source and actual child geometry while preserving block and responsive utilities
+PASS row, column and All gap controls preserve companion values and exact unrelated source
+PASS negative and axis/All margin controls persist real source and rendered margins
+PASS invalid spacing and typography drafts block every design Apply without source writes
+PASS All padding source edits retain lg block override and truthfully remain visually unconfirmed
+PASS block padding preserves inline shorthand companion and does not overwrite responsive behavior
+PASS an inactive block gap keeps the exact source edit and reports unconfirmed despite changed computed CSS
+PASS a mixed typography and spacing draft verifies both groups through one source patch
+PASS a no-op spacing Apply does not rewrite source
+PASS stale spacing writes refuse safely and preserve external source bytes
+PASS dynamic class expressions keep spacing disabled and static text editable
+PASS dark narrow controls preserve drafts through collapse and maintain native keyboard focus order
+12 spacing checks passed.

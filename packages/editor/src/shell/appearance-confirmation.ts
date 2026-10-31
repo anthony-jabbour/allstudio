@@ -5,11 +5,12 @@ import {
   type AppearanceProperty,
   inspectAppearanceClasses,
 } from "../site/appearance.ts";
+import type { EditBreakpoint } from "../site/class-tokens.ts";
 import { srgb } from "./typography-confirmation.ts";
 
 export interface AppearanceTarget {
   property: AppearanceProperty;
-  expectation: AppearanceExpectation;
+  expectation: AppearanceExpectation | { kind: "removed" };
   before: string;
 }
 
@@ -17,9 +18,10 @@ export function appearanceTargets(
   before: string,
   after: string,
   observed: PreviewAppearance,
+  scope: EditBreakpoint = "base",
 ): { ok: true; targets: AppearanceTarget[] } | { ok: false; message: string } {
-  const previous = inspectAppearanceClasses(before);
-  const next = inspectAppearanceClasses(after);
+  const previous = inspectAppearanceClasses(before, scope);
+  const next = inspectAppearanceClasses(after, scope);
   const targets: AppearanceTarget[] = [];
   for (const property of APPEARANCE_PROPERTIES) {
     const old = previous[property];
@@ -27,7 +29,10 @@ export function appearanceTargets(
     const oldValue = old.state === "value" ? old.value : old.state;
     const newValue = setting.state === "value" ? setting.value : setting.state;
     if (oldValue === newValue) continue;
-    if (setting.state !== "value")
+    if (
+      setting.state !== "value" &&
+      !(scope !== "base" && setting.state === "unset" && old.state === "value")
+    )
       return {
         ok: false,
         message:
@@ -42,7 +47,8 @@ export function appearanceTargets(
       };
     targets.push({
       property,
-      expectation: setting.expectation,
+      expectation:
+        setting.state === "value" ? setting.expectation : { kind: "removed" },
       before: baseline,
     });
   }
@@ -71,7 +77,8 @@ export function observesAppearance(
     if (property === "backgroundColor") {
       // An image or gradient can hide the colour; only "none" proves visibility.
       if (observed.backgroundImage !== "none") return false;
-      if (expectation.kind === "project") return true;
+      if (expectation.kind === "removed" || expectation.kind === "project")
+        return true;
       if (expectation.kind !== "color") return false;
       const target = srgb(expectation.value);
       const rendered = srgb(actual);
@@ -83,7 +90,7 @@ export function observesAppearance(
           ),
       );
     }
-    if (expectation.kind === "project") {
+    if (expectation.kind === "removed" || expectation.kind === "project") {
       // A preset still has to produce one radius; an overridden corner is unconfirmed.
       if (property === "borderRadius" && !uniformRadius(actual)) return false;
       return true;

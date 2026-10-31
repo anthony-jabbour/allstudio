@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PreviewLayout } from "../preview-bridge/protocol.ts";
+import type { EditBreakpoint } from "../site/class-tokens.ts";
 import {
+  clearLayoutClass,
   inspectLayoutClasses,
   inspectLayoutConstraints,
   LAYOUT_PRESETS,
@@ -125,6 +127,7 @@ function constraintMessage(
 }
 
 interface Props {
+  scope?: EditBreakpoint;
   className: string;
   rendered: PreviewLayout | null;
   disabled: boolean;
@@ -139,7 +142,7 @@ interface Props {
 interface FieldProps
   extends Pick<
     Props,
-    "className" | "rendered" | "disabled" | "sourceKnown" | "onChange"
+    "className" | "rendered" | "disabled" | "sourceKnown" | "onChange" | "scope"
   > {
   property: LayoutProperty;
   setting: LayoutSetting;
@@ -148,6 +151,7 @@ interface FieldProps
 }
 
 function LayoutField({
+  scope = "base",
   property,
   setting,
   constraints,
@@ -181,7 +185,7 @@ function LayoutField({
     setting.state === "unsupported" || setting.state === "ambiguous";
   const locked = disabled || unavailable || !measured || !rendered?.display;
   const change = (utility: string, source = className) => {
-    const result = setLayoutClass(source, property, utility);
+    const result = setLayoutClass(source, property, utility, scope);
     if (!result.ok) {
       setError(result.message);
       onValidity(property, false);
@@ -189,7 +193,7 @@ function LayoutField({
     }
     const next = sourceMode(
       property,
-      inspectLayoutClasses(result.className)[property],
+      inspectLayoutClasses(result.className, scope)[property],
     );
     emitted.current = `${next.mode}|${next.raw}`;
     setError(null);
@@ -227,7 +231,7 @@ function LayoutField({
                 ? "Unsupported source"
                 : setting.state === "ambiguous"
                   ? "Conflicting utilities"
-                  : "No base utility"}
+                  : `No ${scope} utility`}
           </option>
           {hasExisting && setting.state === "value" ? (
             <option value={setting.value}>Current project setting</option>
@@ -264,13 +268,33 @@ function LayoutField({
           />
         </label>
       ) : null}
+      {scope !== "base" ? (
+        <button
+          type="button"
+          aria-label={`Clear ${label} override`}
+          disabled={locked || !sourceKnown || setting.state === "unset"}
+          onClick={() => {
+            const result = clearLayoutClass(className, property, scope);
+            if (!result.ok) {
+              setError(result.message);
+              onValidity(property, false);
+              return;
+            }
+            setError(null);
+            onValidity(property, true);
+            onChange(result.className);
+          }}
+        >
+          Clear override
+        </button>
+      ) : null}
       <p className="field-note">
         Source draft:{" "}
         {sourceKnown ? (
           setting.state === "value" ? (
             <code>{setting.utility}</code>
           ) : setting.state === "unset" ? (
-            "No base utility; origin may be elsewhere"
+            `No ${scope} utility; origin may be elsewhere`
           ) : (
             setting.message
           )
@@ -300,6 +324,7 @@ function LayoutField({
 }
 
 export function LayoutInspector({
+  scope = "base",
   className,
   rendered,
   disabled,
@@ -310,7 +335,10 @@ export function LayoutInspector({
   onApply,
   onValidityChange,
 }: Props) {
-  const settings = useMemo(() => inspectLayoutClasses(className), [className]);
+  const settings = useMemo(
+    () => inspectLayoutClasses(className, scope),
+    [className, scope],
+  );
   const constraints = useMemo(
     () => inspectLayoutConstraints(className),
     [className],
@@ -334,7 +362,8 @@ export function LayoutInspector({
   return (
     <details className="layout-inspector" open>
       <summary>
-        Layout <span className="field-note">Base</span>
+        Layout{" "}
+        <span className="field-note">{scope === "base" ? "Base" : scope}</span>
       </summary>
       <section aria-label="Layout">
         <p className="field-note">
@@ -344,6 +373,7 @@ export function LayoutInspector({
         </p>
         {LAYOUT_PROPERTIES.map((property) => (
           <LayoutField
+            scope={scope}
             key={property}
             property={property}
             setting={settings[property]}

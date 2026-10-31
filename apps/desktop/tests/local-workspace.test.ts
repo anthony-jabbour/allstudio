@@ -48,6 +48,82 @@ describe("real local workspace", () => {
     await workspace?.close();
     if (directory) await rm(directory, { recursive: true, force: true });
   });
+  it("audits default breakpoints and rechecks them before scoped source edits", async () => {
+    const root = join(directory, "responsive-project");
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ devDependencies: { tailwindcss: "^4" } }),
+    );
+    await writeFile(join(root, "src/globals.css"), '@import "tailwindcss";');
+    await writeFile(join(root, "src/page.tsx"), source);
+    const current = await LocalWorkspace.open(
+      root,
+      join(directory, "files"),
+      join(directory, "responsive-recovery"),
+    );
+    try {
+      expect(await current.getResponsiveCapabilities()).toEqual({
+        status: "supported-defaults",
+      });
+      const oid = preparePreviewSource(join(root, "src/page.tsx"), source)
+        .injectedOids[1]!;
+      const located = await current.locate(oid);
+      if (!located.ok) throw new Error(located.reason);
+      const request = {
+        path: "src/page.tsx",
+        oid,
+        expectedSha256: located.element.sha256,
+        className: "old md:text-xl",
+        breakpoint: "md" as const,
+      };
+      expect((await current.previewClassEdit(request)).ok).toBe(true);
+      // Repeated audits must not consume the persistent grant's directory offset.
+      expect((await current.getResponsiveCapabilities()).status).toBe(
+        "supported-defaults",
+      );
+      for (const [path, content] of [
+        ["theme.css", "@theme{--breakpoint-md:900px}"],
+        [".postcssrc.json", '{"plugins":{"custom":{}}}'],
+      ]) {
+        await writeFile(join(root, path), content);
+        expect((await current.getResponsiveCapabilities()).status).toBe(
+          "unsupported",
+        );
+        expect(await current.applyClassEdit(request)).toMatchObject({
+          ok: false,
+          reason: "unsupported-breakpoints",
+        });
+        await rm(join(root, path));
+      }
+      await writeFile(
+        join(root, "src/page.tsx"),
+        'import "../../outside.css";\n' + source,
+      );
+      expect((await current.getResponsiveCapabilities()).status).toBe(
+        "unsupported",
+      );
+      await writeFile(join(root, "src/page.tsx"), source);
+      expect(await readFile(join(root, "src/page.tsx"), "utf8")).toBe(source);
+      await writeFile(
+        join(root, "src/globals.css"),
+        '@import "tailwindcss"; @theme{--breakpoint-md:900px} /*private-marker*/',
+      );
+      const caps = await current.getResponsiveCapabilities();
+      expect(caps.status).toBe("unsupported");
+      expect(JSON.stringify(caps)).not.toContain("private-marker");
+      expect(await current.applyClassEdit(request)).toMatchObject({
+        ok: false,
+        reason: "unsupported-breakpoints",
+      });
+      expect(await readFile(join(root, "src/page.tsx"), "utf8")).toBe(source);
+      expect(
+        (await current.applyClassEdit({ ...request, breakpoint: "base" })).ok,
+      ).toBe(true);
+    } finally {
+      await current.close();
+    }
+  });
   it("locates preview IDs and edits original source without persisting attributes", async () => {
     const preview = preparePreviewSource(
       join(workspace.root, "src/page.tsx"),

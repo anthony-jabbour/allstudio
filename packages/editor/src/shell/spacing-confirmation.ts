@@ -1,4 +1,5 @@
 import type { PreviewSpacing } from "../preview-bridge/protocol.ts";
+import type { EditBreakpoint } from "../site/class-tokens.ts";
 import {
   inspectSpacingClasses,
   type SpacingExpectation,
@@ -7,7 +8,7 @@ import {
 
 export interface SpacingTarget {
   key: keyof PreviewSpacing;
-  expectation: SpacingExpectation;
+  expectation: SpacingExpectation | { kind: "removed" };
   before: string;
 }
 const AXES: ReadonlyArray<
@@ -24,9 +25,10 @@ export function spacingTargets(
   beforeClass: string,
   afterClass: string,
   measured: PreviewSpacing,
+  scope: EditBreakpoint = "base",
 ): { ok: true; targets: SpacingTarget[] } | { ok: false; message: string } {
-  const before = inspectSpacingClasses(beforeClass),
-    after = inspectSpacingClasses(afterClass);
+  const before = inspectSpacingClasses(beforeClass, scope),
+    after = inspectSpacingClasses(afterClass, scope);
   const targets: SpacingTarget[] = [];
   for (const [property, keys] of AXES) {
     const old = before[property],
@@ -43,7 +45,10 @@ export function spacingTargets(
       old.state === next.state
     )
       continue;
-    if (next.state !== "value")
+    if (
+      next.state !== "value" &&
+      !(scope !== "base" && next.state === "unset" && old.state === "value")
+    )
       return {
         ok: false,
         message:
@@ -57,7 +62,12 @@ export function spacingTargets(
           message:
             "Spacing measurement is unavailable. Reselect the element before applying.",
         };
-      targets.push({ key, expectation: next.expectation, before: value });
+      targets.push({
+        key,
+        expectation:
+          next.state === "value" ? next.expectation : { kind: "removed" },
+        before: value,
+      });
     }
   }
   return { ok: true, targets };
@@ -89,7 +99,8 @@ export function observesSpacing(
       return false;
     const actual = observed[key];
     if (!actual || actual === before) return false;
-    if (expectation.kind === "project") return true;
+    if (expectation.kind === "removed" || expectation.kind === "project")
+      return true;
     const px = /^(-?\d+(?:\.\d+)?)px$/.exec(actual);
     return Boolean(
       px?.[1] && Math.abs(Number(px[1]) - expectation.value) < 0.02,

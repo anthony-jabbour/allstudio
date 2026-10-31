@@ -1,4 +1,10 @@
-import { topLevelSeparator } from "./class-tokens.ts";
+import {
+  type EditBreakpoint,
+  isEditBreakpoint,
+  scopedUtility,
+  scopeUtilities,
+  topLevelSeparator,
+} from "./class-tokens.ts";
 import {
   type ColorExpectation,
   normalizeHex,
@@ -110,7 +116,11 @@ function radius(
   };
 }
 
-function token(raw: string, start: number): Token {
+function token(
+  raw: string,
+  start: number,
+  scope: EditBreakpoint = "base",
+): Token {
   const result: Token = {
     raw,
     start,
@@ -118,9 +128,10 @@ function token(raw: string, start: number): Token {
     matches: [],
     unsupported: [],
   };
-  if (topLevelSeparator(raw, ":") >= 0) return result;
-  const important = raw.startsWith("!") || raw.endsWith("!");
-  const utility = raw.replace(/^!|!$/g, "");
+  const selected = scopedUtility(raw, scope);
+  if (selected === null) return result;
+  const important = selected.startsWith("!") || selected.endsWith("!");
+  const utility = selected.replace(/^!|!$/g, "");
   const slash = topLevelSeparator(utility, "/");
   const body = slash < 0 ? utility : utility.slice(0, slash);
   const suffix = slash < 0 ? undefined : utility.slice(slash + 1);
@@ -149,16 +160,18 @@ function token(raw: string, start: number): Token {
   return result;
 }
 
-function tokens(className: string): Token[] {
+function tokens(className: string, scope: EditBreakpoint = "base"): Token[] {
   return [...className.matchAll(/\S+/g)].map((match) =>
-    token(match[0], match.index),
+    token(match[0], match.index, scope),
   );
 }
 
 export function inspectAppearanceClasses(
   className: string,
+  scope: EditBreakpoint = "base",
 ): AppearanceSettings {
-  const parsed = className.length <= MAX_CLASS_LENGTH ? tokens(className) : [];
+  const parsed =
+    className.length <= MAX_CLASS_LENGTH ? tokens(className, scope) : [];
   return Object.fromEntries(
     APPEARANCE_PROPERTIES.map((property) => {
       const matches = parsed.flatMap((item) =>
@@ -179,8 +192,7 @@ export function inspectAppearanceClasses(
       else if (new Set(matches.map((match) => match.value)).size > 1)
         setting = {
           state: "ambiguous",
-          message:
-            "Conflicting base utilities make this property ambiguous. Resolve them in Classes first.",
+          message: `Conflicting ${scope} utilities make this property ambiguous. Resolve them in Classes first.`,
         };
       else if (matches[0])
         setting = {
@@ -198,16 +210,20 @@ export function setAppearanceClass(
   className: string,
   property: AppearanceProperty,
   utility: string,
+  scope: EditBreakpoint = "base",
 ): AppearanceUpdate {
   const refused = (message: string): AppearanceUpdate => ({
     ok: false,
     message,
   });
-  if (!(APPEARANCE_PROPERTIES as readonly string[]).includes(property))
+  if (
+    !isEditBreakpoint(scope) ||
+    !(APPEARANCE_PROPERTIES as readonly string[]).includes(property)
+  )
     return refused("Unknown appearance property.");
   if (className.length > MAX_CLASS_LENGTH)
     return refused("The class value exceeds the supported edit size.");
-  const current = inspectAppearanceClasses(className)[property];
+  const current = inspectAppearanceClasses(className, scope)[property];
   if (current.state === "ambiguous" || current.state === "unsupported")
     return refused(current.message);
   const target = token(utility, 0);
@@ -223,14 +239,16 @@ export function setAppearanceClass(
   if (current.state === "value" && current.value === match.value)
     return { ok: true, className };
   const edits: Array<{ start: number; end: number; value: string }> = [];
-  for (const item of tokens(className)) {
+  for (const item of tokens(className, scope)) {
     const source = item.matches.find(
       (candidate) => candidate.property === property,
     );
     if (!source) continue;
     let replacement = match.value;
     if (property === "backgroundColor") {
-      const oldHex = /^bg-\[(#[a-f\d]+)\]/i.exec(item.raw);
+      const oldHex = /^bg-\[(#[a-f\d]+)\]/i.exec(
+        scopedUtility(item.raw, scope) ?? "",
+      );
       const newHex = /^bg-\[(#[a-f\d]+)\]$/i.exec(match.value);
       const oldRgb = oldHex?.[1] ? normalizeHex(oldHex[1]) : null;
       const newRgb = newHex?.[1] ? normalizeHex(newHex[1]) : null;
@@ -248,7 +266,14 @@ export function setAppearanceClass(
       );
       if (next?.value === source.value) replacement = item.raw;
     }
-    edits.push({ start: item.start, end: item.end, value: replacement });
+    edits.push({
+      start: item.start,
+      end: item.end,
+      value:
+        replacement === item.raw
+          ? item.raw
+          : scopeUtilities(replacement, scope),
+    });
   }
   let result = className;
   for (const edit of edits.slice().reverse())
@@ -257,8 +282,33 @@ export function setAppearanceClass(
     result =
       className +
       (className && !/\s$/.test(className) ? " " : "") +
-      match.value;
+      scopeUtilities(match.value, scope);
   return result.length <= MAX_CLASS_LENGTH
     ? { ok: true, className: result }
     : refused("The resulting class value exceeds the supported edit size.");
+}
+
+export function clearAppearanceClass(
+  className: string,
+  property: AppearanceProperty,
+  scope: EditBreakpoint,
+): AppearanceUpdate {
+  if (
+    !isEditBreakpoint(scope) ||
+    scope === "base" ||
+    !(APPEARANCE_PROPERTIES as readonly string[]).includes(property)
+  )
+    return {
+      ok: false,
+      message: "Choose a supported responsive property to clear.",
+    };
+  const current = inspectAppearanceClasses(className, scope)[property];
+  if (current.state === "unsupported" || current.state === "ambiguous")
+    return { ok: false, message: current.message };
+  let result = className;
+  for (const item of tokens(className, scope).reverse()) {
+    if (item.matches.some((match) => match.property === property))
+      result = result.slice(0, item.start) + result.slice(item.end);
+  }
+  return { ok: true, className: result };
 }

@@ -41,6 +41,9 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await expect(tree.getByRole("treeitem").first()).toBeVisible();
 
   const rootPageBtn = pagesList.locator('button.page-item[data-route="/"]');

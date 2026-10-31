@@ -15,9 +15,11 @@ export type {
 export type {
   ClassEditRequest,
   DiscoveredRoute,
+  EditBreakpoint,
   LocateElementResult,
   ProjectRoutesSnapshot,
   ResolvePreviewRouteUrlResult,
+  ResponsiveCapabilities,
   SelectRouteRequest,
   SelectRouteResult,
   SelectRouteSuccess,

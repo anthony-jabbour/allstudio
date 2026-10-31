@@ -471,3 +471,66 @@ No Electron main/preload/IPC/path grant/atomic write/history/recovery code chang
 ### 9.3 Remaining Open Items for Phase 3
 
 Responsive viewport/breakpoint controls (3.5), bounded structural edits (3.6), project-owned assets (3.7), unfamiliar-user sessions, and assistive-technology validation remain open. Phase 3 remains `INCOMPLETE`.
+
+## Resume audit — 2026-10-30
+
+Verified main24cbd6d and draft PR21/22 heads814f456/7eeec3c against origin; both have quality and Electron SUCCESS. Fresh lint, seven-workspace typecheck,668Vitest tests/25files and public-boundary validation passed. No new browser/native run is claimed from this static refresh. See `docs/research/phase-03-resume-audit.md` for source findings and corrections to the proposed3.5–3.7 designs. Founder choices are pending; no product code, permission/grant, dependency, cloud file, merge or phase PASS changed.
+
+
+## Slice 3.5 checkpoint — scoped source transforms and breakpoint audit (2026-10-30)
+
+Status: IN PROGRESS. Branch `feat/phase-03-responsive`, based on routes `7eeec3c`. Founder approved automatic scopes with override, Clear, true viewport widths/zoom, and bounded read-only CSS/config metadata auditing within the existing grant.
+
+Exact-scope transforms and companion-preserving removal are committed at `01f0c53`. The metadata adapter now rechecks eligibility on each non-Base property preview/apply. An external custom breakpoint mutation refuses the source write; Base/manual edits retain existing behavior. IPC and HTTP return fixed eligibility/reason only. CSS listing/reads reject alternate roots, writes, symlinks, hardlinks, oversized files and invalid bytes. No dependency, grant or Electron permission added.
+
+Executed evidence:
+- `bun run test apps/playground/tests/dev-workspace.test.ts`: RED (2 missing-method failures), then GREEN 40 tests. Actual temp project bytes checked after refused scoped save and permitted Base save.
+- `bun run test apps/playground/tests/workspace-api.test.ts`: RED (new action rejected), then GREEN 37 tests; unknown fields, foreign origin and invalid token refused.
+- `bun run test`: 787 tests / 30 files passed, including native helper compilation with warnings-as-errors and original native regressions.
+- `bun run typecheck`: all seven workspaces passed.
+- `bun run lint`: passed after formatting (four non-null assertions in tests remain warnings).
+- `bun run validate:public-boundary`: passed, 398 files.
+
+This checkpoint does not demonstrate the responsive UI, zoom geometry, new desktop IPC interaction, packaged persistence or the Phase 3 gate. Those remain unverified until the integrated slice runs. No human usability/accessibility gate is claimed.
+
+
+## Slice 3.5 integrated browser and native checkpoint (2026-10-31)
+
+Status: IN PROGRESS; no phase PASS or merge authorized. Fresh remote check: main `24cbd6d`, routes `7eeec3c`; responsive branch remains based on routes. Founder preapproved remaining Phase3 implementation decisions, including 3.6 buttons plus adjacent layer drag and 3.7 metadata plus asset association.
+
+Implemented and observed: actual390/768/1024/1440 viewport presets, custom320–2560, automatic scope with explicit override, Fit/50/75/100 scaling, scoped controls across all four inspector families, companion-preserving Clear and draft-safe width/scope transitions. Shared transformed iframe/selection geometry was measured to within1.1 CSS px. Scoped source diffs and computed rendering were checked; external custom breakpoint mutation refused a save without changing JSX. The protocol remainsv7: viewport geometry uses the existing local coordinate contract.
+
+Independent static review found one Important eligibility defect: auditing unused default CSS alone did not establish the active source/build inputs. Added bounded read-only source-module inspection, static import/build-config validation and project-root style/config metadata refusal. RED missing-validator tests and root .postcssrc tests became GREEN; full792 Vitest tests/32 files passed. Unknown aliases, dynamic imports, loaders and executable configuration fail closed. No new dependency, grant, Electron permission or cloud capability. The new read operations are restricted to source-module audit under src and never returned to the renderer.
+
+Executed fresh serial browser matrix:
+- `node scripts/e2e/responsive.e2e.mjs`: six scenario groups passed, including all four property families, exact source bytes, Clear, inactive source scopes, reload, scaled selection and external-theme refusal.
+- `NODE_PATH=node_modules/.bun/playwright@1.64.1/node_modules node scripts/e2e/text-edit.e2e.mjs`:34 checks passed.
+- `node scripts/e2e/layers.e2e.mjs`:13 checks passed.
+- `node scripts/e2e/typography.e2e.mjs`:10 checks passed.
+- `node scripts/e2e/spacing.e2e.mjs`:12 checks passed.
+- `node scripts/e2e/appearance.e2e.mjs`:10 checks passed.
+- `node scripts/e2e/layout.e2e.mjs`:15 checks passed.
+- `node scripts/e2e/routes.e2e.mjs`:7 checks passed.
+
+Existing design harnesses explicitly select Base to preserve their original assertions under the newly approved initial Desktop/xl default. The text harness scrolls its target before measuring its click point. Early attempts interrupted by development-server HMR/restart were not counted as passes; a fresh reset and frozen production code produced the matrix above. The original playground workspace is preserved at `/tmp/allstudio-responsive-preserved-workspace-20261030`.
+
+`bun run test:desktop`:6 checks passed, including wrong-WebContents denial for the new capability IPC. The original exact API-surface assertion was updated for the approved new method after an observed failure. `bun run test:local`:37 checks passed, including real scoped typography/spacing/appearance/sizing, exact source diff, undo/redo, full Electron quit/reopen and computed values. Evidence: `apps/desktop/dist/local-workflow-fkc2vM`. An initial local run correctly rejected the executable consent probe left in test config. The repaired harness first verifies that rejection, then closes the project, restores the static fixture configuration and reopens before testing scoped writes.
+
+`bun run typecheck` passed all seven workspaces; `bun run build`, `bun run build:desktop`, `bun run package:desktop` passed. `bun run lint` passed with four test non-null warnings and two template-style informational notes; `bun run validate:public-boundary` passed408 files. No claim of offline production Google-font build success.
+
+Review minor deferred: Fit reserves150px for chrome instead of measuring wrapped controls, so unusually narrow canvases may retain vertical scrolling. Eligibility is deliberately restrictive and is not a multi-file atomic snapshot. Human usability/assistive-technology validation and the unavailable direct subframe IPC probe remain unvalidated. General preview isolation and wrong-WebContents checks passed.
+
+Committed evidence is under `docs/validation/evidence/phase-03-responsive/`: actual generated before/after source text, unified diff, browser screenshot, per-suite logs and the executed Tailwind4.3.3 unused-breakpoint compiler probe. Full traces remain in their local harness evidence directories.
+
+
+### Slice3.5 final executed delivery evidence (2026-10-31)
+
+Additional native regressions completed serially: `ALLSTUDIO_FIXTURE=nested-components-fixture bun run test:local`23 checks; `ALLSTUDIO_FIXTURE=tailwind-variants-fixture bun run test:local`23 checks. Packaged `desktop.e2e.mjs`6 checks passed. Packaged `local-workflow.e2e.mjs <allstudio executable> --offline` diagnostic retry37 checks passed with browser HTTP disabled, OS preview-child egress denied, source edits/undo/redo/recovery/restart and the new scoped4-family workflow verified. Evidence directories: `apps/desktop/dist/local-workflow-sFQFhc`, `local-workflow-4SC3SM`, `local-workflow-Mnm7nw`.
+
+The first packaged offline attempt failed during layout confirmation and target/window closure (`local-workflow-pseihc`). The cause remains unexplained. Bounded process diagnostics were added; a single diagnostic retry passed. No product timeout/security relaxation was made. The failed attempt is not counted as a pass.
+
+An additional read-only packaged offline reopen verified current breakpoint eligibility, selected source, enabled md font-size control at28px and unchanged source; screenshot `native-offline-reopened.png`. The full workflow now includes the same readiness assertions before its final screenshot. Earlier `native-reopened.png` captured loading/no-selection and is not treated as proof of enabled controls.
+
+Remaining limits: direct subframe IPC probe unavailable; offline production next/font/google build NOT RUN; unfamiliar-user/assistive-technology gate pending; restrictive static configuration support; narrow Fit chrome allowance minor deferred. Slice3.5 recommendation: READY FOR REVIEW with these limits and the unexplained initial closure disclosed. Phase3 remains IN PROGRESS. Next approved slice:3.6 adjacent static sibling buttons and layer drag, then3.7 bounded public asset metadata/source association.
+
+Delivery: Slice3.5 draft [PR #23](https://github.com/anthony-jabbour/allstudio/pull/23), stacked on routes #22. Implementation/evidence head `989b3b19e3e328219444d56524da0085be2d0634`. No merge or phase PASS.

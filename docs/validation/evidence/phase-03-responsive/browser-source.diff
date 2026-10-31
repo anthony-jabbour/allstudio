@@ -1,0 +1,11 @@
+--- before.tsx
++++ md-design-after.tsx
+@@ -6,7 +6,7 @@
+       </p>
+       <h1
+         id="hero-heading"
+-        className="max-w-xl text-5xl leading-tight font-semibold tracking-tight text-zinc-950" data-oid="v2dc.df"
++        className="max-w-xl text-5xl leading-tight font-semibold tracking-tight text-zinc-950 md:px-4 md:bg-[#112233] md:w-[300px]" data-oid="v2dc.df"
+       >
+         Aurora Atelier
+       </h1>

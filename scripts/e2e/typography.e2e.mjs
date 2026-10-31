@@ -27,6 +27,9 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await preview.locator("h1").click();
   await expect(page.getByTestId("source-location")).toBeVisible();
   const typography = page.getByRole("region", {
@@ -232,6 +235,9 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
+    await page
+      .getByLabel("Edit breakpoint", { exact: true })
+      .selectOption("base");
     await preview.locator("h1").click();
     await expect
       .poll(() =>
@@ -276,6 +282,9 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await preview.locator("h1").click();
   await expect
     .poll(() =>
@@ -299,6 +308,9 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await preview.locator("#harbor-secondary").click();
   await expect(
     page.getByText("className is an expression", { exact: false }),

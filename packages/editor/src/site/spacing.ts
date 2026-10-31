@@ -1,4 +1,9 @@
-import { topLevelSeparator } from "./class-tokens.ts";
+import {
+  type EditBreakpoint,
+  isEditBreakpoint,
+  scopedUtility,
+  scopeUtilities,
+} from "./class-tokens.ts";
 
 export const SPACING_PROPERTIES = [
   "padding",
@@ -160,14 +165,15 @@ function parseValue(
   };
 }
 
-function parse(className: string) {
+function parse(className: string, scope: EditBreakpoint = "base") {
   const entries: Entry[] = [];
   const errors = new Map<Family, string>();
   for (const match of className.matchAll(/\S+/g)) {
     const raw = match[0];
-    if (topLevelSeparator(raw, ":") >= 0) continue;
-    const important = raw.startsWith("!") || raw.endsWith("!");
-    const utility = raw.replace(/^!|!$/g, "");
+    const selected = scopedUtility(raw, scope);
+    if (selected === null) continue;
+    const important = selected.startsWith("!") || selected.endsWith("!");
+    const utility = selected.replace(/^!|!$/g, "");
     const part = /^(-?)(gap-x|gap-y|gap|px|py|p|mx|my|m)-(.+)$/.exec(utility);
     if (part?.[2] && part[3]) {
       const prefix = part[2],
@@ -256,8 +262,11 @@ function parse(className: string) {
   return { entries, errors };
 }
 
-export function inspectSpacingClasses(className: string): SpacingSettings {
-  const { entries, errors } = parse(className);
+export function inspectSpacingClasses(
+  className: string,
+  scope: EditBreakpoint = "base",
+): SpacingSettings {
+  const { entries, errors } = parse(className, scope);
   const result = {} as SpacingSettings;
   for (const property of SPACING_PROPERTIES) {
     const family = familyOf(property),
@@ -305,16 +314,20 @@ export function setSpacingClass(
   className: string,
   property: SpacingProperty,
   utility: string,
+  scope: EditBreakpoint = "base",
 ): { ok: true; className: string } | { ok: false; message: string } {
   const refuse = (message: string): { ok: false; message: string } => ({
     ok: false,
     message,
   });
-  if (!(SPACING_PROPERTIES as readonly string[]).includes(property))
+  if (
+    !isEditBreakpoint(scope) ||
+    !(SPACING_PROPERTIES as readonly string[]).includes(property)
+  )
     return refuse("Unknown spacing property.");
   const family = familyOf(property),
     axis = axisOf(property),
-    current = parse(className);
+    current = parse(className, scope);
   const error = current.errors.get(family);
   if (error) return refuse(error);
   const target = parse(utility);
@@ -356,14 +369,61 @@ export function setSpacingClass(
       const [, inline, block] = GROUPS[family];
       replacement = `${format(inline, axis === 0 ? wanted.value : item.value)} ${format(block, axis === 1 ? wanted.value : item.value)}`;
     }
-    edits.push({ start: item.start, end: item.end, value: replacement });
+    edits.push({
+      start: item.start,
+      end: item.end,
+      value: scopeUtilities(replacement, scope),
+    });
   }
   let result = className;
   for (const edit of edits.slice().reverse())
     result = result.slice(0, edit.start) + edit.value + result.slice(edit.end);
   if (!edits.length)
-    result += `${className && !/\s$/.test(className) ? " " : ""}${format(property, wanted.value)}`;
+    result += `${className && !/\s$/.test(className) ? " " : ""}${scopeUtilities(format(property, wanted.value), scope)}`;
   return result.length <= 2000
     ? { ok: true, className: result }
     : refuse("The resulting class value exceeds the supported edit size.");
+}
+
+export function clearSpacingClass(
+  className: string,
+  property: SpacingProperty,
+  scope: EditBreakpoint,
+): { ok: true; className: string } | { ok: false; message: string } {
+  if (
+    !isEditBreakpoint(scope) ||
+    scope === "base" ||
+    !(SPACING_PROPERTIES as readonly string[]).includes(property)
+  )
+    return {
+      ok: false,
+      message: "Choose a supported responsive property to clear.",
+    };
+  const parsed = parse(className, scope),
+    family = familyOf(property),
+    axis = axisOf(property);
+  const error = parsed.errors.get(family);
+  if (error) return { ok: false, message: error };
+  let result = className;
+  for (const item of parsed.entries.slice().reverse()) {
+    if (
+      item.family !== family ||
+      (axis !== "all" && item.axis !== "all" && item.axis !== axis)
+    )
+      continue;
+    const companion =
+      axis !== "all" && item.axis === "all"
+        ? format(GROUPS[family][axis === 0 ? 2 : 1], item.value)
+        : "";
+    result =
+      result.slice(0, item.start) +
+      scopeUtilities(companion, scope) +
+      result.slice(item.end);
+  }
+  return result.length <= 2000
+    ? { ok: true, className: result }
+    : {
+        ok: false,
+        message: "The resulting class value exceeds the supported edit size.",
+      };
 }

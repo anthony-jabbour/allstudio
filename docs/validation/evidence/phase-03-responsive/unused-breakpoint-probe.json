@@ -1,0 +1,9 @@
+{
+  "version": "4.3.3",
+  "candidates": ["block"],
+  "defaultMd": "48rem",
+  "customMd": "900px",
+  "equalCss": true,
+  "defaultCss": "/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */\n.block {\n  display: block;\n}\n",
+  "customCss": "/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */\n.block {\n  display: block;\n}\n"
+}

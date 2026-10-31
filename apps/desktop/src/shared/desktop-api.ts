@@ -28,6 +28,7 @@ export interface DesktopApi {
     request: ClassEditRequest,
   ): Promise<TextEditResult>;
   selectRoute(projectId: string, route: string): Promise<SelectRouteResult>;
+  getResponsiveCapabilities(projectId: string): Promise<ResponsiveCapabilities>;
   undo(projectId: string): Promise<TextEditResult>;
   redo(projectId: string): Promise<TextEditResult>;
   onChange(callback: (message: string) => void): () => void;
@@ -39,6 +40,7 @@ import type {
   ClassEditRequest,
   DiscoveredRoute,
   LocateElementResult,
+  ResponsiveCapabilities,
   SelectRouteResult,
   TextEditRequest,
   TextEditResult,

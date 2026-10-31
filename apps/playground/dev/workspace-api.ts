@@ -12,6 +12,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
+  hasExactKeys,
   parseClassEditBody,
   parseLocateBody,
   parseSelectRouteBody,
@@ -131,6 +132,14 @@ export function createWorkspaceApiMiddleware(options: WorkspaceApiOptions) {
         return;
       }
       const body = await readJson(req);
+      if (action === "responsive-capabilities") {
+        if (!hasExactKeys(body, [])) {
+          fail(res, "invalid-request");
+          return;
+        }
+        send(res, 200, await workspace.getResponsiveCapabilities());
+        return;
+      }
       if (action === "locate") {
         const parsed = parseLocateBody(body);
         if (!parsed) {

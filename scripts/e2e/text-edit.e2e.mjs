@@ -99,6 +99,7 @@ async function select(locator, expectedLocation) {
   for (let attempt = 0; ; attempt += 1) {
     try {
       await locator.waitFor();
+      await locator.scrollIntoViewIfNeeded();
       const oid = await locator.getAttribute("data-oid");
       const position = await ownPoint(locator);
       assert.ok(position, "element has a clickable spot of its own");

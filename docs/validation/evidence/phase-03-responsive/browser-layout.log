@@ -1,0 +1,17 @@
+Evidence: allstudio-layout-e2e-qrFs1Z (local temporary trace directory)
+PASS Harbor #hero gridRows preview and apply confirm 2 rendered tracks and preserve responsive utilities
+PASS unconstrained 800px width under max-w-5xl updates source, computed width and bounding-box geometry while preserving max-w-5xl
+PASS constrained 1200px width clamped by max-w-5xl at 1024px preserves max-w-5xl and truthfully reports rendering unconfirmed
+PASS Base grid-cols-3 under active md:grid-cols-2 at 1440px preserves md:grid-cols-2 and reports rendering unconfirmed
+PASS inactive flex-col edit on a grid container saves source and truthfully reports rendering unconfirmed
+PASS multi-child flex container updates flexDirection, justifyContent and alignItems, preserves flex-wrap gap-3, and moves #harbor-secondary below #harbor-cta
+PASS editing width on size-20 splits shorthand into w-[220px] h-20 and preserves 80px companion height
+PASS mixed size-20 w-40 conflicts and unsupported grid-cols-subgrid tokens fail closed in the inspector
+PASS invalid layout px drafts block all four design Apply buttons without writing source
+PASS manual class draft A/B/A changes resynchronize the layout inspector without stale values
+PASS unchanged layout Apply is a no-op and preserves inode/mtime
+PASS mixed typography and layout draft confirms both groups through a single source patch
+PASS stale layout writes refuse safely and preserve external source bytes
+PASS dynamic class expressions disable layout controls while static text remains editable
+PASS dark narrow layout controls preserve drafts through collapse and maintain native keyboard focus order
+15 layout checks passed.

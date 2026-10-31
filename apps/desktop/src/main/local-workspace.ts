@@ -5,8 +5,11 @@ import { join } from "node:path";
 import {
   type ClassEditRequest,
   discoverAppRouterRoutes,
+  isEditBreakpoint,
   type LocateElementResult,
   type ProjectRoutesSnapshot,
+  type ResponsiveCapabilities,
+  readResponsiveMetadata,
   resolvePreviewRouteUrl,
   type SelectRouteResult,
   type SourceEditFailure,
@@ -24,7 +27,9 @@ import {
   formatLineDiff,
   listOids,
   type SourceLocation,
+  validateResponsiveProject,
 } from "@allstudio/editor/source-mapper";
+import { planIntegration } from "./config-integration.ts";
 import { durableJson, syncDirectory } from "./durable-json.ts";
 import { FileFailure, NativeFiles } from "./native-files.ts";
 import {
@@ -249,6 +254,47 @@ export class LocalWorkspace implements SourceEditWorkspace {
     return discoverAppRouterRoutes(paths);
   }
 
+  async getResponsiveCapabilities(): Promise<ResponsiveCapabilities> {
+    const readMetadata = async (path: string): Promise<Buffer | null> => {
+      try {
+        return (await this.files.read(path)).bytes;
+      } catch (error) {
+        if (error instanceof FileFailure && error.reason === "file-not-found")
+          return null;
+        throw error;
+      }
+    };
+    return readResponsiveMetadata({
+      validateProject: (styles) =>
+        validateResponsiveProject(
+          {
+            listSources: () => this.files.listAuditSources(),
+            readSource: async (path) =>
+              (await this.files.readAuditSource(path)).bytes,
+            readConfig: async (path) => {
+              const bytes = await readMetadata(path);
+              if (
+                path.startsWith("next.") &&
+                bytes
+                  ?.toString()
+                  .startsWith("// allstudio preview integration v1")
+              ) {
+                const plan = await planIntegration(this.files);
+                if (!plan.installed)
+                  throw new Error("Unrecognized preview configuration");
+                return plan.backup ? readMetadata(plan.backup) : null;
+              }
+              return bytes;
+            },
+          },
+          styles,
+        ),
+      listStyles: () => this.files.listStyles(),
+      readCss: async (path) => (await this.files.readCss(path)).bytes,
+      readRootMetadata: readMetadata,
+    });
+  }
+
   async selectRoute(
     basePreviewUrl: string,
     routeInput?: unknown,
@@ -342,6 +388,20 @@ export class LocalWorkspace implements SourceEditWorkspace {
   ): Promise<TextEditResult> {
     if (!isSourcePath(request.path)) return sourceEditFailure("path-rejected");
     try {
+      if (
+        field === "className" &&
+        (request as ClassEditRequest).breakpoint !== undefined
+      ) {
+        const breakpoint = (request as ClassEditRequest).breakpoint;
+        if (!isEditBreakpoint(breakpoint))
+          return sourceEditFailure("invalid-request");
+        if (
+          breakpoint !== "base" &&
+          (await this.getResponsiveCapabilities()).status !==
+            "supported-defaults"
+        )
+          return sourceEditFailure("unsupported-breakpoints");
+      }
       const before = (await this.files.read(request.path)).bytes;
       const source = textOf(before);
       if (hash(before) !== request.expectedSha256)

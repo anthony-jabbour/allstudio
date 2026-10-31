@@ -1,4 +1,5 @@
 import type { PreviewLayout } from "../preview-bridge/protocol.ts";
+import type { EditBreakpoint } from "../site/class-tokens.ts";
 import {
   inspectLayoutClasses,
   LAYOUT_PROPERTIES,
@@ -21,7 +22,7 @@ export const LAYOUT_MEASURED_KEYS: Record<LayoutProperty, keyof PreviewLayout> =
 export interface LayoutTarget {
   property: LayoutProperty;
   key: keyof PreviewLayout;
-  expectation: LayoutExpectation;
+  expectation: LayoutExpectation | { kind: "removed" };
   before: string;
 }
 
@@ -29,9 +30,10 @@ export function layoutTargets(
   before: string,
   after: string,
   observed: PreviewLayout,
+  scope: EditBreakpoint = "base",
 ): { ok: true; targets: LayoutTarget[] } | { ok: false; message: string } {
-  const previous = inspectLayoutClasses(before);
-  const next = inspectLayoutClasses(after);
+  const previous = inspectLayoutClasses(before, scope);
+  const next = inspectLayoutClasses(after, scope);
   const targets: LayoutTarget[] = [];
   for (const property of LAYOUT_PROPERTIES) {
     const old = previous[property];
@@ -39,7 +41,10 @@ export function layoutTargets(
     const oldValue = old.state === "value" ? old.value : old.state;
     const newValue = setting.state === "value" ? setting.value : setting.state;
     if (oldValue === newValue) continue;
-    if (setting.state !== "value")
+    if (
+      setting.state !== "value" &&
+      !(scope !== "base" && setting.state === "unset" && old.state === "value")
+    )
       return {
         ok: false,
         message:
@@ -56,7 +61,8 @@ export function layoutTargets(
     targets.push({
       property,
       key: measuredKey,
-      expectation: setting.expectation,
+      expectation:
+        setting.state === "value" ? setting.expectation : { kind: "removed" },
       before: baseline,
     });
   }
@@ -99,6 +105,7 @@ export function observesLayout(
     const actual = observed[key];
     if (!actual || actual === before || !layoutApplies(observed, property))
       return false;
+    if (expectation.kind === "removed") return true;
     if (expectation.kind === "literal") return actual === expectation.value;
     if (expectation.kind === "tracks") {
       const parts = actual.trim().split(/\s+/);

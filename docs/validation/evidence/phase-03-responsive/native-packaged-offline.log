@@ -1,0 +1,47 @@
+PASS actual Electron layer and canvas selection resolve the same heading before persistent edits
+PASS preview binds an available OS-assigned port while the old fixed port is occupied; HTML snippets and comments still compile
+PASS open, explicit config backup and real preview bridge without instrumenting source
+PASS Electron external HTTP is disabled; the preview child gets OS egress denial and no parent secret
+PASS Spacing inspector applies an exact persistent JSX patch and observes all four rendered padding sides
+PASS Spacing undo/redo restores exact source and actual preview padding
+PASS six typography controls save the exact JSX diff and confirm actual Electron rendering
+PASS typography undo/redo restores exact source and rendered output
+PASS appearance inspector applies an exact persistent JSX colour and radius patch and observes rendered CSS
+PASS appearance undo/redo restores exact source and rendered output
+PASS layout inspector applies an exact persistent JSX width/display/justify patch and observes rendered CSS
+PASS layout undo/redo restores exact source and rendered output
+PASS Pages route navigation, unsaved draft guard, /about source edit + undo, and return to /
+PASS Studio theme and panel controls preserve the live frame, unsaved drafts and source
+PASS narrow Studio keeps editing controls reachable without horizontal overflow and preserves keyboard order
+PASS Apply saves real uninstrumented source and live preview refreshes
+PASS real source location and explicit integration/script permission sequence
+PASS cancelled integration, denied execution and failed replacement startup retain preview and draft; errors include child diagnostics
+PASS cancelling folder selection retains the current project and unapplied draft
+PASS session undo and redo persist actual source and refresh the preview
+PASS file watching detects external change; a stale save is non-destructive
+PASS IPC denies traversal, symlink/hardlink escapes, config writes and ungranted project IDs
+PASS subframe IPC probe: unavailable
+PASS actual preview content cannot use Node/IPC, reach the parent bridge or navigate to another origin
+PASS no Clerk/Railway requests; local editing makes no model-provider requests
+Electron exit: code=0 signal=null
+PASS Home search filters remembered local projects and a project card reopens the existing grant; appearance survives restart
+PASS quit, reopen recent project and inspect persisted source
+Electron exit: code=null signal=SIGKILL
+PASS forced Electron termination before commit retains source and stops the orphan preview
+PASS restart restores the durable pending edit while retaining the external change
+PASS changed config invalidates remembered execution permission; Cancel executes no project code
+PASS explicit reapproval runs the changed project and remembers the new fingerprint
+PASS reopening a live project handles pending recovery; Cancel retains its draft and later Restore succeeds
+NOT RUN in this manual offline gate: production next build. An earlier attempt failed on the fixture's remote Google fonts; online portability is tested separately.
+Electron exit: code=0 signal=null
+PASS typography source and actual appearance persist across full Electron quit and reopen
+Electron exit: code=0 signal=null
+PASS Spacing source and actual appearance persist across full Electron quit and reopen
+Electron exit: code=0 signal=null
+PASS appearance source and actual colour/radius persist across full Electron quit and reopen
+Electron exit: code=0 signal=null
+PASS layout source and actual width/display/justify persist across full Electron quit and reopen
+Electron exit: code=0 signal=null
+PASS scoped typography/spacing/appearance/sizing: exact native source diff, undo/redo, real rendering and full offline-capable quit/reopen persistence
+37 local-workflow checks passed. Evidence: apps/desktop/dist/local-workflow-Mnm7nw
+Electron exit: code=0 signal=null
