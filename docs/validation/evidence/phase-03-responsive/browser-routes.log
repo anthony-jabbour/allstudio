@@ -1,0 +1,9 @@
+Evidence: allstudio-routes-e2e-tgX6KY (local temporary trace directory)
+PASS Pages navigator lists static routes (/ and /about) and marks /journal/[slug] as unsupported Dynamic
+PASS clicking /about with an unsaved draft opens inline confirmation without navigating or writing disk
+PASS Keep editing closes confirmation and preserves current route, selection, and unsaved draft
+PASS Discard and switch navigates preview to /about, refreshes layers, clears inspector selection/drafts, and leaves root source untouched
+PASS editing #about-heading on /about persists to src/app/about/page.tsx and confirms live preview update
+PASS hostile, unsupported, and missing select-route requests are rejected with 400/422/404 without altering preview
+PASS switching back to / renders #hero-heading on the root route
+7 route checks passed.

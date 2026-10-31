@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PreviewTypography } from "../preview-bridge/protocol.ts";
+import type { EditBreakpoint } from "../site/class-tokens.ts";
 import {
+  clearTypographyClass,
   inspectTypographyClasses,
   setTypographyClass,
   TYPOGRAPHY_PRESETS,
@@ -64,6 +66,7 @@ function utilityFor(
   return `text-[${raw}]`;
 }
 interface FieldProps {
+  scope: EditBreakpoint;
   property: TypographyProperty;
   setting: TypographySetting;
   rendered: string | null;
@@ -74,6 +77,7 @@ interface FieldProps {
   onValidity(property: TypographyProperty, valid: boolean): void;
 }
 function TypographyField({
+  scope = "base",
   property,
   setting,
   rendered,
@@ -106,7 +110,7 @@ function TypographyField({
     setting.state === "unsupported" || setting.state === "ambiguous";
   const locked = disabled || unavailable || !rendered;
   const change = (utility: string, base = className) => {
-    const result = setTypographyClass(base, property, utility);
+    const result = setTypographyClass(base, property, utility, scope);
     if (!result.ok) {
       setError(result.message);
       onValidity(property, false);
@@ -116,7 +120,7 @@ function TypographyField({
     onValidity(property, true);
     const next = sourceMode(
       property,
-      inspectTypographyClasses(result.className)[property],
+      inspectTypographyClasses(result.className, scope)[property],
     );
     emittedSetting.current = `${next.mode}|${next.raw}`;
     onChange(result.className);
@@ -144,7 +148,7 @@ function TypographyField({
           }}
         >
           <option value="" disabled>
-            {sourceKnown ? "No base utility" : "Source unavailable"}
+            {sourceKnown ? `No ${scope} utility` : "Source unavailable"}
           </option>
           {hasExisting && setting.state === "value" ? (
             <option value={setting.value}>Current project setting</option>
@@ -188,13 +192,33 @@ function TypographyField({
           />
         </label>
       ) : null}
+      {scope !== "base" ? (
+        <button
+          type="button"
+          aria-label={`Clear ${label} override`}
+          disabled={locked || !sourceKnown || setting.state === "unset"}
+          onClick={() => {
+            const result = clearTypographyClass(className, property, scope);
+            if (!result.ok) {
+              setError(result.message);
+              onValidity(property, false);
+              return;
+            }
+            setError(null);
+            onValidity(property, true);
+            onChange(result.className);
+          }}
+        >
+          Clear override
+        </button>
+      ) : null}
       <p className="field-note">
         Source draft:{" "}
         {sourceKnown ? (
           setting.state === "value" ? (
             <code>{setting.utility}</code>
           ) : setting.state === "unset" ? (
-            "No base utility; origin may be elsewhere"
+            `No ${scope} utility; origin may be elsewhere`
           ) : (
             setting.message
           )
@@ -228,6 +252,7 @@ function TypographyField({
   );
 }
 interface Props {
+  scope?: EditBreakpoint;
   applyDisabled?: boolean;
   onValidityChange?(valid: boolean): void;
   className: string;
@@ -239,6 +264,7 @@ interface Props {
   onApply(): void;
 }
 export function TypographyInspector({
+  scope = "base",
   applyDisabled,
   onValidityChange,
   className,
@@ -250,8 +276,8 @@ export function TypographyInspector({
   onApply,
 }: Props) {
   const settings = useMemo(
-    () => inspectTypographyClasses(className),
-    [className],
+    () => inspectTypographyClasses(className, scope),
+    [className, scope],
   );
   const [invalid, setInvalid] = useState<Set<TypographyProperty>>(
     () => new Set(),
@@ -274,7 +300,8 @@ export function TypographyInspector({
   return (
     <section className="typography-inspector" aria-label="Typography">
       <h2>
-        Typography <span className="field-note">Base</span>
+        Typography{" "}
+        <span className="field-note">{scope === "base" ? "Base" : scope}</span>
       </h2>
       <p className="field-note">
         Changes stay in the draft until Apply. Rendered values are last
@@ -282,6 +309,7 @@ export function TypographyInspector({
       </p>
       {TYPOGRAPHY_PROPERTIES.map((property) => (
         <TypographyField
+          scope={scope}
           key={property}
           property={property}
           setting={settings[property]}

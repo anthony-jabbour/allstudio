@@ -1,0 +1,12 @@
+Evidence: allstudio-typography-e2e-ECbKyr (local temporary trace directory)
+PASS visual size control previews then saves only the intended utility and confirms real rendering
+PASS unchanged typography does not rewrite source and preserves the unsaved text draft
+PASS all six controls persist their scoped source changes and actual computed properties
+PASS invalid property values remain local drafts and cannot write source
+PASS manual class draft A/B/A changes resynchronize the inspector without stale local values
+PASS overriding CSS keeps the source edit and reports rendering unconfirmed without automatic rollback
+PASS typography controls remain keyboard reachable in dark mode at a narrow desktop width
+PASS dynamic class expressions disable typography while static text remains editable
+PASS Base edit preserves sm/lg variants and truthfully reports unchanged desktop rendering
+PASS stale typography hash refuses the save and preserves external source bytes
+10 typography checks passed.

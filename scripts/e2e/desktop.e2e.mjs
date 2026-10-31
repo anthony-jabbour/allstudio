@@ -106,6 +106,7 @@ try {
         "previewClassEdit",
         "applyClassEdit",
         "selectRoute",
+        "getResponsiveCapabilities",
         "undo",
         "redo",
         "onChange",
@@ -181,6 +182,12 @@ try {
   );
   await assert.rejects(
     attacker.evaluate(() => window.allstudio.runtime()),
+    /Unauthorized desktop request/,
+  );
+  await assert.rejects(
+    attacker.evaluate(() =>
+      window.allstudio.getResponsiveCapabilities("0".repeat(64)),
+    ),
     /Unauthorized desktop request/,
   );
   await attacker.close();

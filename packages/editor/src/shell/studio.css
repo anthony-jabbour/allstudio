@@ -286,7 +286,6 @@ code,
   margin-bottom: 10px;
 }
 .preview-pane {
-  /* shortcut: one desktop viewport; add explicit device widths in Slice 3.5. */
   width: 1440px;
   position: relative;
   background: white;
@@ -591,4 +590,46 @@ code,
 .appearance-inspector .actions button,
 .layout-inspector .actions button {
   width: 100%;
+}
+
+.viewport-controls {
+  min-inline-size: 0;
+  border: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 11px;
+}
+.viewport-controls label,
+.viewport-controls form,
+.viewport-presets {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.viewport-controls input {
+  width: 68px;
+}
+.viewport-controls select {
+  width: auto;
+}
+.viewport-controls button,
+.viewport-controls select,
+.viewport-controls input {
+  padding: 5px 7px;
+}
+.viewport-controls button[aria-pressed="true"] {
+  color: var(--studio-text);
+  background: var(--studio-border);
+}
+.preview-stage {
+  position: relative;
+  overflow: hidden;
+}
+.preview-stage .preview-pane {
+  position: absolute;
+  inset: 0 auto auto 0;
 }

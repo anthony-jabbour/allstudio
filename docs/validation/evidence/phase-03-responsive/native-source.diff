@@ -1,0 +1,11 @@
+--- before.tsx
++++ after.tsx
+@@ -6,7 +6,7 @@
+       </p>
+       <h1
+         id="hero-heading"
+-        className="max-w-xl text-[36px] leading-tight font-semibold tracking-tight text-zinc-950 p-[16px]"
++        className="max-w-xl text-[36px] leading-tight font-semibold tracking-tight text-zinc-950 p-[16px] md:text-[28px] md:px-5 md:bg-[#223344] md:w-[280px]"
+       >
+         Recovered local edit
+       </h1>

@@ -48,13 +48,13 @@
 
 **Files:** shell/viewport-controls.tsx + pure viewport.ts/tests, editor-shell.tsx, four inspector/confirmation modules, studio.css, protocol/client only for fixed innerWidth/height; tests + e2e/responsive.e2e.mjs/native workflow.
 
-- [ ] Browser RED:390/768/1440 widths and50% overlay geometry. Add controls, draft-safe transitions using existing route guard pattern, initial Desktop/100%/xl, visible scope chip and actual width/readout. Scale iframe+overlay together and size its scroll wrapper; Fit recomputes from available canvas dimensions, cap0.1–1 for legibility/no automatic enlargement.
-- [ ] Pass scope through all fields and their source modes, invalid draft handling and combined confirmation. Add per-property Clear override actions. Removed overrides require source readback and observed change, with no fabricated fallback value. Show unsupported/default eligibility explicitly; keep text editing independent.
-- [ ] Real browser proof: default scopes, create md override without existing token, clear companion-safe override, keep Base/lg/state bytes, three true widths with geometry,50%/75%/Fit scrolling/selection, draft cancellation and conflicts. Validate custom theme rejection and external change refusal.
-- [ ] Native/packaged offline proof: scoped typography/spacing/appearance/layout, exact source diffs, undo/redo/restart; viewport changes do not write files. Existing seven browser harnesses run serially with explicit Base setup where needed; native fixtures/security/recovery regressions.
+- [x] Browser RED:390/768/1440 widths and50% overlay geometry. Add controls, draft-safe transitions using existing route guard pattern, initial Desktop/100%/xl, visible scope chip and actual width/readout. Scale iframe+overlay together and size its scroll wrapper; Fit recomputes from available canvas dimensions, cap0.1–1 for legibility/no automatic enlargement.
+- [x] Pass scope through all fields and their source modes, invalid draft handling and combined confirmation. Add per-property Clear override actions. Removed overrides require source readback and observed change, with no fabricated fallback value. Show unsupported/default eligibility explicitly; keep text editing independent.
+- [x] Real browser proof: default scopes, create md override without existing token, clear companion-safe override, keep Base/lg/state bytes, three true widths with geometry,50%/75%/Fit scrolling/selection, draft cancellation and conflicts. Validate custom theme rejection and external change refusal.
+- [x] Native/packaged offline proof: scoped typography/spacing/appearance/layout, exact source diffs, undo/redo/restart; viewport changes do not write files. Existing seven browser harnesses run serially with explicit Base setup where needed; native fixtures/security/recovery regressions.
 
 ### Task4 — independent review and focused delivery
 
-- [ ] Run available lint/type/Vitest/boundary/build/desktop/package checks and serial runtime matrix. No blocked or unrun command reported PASS; retain next/font/google offline-build limitation and unavailable subframe probe.
-- [ ] Fresh independent review; fix demonstrated issues RED→GREEN. Append PHASE-03 exact evidence/source/screenshots/limits and user docs. No unfamiliar-user or assistive-technology gate fabricated.
+- [x] Run available lint/type/Vitest/boundary/build/desktop/package checks and serial runtime matrix. No blocked or unrun command reported PASS; retain next/font/google offline-build limitation and unavailable subframe probe.
+- [x] Fresh independent review; fix demonstrated issues RED→GREEN. Append PHASE-03 exact evidence/source/screenshots/limits and user docs. No unfamiliar-user or assistive-technology gate fabricated.
 - [ ] Commit/push focused responsive branch and draft PR on routes; attach it. Phase3 remains IN PROGRESS. Then3.6 B and3.7 A on their own branches, no merge.

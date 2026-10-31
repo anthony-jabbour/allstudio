@@ -31,10 +31,16 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await page.locator(".fixture-picker select").selectOption("harbor-studio");
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await preview.locator("#hero").click({ position: { x: 5, y: 5 } });
   await expect(page.getByTestId("source-location")).toBeVisible();
   await expect(

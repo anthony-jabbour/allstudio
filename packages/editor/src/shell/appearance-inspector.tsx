@@ -5,11 +5,13 @@ import {
   type AppearanceProperty,
   type AppearanceSetting,
   BACKGROUND_PRESETS,
+  clearAppearanceClass,
   inspectAppearanceClasses,
   MAX_RADIUS_PX,
   RADIUS_PRESETS,
   setAppearanceClass,
 } from "../site/appearance.ts";
+import type { EditBreakpoint } from "../site/class-tokens.ts";
 
 const LABELS: Record<AppearanceProperty, string> = {
   backgroundColor: "Background colour",
@@ -49,6 +51,7 @@ function presetLabel(property: AppearanceProperty, value: string): string {
 }
 
 interface Props {
+  scope?: EditBreakpoint;
   className: string;
   rendered: PreviewAppearance | null;
   disabled: boolean;
@@ -62,7 +65,7 @@ interface Props {
 interface FieldProps
   extends Pick<
     Props,
-    "className" | "rendered" | "disabled" | "sourceKnown" | "onChange"
+    "className" | "rendered" | "disabled" | "sourceKnown" | "onChange" | "scope"
   > {
   property: AppearanceProperty;
   setting: AppearanceSetting;
@@ -70,6 +73,7 @@ interface FieldProps
 }
 
 function AppearanceField({
+  scope = "base",
   property,
   setting,
   className,
@@ -101,7 +105,7 @@ function AppearanceField({
     setting.state === "unsupported" || setting.state === "ambiguous";
   const locked = disabled || unavailable || !measured;
   const change = (utility: string, source = className) => {
-    const result = setAppearanceClass(source, property, utility);
+    const result = setAppearanceClass(source, property, utility, scope);
     if (!result.ok) {
       setError(result.message);
       onValidity(property, false);
@@ -109,7 +113,7 @@ function AppearanceField({
     }
     const next = sourceMode(
       property,
-      inspectAppearanceClasses(result.className)[property],
+      inspectAppearanceClasses(result.className, scope)[property],
     );
     emitted.current = `${next.mode}|${next.raw}`;
     setError(null);
@@ -149,7 +153,7 @@ function AppearanceField({
                 ? "Unsupported source"
                 : setting.state === "ambiguous"
                   ? "Conflicting utilities"
-                  : "No base utility"}
+                  : `No ${scope} utility`}
           </option>
           {hasExisting && setting.state === "value" ? (
             <option value={setting.value}>Current project setting</option>
@@ -186,13 +190,33 @@ function AppearanceField({
           />
         </label>
       ) : null}
+      {scope !== "base" ? (
+        <button
+          type="button"
+          aria-label={`Clear ${label} override`}
+          disabled={locked || !sourceKnown || setting.state === "unset"}
+          onClick={() => {
+            const result = clearAppearanceClass(className, property, scope);
+            if (!result.ok) {
+              setError(result.message);
+              onValidity(property, false);
+              return;
+            }
+            setError(null);
+            onValidity(property, true);
+            onChange(result.className);
+          }}
+        >
+          Clear override
+        </button>
+      ) : null}
       <p className="field-note">
         Source draft:{" "}
         {sourceKnown ? (
           setting.state === "value" ? (
             <code>{setting.utility}</code>
           ) : setting.state === "unset" ? (
-            "No base utility; origin may be elsewhere"
+            `No ${scope} utility; origin may be elsewhere`
           ) : (
             setting.message
           )
@@ -233,6 +257,7 @@ function AppearanceField({
 }
 
 export function AppearanceInspector({
+  scope = "base",
   className,
   rendered,
   disabled,
@@ -244,8 +269,8 @@ export function AppearanceInspector({
   onValidityChange,
 }: Props) {
   const settings = useMemo(
-    () => inspectAppearanceClasses(className),
-    [className],
+    () => inspectAppearanceClasses(className, scope),
+    [className, scope],
   );
   const [invalid, setInvalid] = useState<Set<AppearanceProperty>>(
     () => new Set(),
@@ -268,7 +293,8 @@ export function AppearanceInspector({
   return (
     <details className="appearance-inspector" open>
       <summary>
-        Appearance <span className="field-note">Base</span>
+        Appearance{" "}
+        <span className="field-note">{scope === "base" ? "Base" : scope}</span>
       </summary>
       <section aria-label="Appearance properties">
         <p className="field-note">
@@ -278,6 +304,7 @@ export function AppearanceInspector({
         </p>
         {APPEARANCE_PROPERTIES.map((property) => (
           <AppearanceField
+            scope={scope}
             key={property}
             property={property}
             setting={settings[property]}

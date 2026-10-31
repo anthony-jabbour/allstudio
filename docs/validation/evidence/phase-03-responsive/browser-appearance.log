@@ -1,0 +1,12 @@
+Evidence: allstudio-appearance-e2e-icoK3l (local temporary trace directory)
+PASS Harbor CTA Base colour previews then saves only bg-sky-600 and confirms rendered sRGB
+PASS uniform radius 12px replaces rounded-full and keeps hover/focus bytes
+PASS unchanged appearance does not rewrite source
+PASS invalid appearance drafts block every design Apply without source writes
+PASS manual class draft A/B/A changes resynchronize the inspector without stale local values
+PASS overriding CSS keeps the source colour edit and reports rendering unconfirmed
+PASS a mixed typography and appearance draft verifies both groups through one source patch
+PASS dynamic class expressions keep appearance disabled and static text editable
+PASS stale appearance writes refuse safely and preserve external source bytes
+PASS dark narrow controls preserve drafts through collapse and remain keyboard reachable
+10 appearance checks passed.

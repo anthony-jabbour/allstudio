@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PreviewSpacing } from "../preview-bridge/protocol.ts";
+import type { EditBreakpoint } from "../site/class-tokens.ts";
 import {
+  clearSpacingClass,
   inspectSpacingClasses,
   SPACING_PROPERTIES,
   SPACING_SCALE,
@@ -63,6 +65,7 @@ function sourceMode(setting: SpacingSetting) {
     : { mode: setting.value, raw: "" };
 }
 interface Props {
+  scope?: EditBreakpoint;
   className: string;
   rendered: PreviewSpacing | null;
   disabled: boolean;
@@ -76,13 +79,14 @@ interface Props {
 interface FieldProps
   extends Pick<
     Props,
-    "className" | "rendered" | "disabled" | "sourceKnown" | "onChange"
+    "className" | "rendered" | "disabled" | "sourceKnown" | "onChange" | "scope"
   > {
   property: SpacingProperty;
   setting: SpacingSetting;
   onValidity(property: SpacingProperty, valid: boolean): void;
 }
 function SpacingField({
+  scope = "base",
   property,
   setting,
   className,
@@ -118,13 +122,15 @@ function SpacingField({
   const values: string[] = SPACING_SCALE.map((value) => `${prefix}-${value}`);
   if (property.startsWith("margin")) values.push(`${prefix}-auto`);
   const change = (utility: string, source = className) => {
-    const result = setSpacingClass(source, property, utility);
+    const result = setSpacingClass(source, property, utility, scope);
     if (!result.ok) {
       setError(result.message);
       onValidity(property, false);
       return;
     }
-    const next = sourceMode(inspectSpacingClasses(result.className)[property]);
+    const next = sourceMode(
+      inspectSpacingClasses(result.className, scope)[property],
+    );
     emitted.current = `${next.mode}|${next.raw}`;
     setError(null);
     onValidity(property, true);
@@ -155,7 +161,7 @@ function SpacingField({
                 ? "Unsupported source"
                 : setting.state === "mixed"
                   ? "Mixed / partly set"
-                  : "No base utility"}
+                  : `No ${scope} utility`}
           </option>
           {setting.state === "value" &&
           !values.includes(setting.value) &&
@@ -197,13 +203,33 @@ function SpacingField({
           />
         </label>
       ) : null}
+      {scope !== "base" ? (
+        <button
+          type="button"
+          aria-label={`Clear ${label} override`}
+          disabled={locked || !sourceKnown || setting.state === "unset"}
+          onClick={() => {
+            const result = clearSpacingClass(className, property, scope);
+            if (!result.ok) {
+              setError(result.message);
+              onValidity(property, false);
+              return;
+            }
+            setError(null);
+            onValidity(property, true);
+            onChange(result.className);
+          }}
+        >
+          Clear override
+        </button>
+      ) : null}
       <p className="field-note">
         Source draft:{" "}
         {sourceKnown ? (
           setting.state === "value" ? (
             <code>{setting.utility}</code>
           ) : setting.state === "unset" ? (
-            "No base utility; origin may be elsewhere"
+            `No ${scope} utility; origin may be elsewhere`
           ) : (
             setting.message
           )
@@ -238,6 +264,7 @@ function SpacingField({
   );
 }
 export function SpacingInspector({
+  scope = "base",
   className,
   rendered,
   disabled,
@@ -248,7 +275,10 @@ export function SpacingInspector({
   onApply,
   onValidityChange,
 }: Props) {
-  const settings = useMemo(() => inspectSpacingClasses(className), [className]);
+  const settings = useMemo(
+    () => inspectSpacingClasses(className, scope),
+    [className, scope],
+  );
   const [invalid, setInvalid] = useState<Set<SpacingProperty>>(() => new Set());
   const validity = useCallback(
     (property: SpacingProperty, valid: boolean) =>
@@ -268,7 +298,8 @@ export function SpacingInspector({
   return (
     <details className="spacing-inspector" open>
       <summary>
-        Spacing <span className="field-note">Base</span>
+        Spacing{" "}
+        <span className="field-note">{scope === "base" ? "Base" : scope}</span>
       </summary>
       <section aria-label="Spacing">
         <p className="field-note">
@@ -278,6 +309,7 @@ export function SpacingInspector({
         </p>
         {SPACING_PROPERTIES.map((property) => (
           <SpacingField
+            scope={scope}
             key={property}
             property={property}
             setting={settings[property]}

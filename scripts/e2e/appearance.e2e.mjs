@@ -40,10 +40,16 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await page.locator(".fixture-picker select").selectOption("harbor-studio");
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await preview.locator("#harbor-cta").click();
   await expect(page.getByTestId("source-location")).toBeVisible();
   await page.getByLabel("Classes", { exact: true }).fill(CTA);
@@ -184,10 +190,16 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
+    await page
+      .getByLabel("Edit breakpoint", { exact: true })
+      .selectOption("base");
     await page.locator(".fixture-picker select").selectOption("harbor-studio");
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
+    await page
+      .getByLabel("Edit breakpoint", { exact: true })
+      .selectOption("base");
     await preview.locator("#harbor-cta").click();
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       /bg-\[#112233\]/,
@@ -231,10 +243,16 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await page.locator(".fixture-picker select").selectOption("harbor-studio");
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   await preview.locator("#harbor-cta").click();
   await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
     /bg-\[#445566\]/,

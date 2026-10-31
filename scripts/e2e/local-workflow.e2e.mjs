@@ -88,6 +88,7 @@ await writeFile(
 let application;
 let checks = 0;
 let orphanPid;
+let desktopOutput = "";
 function pass(message) {
   checks++;
   console.log(`PASS ${message}`);
@@ -120,6 +121,15 @@ async function launch() {
     },
     timeout: 30_000,
   });
+  desktopOutput = "";
+  const child = application.process();
+  child.stderr?.on("data", (chunk) => {
+    desktopOutput = (desktopOutput + chunk.toString()).slice(-16000);
+  });
+  if (process.env.ALLSTUDIO_OFFLINE_DIAGNOSTICS === "1")
+    child.on("exit", (code, signal) =>
+      console.log(`Electron exit: code=${code} signal=${signal}`),
+    );
   await application.evaluate(
     async ({ dialog, session }, { root, offline, frameProbe }) => {
       globalThis.testDialogs = [];
@@ -227,6 +237,9 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   const preview = page.frameLocator('iframe[title="Project preview"]');
   await preview.locator("h1").click();
   const originalHeading = await preview.locator("h1").innerText();
@@ -688,6 +701,9 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 30000 });
+    await page
+      .getByLabel("Edit breakpoint", { exact: true })
+      .selectOption("base");
     await expect(preview.locator("#about-heading")).toHaveText(
       "About Aurora Atelier",
       { timeout: 30000 },
@@ -726,6 +742,9 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 30000 });
+    await page
+      .getByLabel("Edit breakpoint", { exact: true })
+      .selectOption("base");
     await expect(preview.locator("h1")).toHaveText(originalHeading, {
       timeout: 30000,
     });
@@ -1157,6 +1176,9 @@ try {
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
   await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
+  await page
     .frameLocator('iframe[title="Project preview"]')
     .getByRole("heading", { name: "Saved locally", exact: true })
     .waitFor();
@@ -1241,6 +1263,9 @@ try {
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
   await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
+  await page
     .frameLocator('iframe[title="Project preview"]')
     .getByRole("heading", { name: "Recovered local edit", exact: true })
     .waitFor({ timeout: 30_000 });
@@ -1289,6 +1314,9 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   assert.equal(await readFile(runMarker, "utf8"), "ran");
   assert.equal(
     (await application.evaluate(() => globalThis.testDialogs)).filter(
@@ -1345,6 +1373,9 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
+  await page
+    .getByLabel("Edit breakpoint", { exact: true })
+    .selectOption("base");
   assert.equal(await readFile(sourceFile, "utf8"), liveAfter);
   await assert.rejects(access(journal), (error) => error.code === "ENOENT");
   pass(
@@ -1396,6 +1427,9 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
+    await page
+      .getByLabel("Edit breakpoint", { exact: true })
+      .selectOption("base");
     const savedPreview = page.frameLocator('iframe[title="Project preview"]');
     await savedPreview.locator("h1").click();
     await expect(
@@ -1439,6 +1473,9 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
+    await page
+      .getByLabel("Edit breakpoint", { exact: true })
+      .selectOption("base");
     await persistedPreview.locator("h1").click();
     await page
       .getByLabel("Padding all preset", { exact: true })
@@ -1482,6 +1519,9 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
+    await page
+      .getByLabel("Edit breakpoint", { exact: true })
+      .selectOption("base");
     await appearancePreview
       .getByRole("button", { name: "Start a project" })
       .click();
@@ -1546,6 +1586,9 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
+    await page
+      .getByLabel("Edit breakpoint", { exact: true })
+      .selectOption("base");
     await layoutPreview
       .getByRole("button", { name: "Start a project" })
       .click();
@@ -1597,8 +1640,153 @@ try {
       "layout source and actual width/display/justify persist across full Electron quit and reopen",
     );
   }
+  if (fixtureName === "nextjs-site-fixture") {
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    {
+      // Earlier consent/egress probes deliberately added executable config; it must remain unsupported.
+      const id = await page.evaluate(
+        async () => (await window.allstudio.recent())[0].id,
+      );
+      assert.equal(
+        (
+          await page.evaluate(
+            (id) => window.allstudio.getResponsiveCapabilities(id),
+            id,
+          )
+        ).status,
+        "unsupported",
+      );
+      await toolbar(page, "Close project");
+      await writeFile(
+        join(project, "next.config.allstudio-original.ts"),
+        await readFile(join(fixture, "next.config.ts"), "utf8"),
+      );
+      await toolbar(page, "Reopen");
+      await page
+        .getByText("Preview bridge: connected", { exact: false })
+        .waitFor({ timeout: 60000 });
+    }
+    const projectId = await page.evaluate(
+      async () => (await window.allstudio.recent())[0].id,
+    );
+    assert.deepEqual(
+      await page.evaluate(
+        (id) => window.allstudio.getResponsiveCapabilities(id),
+        projectId,
+      ),
+      { status: "supported-defaults" },
+    );
+    assert.equal(
+      (
+        await page.evaluate(() =>
+          window.allstudio.getResponsiveCapabilities("0".repeat(64)),
+        )
+      ).reason,
+      "unauthorized",
+    );
+    await page
+      .getByRole("button", { name: "Tablet viewport", exact: true })
+      .click();
+    const responsivePreview = page.frameLocator(
+      'iframe[title="Project preview"]',
+    );
+    await expect
+      .poll(() => responsivePreview.locator("html").evaluate(() => innerWidth))
+      .toBe(768);
+    await responsivePreview.locator("h1").click();
+    await expect(
+      page.getByLabel("Font size preset", { exact: true }),
+    ).toBeEnabled();
+    const beforeResponsive = await readFile(sourceFile, "utf8");
+    const beforeClass = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    await page
+      .getByLabel("Font size preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Font size px", { exact: true }).fill("28");
+    await page
+      .getByLabel("Padding inline preset", { exact: true })
+      .selectOption("px-5");
+    await page
+      .getByLabel("Background colour preset", { exact: true })
+      .selectOption("custom:hex");
+    await page
+      .getByLabel("Background colour hex", { exact: true })
+      .fill("#223344");
+    await page
+      .getByLabel("Width preset", { exact: true })
+      .selectOption("custom:px");
+    await page.getByLabel("Width px", { exact: true }).fill("280");
+    const scopedClass = await page
+      .getByLabel("Classes", { exact: true })
+      .inputValue();
+    await toolbar(page, "Preview typography patch");
+    assert.equal(await readFile(sourceFile, "utf8"), beforeResponsive);
+    await toolbar(page, "Apply typography");
+    await expect(
+      page.getByText(/Saved design properties.*observed/),
+    ).toBeVisible({ timeout: 30000 });
+    const scopedSource = await readFile(sourceFile, "utf8");
+    assert.equal(
+      scopedSource,
+      beforeResponsive.replace(
+        `className="${beforeClass}"`,
+        `className="${scopedClass}"`,
+      ),
+    );
+    await toolbar(page, "Undo saved edit");
+    await expect
+      .poll(() => readFile(sourceFile, "utf8"))
+      .toBe(beforeResponsive);
+    await toolbar(page, "Redo saved edit");
+    await expect.poll(() => readFile(sourceFile, "utf8")).toBe(scopedSource);
+    await application.close();
+    application = undefined;
+    page = await launch();
+    await toolbar(page, "Reopen");
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    await page
+      .getByRole("button", { name: "Tablet viewport", exact: true })
+      .click();
+    await expect
+      .poll(
+        () =>
+          page
+            .frameLocator('iframe[title="Project preview"]')
+            .locator("h1")
+            .evaluate((el) => {
+              const s = getComputedStyle(el);
+              return [s.fontSize, s.paddingLeft, s.backgroundColor, s.width];
+            }),
+        { timeout: 30000 },
+      )
+      .toEqual(["28px", "20px", "rgb(34, 51, 68)", "280px"]);
+    assert.equal(await readFile(sourceFile, "utf8"), scopedSource);
+    await page
+      .frameLocator('iframe[title="Project preview"]')
+      .locator("h1")
+      .click();
+    await expect(page.getByLabel("Font size px", { exact: true })).toBeEnabled({
+      timeout: 30000,
+    });
+    await expect(page.getByLabel("Font size px", { exact: true })).toHaveValue(
+      "28",
+    );
+    await writeFile(join(evidence, "responsive-before.tsx"), beforeResponsive);
+    await writeFile(join(evidence, "responsive-after.tsx"), scopedSource);
+    await page.screenshot({ path: join(evidence, "responsive-reopened.png") });
+    pass(
+      "scoped typography/spacing/appearance/sizing: exact native source diff, undo/redo, real rendering and full offline-capable quit/reopen persistence",
+    );
+  }
   console.log(`${checks} local-workflow checks passed. Evidence: ${evidence}`);
 } catch (error) {
+  console.error("Desktop runtime diagnostics:", desktopOutput);
   if (application) {
     console.error(
       "Picker result:",
