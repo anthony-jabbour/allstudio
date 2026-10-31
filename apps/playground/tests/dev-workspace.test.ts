@@ -675,3 +675,60 @@ describe("DevWorkspace route discovery and selection", () => {
     }
   });
 });
+
+describe("responsive breakpoint audit", () => {
+  it("returns eligibility only and refuses scoped edits after external theme changes", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    expect(await workspace.getResponsiveCapabilities()).toEqual({
+      status: "supported-defaults",
+    });
+    const { oid, element } = await heading(workspace);
+    const request = {
+      path: element.path,
+      oid,
+      expectedSha256: element.sha256,
+      className: "text-lg md:text-xl",
+      breakpoint: "md" as const,
+    };
+    const before = await readFile(pageFile, "utf8");
+    expect((await workspace.previewClassEdit(request)).ok).toBe(true);
+    await writeFile(
+      join(workspaceDir, "src/app/globals.css"),
+      '@import "tailwindcss"; @theme{--breakpoint-md:900px}/*private-marker*/',
+    );
+    const caps = await workspace.getResponsiveCapabilities();
+    expect(caps.status).toBe("unsupported");
+    expect(JSON.stringify(caps)).not.toContain("private-marker");
+    expect(await workspace.applyClassEdit(request)).toMatchObject({
+      ok: false,
+      reason: "unsupported-breakpoints",
+    });
+    expect(await readFile(pageFile, "utf8")).toBe(before);
+    expect(
+      (await workspace.applyClassEdit({ ...request, breakpoint: "base" })).ok,
+    ).toBe(true);
+  });
+  it("fails closed for CSS symlink/hardlink and invalid byte sources", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    const outside = join(tmp, "outside.css");
+    await writeFile(outside, "@theme{--breakpoint-md:900px}");
+    const css = join(workspaceDir, "src/unsafe.css");
+    await symlink(outside, css);
+    expect((await workspace.getResponsiveCapabilities()).status).toBe(
+      "unavailable",
+    );
+    await rm(css);
+    await link(outside, css);
+    expect((await workspace.getResponsiveCapabilities()).status).toBe(
+      "unavailable",
+    );
+    await rm(css);
+    await writeFile(css, Buffer.from([255]));
+    expect((await workspace.getResponsiveCapabilities()).status).toBe(
+      "unavailable",
+    );
+    expect(await readFile(outside, "utf8")).toBe(
+      "@theme{--breakpoint-md:900px}",
+    );
+  });
+});

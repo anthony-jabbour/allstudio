@@ -1,3 +1,4 @@
+import { isEditBreakpoint } from "./class-tokens.ts";
 import type {
   ClassEditRequest,
   SelectRouteRequest,
@@ -51,9 +52,20 @@ export function parseTextEditBody(body: unknown): TextEditRequest | null {
 }
 
 export function parseClassEditBody(body: unknown): ClassEditRequest | null {
-  if (!hasExactKeys(body, ["path", "oid", "expectedSha256", "className"])) {
+  const scoped = hasExactKeys(body, [
+    "path",
+    "oid",
+    "expectedSha256",
+    "className",
+    "breakpoint",
+  ]);
+  if (
+    !scoped &&
+    !hasExactKeys(body, ["path", "oid", "expectedSha256", "className"])
+  ) {
     return null;
   }
+  if (scoped && !isEditBreakpoint(body.breakpoint)) return null;
   const { path, oid, expectedSha256, className } = body;
   if (
     typeof path !== "string" ||
@@ -66,7 +78,9 @@ export function parseClassEditBody(body: unknown): ClassEditRequest | null {
   ) {
     return null;
   }
-  return { path, oid, expectedSha256, className };
+  return scoped && isEditBreakpoint(body.breakpoint)
+    ? { path, oid, expectedSha256, className, breakpoint: body.breakpoint }
+    : { path, oid, expectedSha256, className };
 }
 
 export function parseSelectRouteBody(body: unknown): SelectRouteRequest | null {

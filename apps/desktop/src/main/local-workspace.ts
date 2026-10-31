@@ -5,8 +5,11 @@ import { join } from "node:path";
 import {
   type ClassEditRequest,
   discoverAppRouterRoutes,
+  isEditBreakpoint,
   type LocateElementResult,
   type ProjectRoutesSnapshot,
+  type ResponsiveCapabilities,
+  readResponsiveMetadata,
   resolvePreviewRouteUrl,
   type SelectRouteResult,
   type SourceEditFailure,
@@ -249,6 +252,22 @@ export class LocalWorkspace implements SourceEditWorkspace {
     return discoverAppRouterRoutes(paths);
   }
 
+  async getResponsiveCapabilities(): Promise<ResponsiveCapabilities> {
+    return readResponsiveMetadata({
+      listStyles: () => this.files.listStyles(),
+      readCss: async (path) => (await this.files.readCss(path)).bytes,
+      readRootMetadata: async (path) => {
+        try {
+          return (await this.files.read(path)).bytes;
+        } catch (error) {
+          if (error instanceof FileFailure && error.reason === "file-not-found")
+            return null;
+          throw error;
+        }
+      },
+    });
+  }
+
   async selectRoute(
     basePreviewUrl: string,
     routeInput?: unknown,
@@ -342,6 +361,20 @@ export class LocalWorkspace implements SourceEditWorkspace {
   ): Promise<TextEditResult> {
     if (!isSourcePath(request.path)) return sourceEditFailure("path-rejected");
     try {
+      if (
+        field === "className" &&
+        (request as ClassEditRequest).breakpoint !== undefined
+      ) {
+        const breakpoint = (request as ClassEditRequest).breakpoint;
+        if (!isEditBreakpoint(breakpoint))
+          return sourceEditFailure("invalid-request");
+        if (
+          breakpoint !== "base" &&
+          (await this.getResponsiveCapabilities()).status !==
+            "supported-defaults"
+        )
+          return sourceEditFailure("unsupported-breakpoints");
+      }
       const before = (await this.files.read(request.path)).bytes;
       const source = textOf(before);
       if (hash(before) !== request.expectedSha256)

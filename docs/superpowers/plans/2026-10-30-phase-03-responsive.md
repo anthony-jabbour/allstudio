@@ -40,9 +40,9 @@
 **Files:** site/breakpoints.ts + tests; desktop/native/files.c, main/native-files.ts, local-workspace.ts and typed requests/API/preload/main wiring; playground dev-workspace/workspace-api/client adapters; corresponding native/API tests.
 **Interfaces:** getResponsiveCapabilities() returns bounded supported-defaults/unsupported/unavailable status with fixed reason, never CSS. Optional breakpoint on property ClassEditRequest; every non-Base preview/apply rechecks current default eligibility before invoking unchanged source edit pipeline.
 
-- [ ] RED: pure audit accepts current fixture CSS/default package and rejects custom breakpoint/theme/config, plugins, unknown/import/escape/unsupported style sources; count/byte/path/encoding limits. Capture identical emitted CSS probe for default vs unused custom md to document why CSSOM alone is insufficient.
-- [ ] RED: native helper cannot write CSS or list/read arbitrary paths, symlink/hardlink escapes or unbounded CSS; sender/schema/scope/unknown action negatives. Implement narrow readonly CSS/config metadata collection using existing descriptor protections, with source writes unchanged. Bound files/entries/bytes and imports; no renderer raw contents.
-- [ ] Wire eligibility through both adapters. Recheck on non-Base requests so external custom-theme changes fail safely without writing JSX. Preserve old Base/manual behavior. Run metadata/native/API/type regressions; commit task2.
+- [x] RED: pure audit accepts current fixture CSS/default package and rejects custom breakpoint/theme/config, plugins, unknown/import/escape/unsupported style sources; count/byte/path/encoding limits. Capture identical emitted CSS probe for default vs unused custom md to document why CSSOM alone is insufficient.
+- [x] RED: native helper cannot write CSS or list/read arbitrary paths, symlink/hardlink escapes or unbounded CSS; sender/schema/scope/unknown action negatives. Implement narrow readonly CSS/config metadata collection using existing descriptor protections, with source writes unchanged. Bound files/entries/bytes and imports; no renderer raw contents.
+- [x] Wire eligibility through both adapters. Recheck on non-Base requests so external custom-theme changes fail safely without writing JSX. Preserve old Base/manual behavior. Run metadata/native/API/type regressions; commit task2.
 
 ### Task3 — real viewport/zoom and scoped inspector integration
 

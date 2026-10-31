@@ -27,6 +27,8 @@ if (process.isMainFrame) {
       request("apply-class", { projectId, request: value }),
     selectRoute: (projectId, route) =>
       request("select-route", { projectId, request: { route } }),
+    getResponsiveCapabilities: (projectId) =>
+      request("responsive-capabilities", { projectId }),
     undo: (projectId) => request("undo", { projectId }),
     redo: (projectId) => request("redo", { projectId }),
     onChange: (callback) => {

@@ -197,6 +197,11 @@ app
       if (!current || value.projectId !== current.info.id)
         return sourceEditFailure("unauthorized");
       if (
+        value.action === "responsive-capabilities" &&
+        hasExactKeys(value, ["action", "projectId"])
+      )
+        return current.workspace.getResponsiveCapabilities();
+      if (
         (value.action === "undo" || value.action === "redo") &&
         hasExactKeys(value, ["action", "projectId"])
       )

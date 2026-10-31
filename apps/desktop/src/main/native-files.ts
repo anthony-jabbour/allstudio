@@ -36,7 +36,18 @@ export class NativeFiles {
   }
 
   async read(path: string): Promise<{ bytes: Buffer; mode: number }> {
-    const result = await this.run("read", path);
+    return this.readChecked("read", path);
+  }
+
+  async readCss(path: string): Promise<{ bytes: Buffer; mode: number }> {
+    return this.readChecked("read-css", path);
+  }
+
+  private async readChecked(
+    operation: "read" | "read-css",
+    path: string,
+  ): Promise<{ bytes: Buffer; mode: number }> {
+    const result = await this.run(operation, path);
     const end = result.indexOf(10);
     const header = /^OK (\d{1,4}) (\d{1,7})$/.exec(
       result.subarray(0, end).toString(),
@@ -64,7 +75,17 @@ export class NativeFiles {
   }
 
   async list(): Promise<string[]> {
-    const output = await this.run("list", "src");
+    return this.listChecked("list");
+  }
+
+  async listStyles(): Promise<string[]> {
+    return this.listChecked("list-styles");
+  }
+
+  private async listChecked(
+    operation: "list" | "list-styles",
+  ): Promise<string[]> {
+    const output = await this.run(operation, "src");
     if (output.subarray(0, 3).toString() !== "OK\n")
       throw new FileFailure("read-failed");
     const result: string[] = [];
@@ -173,6 +194,8 @@ export class NativeFiles {
         } else if (
           operation === "read" ||
           operation === "list" ||
+          operation === "read-css" ||
+          operation === "list-styles" ||
           output.toString() === "READY\nPREPARED\nOK\n"
         )
           resolve(output);

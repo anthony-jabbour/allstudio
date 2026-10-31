@@ -475,3 +475,20 @@ Responsive viewport/breakpoint controls (3.5), bounded structural edits (3.6), p
 ## Resume audit — 2026-10-30
 
 Verified main24cbd6d and draft PR21/22 heads814f456/7eeec3c against origin; both have quality and Electron SUCCESS. Fresh lint, seven-workspace typecheck,668Vitest tests/25files and public-boundary validation passed. No new browser/native run is claimed from this static refresh. See `docs/research/phase-03-resume-audit.md` for source findings and corrections to the proposed3.5–3.7 designs. Founder choices are pending; no product code, permission/grant, dependency, cloud file, merge or phase PASS changed.
+
+
+## Slice 3.5 checkpoint — scoped source transforms and breakpoint audit (2026-10-30)
+
+Status: IN PROGRESS. Branch `feat/phase-03-responsive`, based on routes `7eeec3c`. Founder approved automatic scopes with override, Clear, true viewport widths/zoom, and bounded read-only CSS/config metadata auditing within the existing grant.
+
+Exact-scope transforms and companion-preserving removal are committed at `01f0c53`. The metadata adapter now rechecks eligibility on each non-Base property preview/apply. An external custom breakpoint mutation refuses the source write; Base/manual edits retain existing behavior. IPC and HTTP return fixed eligibility/reason only. CSS listing/reads reject alternate roots, writes, symlinks, hardlinks, oversized files and invalid bytes. No dependency, grant or Electron permission added.
+
+Executed evidence:
+- `bun run test apps/playground/tests/dev-workspace.test.ts`: RED (2 missing-method failures), then GREEN 40 tests. Actual temp project bytes checked after refused scoped save and permitted Base save.
+- `bun run test apps/playground/tests/workspace-api.test.ts`: RED (new action rejected), then GREEN 37 tests; unknown fields, foreign origin and invalid token refused.
+- `bun run test`: 787 tests / 30 files passed, including native helper compilation with warnings-as-errors and original native regressions.
+- `bun run typecheck`: all seven workspaces passed.
+- `bun run lint`: passed after formatting (four non-null assertions in tests remain warnings).
+- `bun run validate:public-boundary`: passed, 398 files.
+
+This checkpoint does not demonstrate the responsive UI, zoom geometry, new desktop IPC interaction, packaged persistence or the Phase 3 gate. Those remain unverified until the integrated slice runs. No human usability/accessibility gate is claimed.

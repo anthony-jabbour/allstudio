@@ -2,6 +2,7 @@ import {
   type ClassEditRequest,
   type DiscoveredRoute,
   type LocateElementResult,
+  type ResponsiveCapabilities,
   type SelectRouteResult,
   type SourceEditWorkspace,
   sourceEditFailure,
@@ -39,6 +40,8 @@ export function createHttpWorkspace(
   }
 
   return {
+    getResponsiveCapabilities: () =>
+      call<ResponsiveCapabilities>("responsive-capabilities", {}),
     locate: (oid) => call<LocateElementResult>("locate", { oid }),
     previewTextEdit: (request: TextEditRequest) =>
       call<TextEditResult>("preview-text", request),

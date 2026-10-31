@@ -59,6 +59,8 @@ function App() {
         window.allstudio.previewClassEdit(id, request),
       applyClassEdit: (request) => window.allstudio.applyClassEdit(id, request),
       selectRoute: (route) => window.allstudio.selectRoute(id, route),
+      getResponsiveCapabilities: () =>
+        window.allstudio.getResponsiveCapabilities(id),
     };
   }, [project]);
   async function open(task: () => Promise<ProjectResult>) {

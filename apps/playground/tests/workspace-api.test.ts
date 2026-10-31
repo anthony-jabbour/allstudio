@@ -61,6 +61,38 @@ const goodHeaders = {
   [SESSION_HEADER]: TOKEN,
 };
 
+it("exposes only authenticated, empty-body breakpoint eligibility", async () => {
+  expect((await post("responsive-capabilities", {})).body).toEqual({
+    status: "supported-defaults",
+  });
+  for (const body of [
+    { path: "src/app/globals.css" },
+    { projectId: "other" },
+    null,
+    [],
+  ]) {
+    expect((await post("responsive-capabilities", body)).status).toBe(400);
+  }
+  expect(
+    (
+      await post(
+        "responsive-capabilities",
+        {},
+        { ...goodHeaders, origin: "http://evil.test" },
+      )
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await post(
+        "responsive-capabilities",
+        {},
+        { ...goodHeaders, [SESSION_HEADER]: "wrong" },
+      )
+    ).status,
+  ).toBe(403);
+});
+
 async function post(
   action: string,
   body: unknown,
