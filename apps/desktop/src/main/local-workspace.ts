@@ -27,7 +27,9 @@ import {
   formatLineDiff,
   listOids,
   type SourceLocation,
+  validateResponsiveProject,
 } from "@allstudio/editor/source-mapper";
+import { planIntegration } from "./config-integration.ts";
 import { durableJson, syncDirectory } from "./durable-json.ts";
 import { FileFailure, NativeFiles } from "./native-files.ts";
 import {
@@ -253,18 +255,43 @@ export class LocalWorkspace implements SourceEditWorkspace {
   }
 
   async getResponsiveCapabilities(): Promise<ResponsiveCapabilities> {
+    const readMetadata = async (path: string): Promise<Buffer | null> => {
+      try {
+        return (await this.files.read(path)).bytes;
+      } catch (error) {
+        if (error instanceof FileFailure && error.reason === "file-not-found")
+          return null;
+        throw error;
+      }
+    };
     return readResponsiveMetadata({
+      validateProject: (styles) =>
+        validateResponsiveProject(
+          {
+            listSources: () => this.files.listAuditSources(),
+            readSource: async (path) =>
+              (await this.files.readAuditSource(path)).bytes,
+            readConfig: async (path) => {
+              const bytes = await readMetadata(path);
+              if (
+                path.startsWith("next.") &&
+                bytes
+                  ?.toString()
+                  .startsWith("// allstudio preview integration v1")
+              ) {
+                const plan = await planIntegration(this.files);
+                if (!plan.installed)
+                  throw new Error("Unrecognized preview configuration");
+                return plan.backup ? readMetadata(plan.backup) : null;
+              }
+              return bytes;
+            },
+          },
+          styles,
+        ),
       listStyles: () => this.files.listStyles(),
       readCss: async (path) => (await this.files.readCss(path)).bytes,
-      readRootMetadata: async (path) => {
-        try {
-          return (await this.files.read(path)).bytes;
-        } catch (error) {
-          if (error instanceof FileFailure && error.reason === "file-not-found")
-            return null;
-          throw error;
-        }
-      },
+      readRootMetadata: readMetadata,
     });
   }
 

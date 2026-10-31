@@ -100,7 +100,14 @@ static void verify_parent(const char *root, const char *relative) {
   free(path);
 }
 static unsigned visited, listed;
+static int audit_source_name(const char *name) {
+  const char *extension = strrchr(name, '.');
+  const char *extensions[] = { ".tsx", ".jsx", ".ts", ".js", ".mjs", ".cjs", NULL };
+  for (unsigned i = 0; extension && extensions[i]; ++i) if (!strcmp(extension, extensions[i])) return 1;
+  return 0;
+}
 static int style_name(const char *name) {
+  if (!strncmp(name, "postcss.config.", 15) || !strncmp(name, ".postcssrc", 10) || !strncmp(name, "tailwind.config.", 16) || !strncmp(name, "babel.config.", 13) || !strncmp(name, ".babelrc", 8) || !strcmp(name, ".swcrc")) return 1;
   const char *extension = strrchr(name, '.');
   const char *styles[] = { ".css", ".scss", ".sass", ".less", ".pcss", ".postcss", ".styl", ".stylus", NULL };
   for (unsigned i = 0; extension && styles[i]; ++i) if (!strcasecmp(extension, styles[i])) return 1;
@@ -116,7 +123,7 @@ static void list_source(int directory, const char *prefix, unsigned depth, int s
     if (++visited > 10000) fail("scan-limit");
     if (!strcmp(entry->d_name, "node_modules") || !strcmp(entry->d_name, ".git") || !strcmp(entry->d_name, ".next")) continue;
     char relative[1025];
-    int length = snprintf(relative, sizeof(relative), "%s/%s", prefix, entry->d_name);
+    int length = snprintf(relative, sizeof(relative), "%s%s%s", prefix, *prefix ? "/" : "", entry->d_name);
     if (length < 0 || (size_t)length >= sizeof(relative)) {
       if (styles) fail("scan-limit");
       continue;
@@ -131,7 +138,7 @@ static void list_source(int directory, const char *prefix, unsigned depth, int s
       int child = openat(directory, entry->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
       if (child >= 0) { list_source(child, relative, depth + 1, styles); close(child); }
       else if (styles) fail("path-rejected");
-    } else if (styles && style_name(entry->d_name)) {
+    } else if ((styles == 1 && style_name(entry->d_name)) || (styles == 2 && audit_source_name(entry->d_name))) {
       if (!S_ISREG(info.st_mode) || info.st_nlink != 1 || info.st_size < 0 || info.st_size > LIMIT) fail("path-rejected");
       if (++listed > 1000) fail("scan-limit");
       printf("%d\n", length);
@@ -154,11 +161,13 @@ static int readable_root(const char *path) {
   return configuration(path);
 }
 int main(int argc, char **argv) {
-  if (argc != 4 || (strcmp(argv[1], "read") && strcmp(argv[1], "write") && strcmp(argv[1], "list") && strcmp(argv[1], "list-styles") && strcmp(argv[1], "read-css") && strcmp(argv[1], "backup") && strcmp(argv[1], "create"))) fail("invalid-request");
+  if (argc != 4 || (strcmp(argv[1], "read") && strcmp(argv[1], "write") && strcmp(argv[1], "list") && strcmp(argv[1], "list-styles") && strcmp(argv[1], "list-audit-sources") && strcmp(argv[1], "read-audit-source") && strcmp(argv[1], "read-css") && strcmp(argv[1], "backup") && strcmp(argv[1], "create"))) fail("invalid-request");
   const char *root = argv[2], *relative = argv[3];
   size_t length = strlen(relative);
   int listing = !strcmp(argv[1], "list") && !strcmp(relative, "src");
   int style_listing = !strcmp(argv[1], "list-styles") && !strcmp(relative, "src");
+  int audit_listing = !strcmp(argv[1], "list-audit-sources") && !strcmp(relative, "src");
+  int audit_read = !strcmp(argv[1], "read-audit-source") && length <= 1024 && length >= 7 && !strncmp(relative, "src/", 4) && !strchr(relative, '\\') && !strchr(relative, ':') && audit_source_name(relative);
   int css_read = !strcmp(argv[1], "read-css") && length <= 1024 && length >= 8 && !strncmp(relative, "src/", 4) &&
       !strchr(relative, '\\') && !strchr(relative, ':') && !strcasecmp(relative + length - 4, ".css");
   int creating = !strcmp(argv[1], "create") && configuration(relative);
@@ -168,18 +177,18 @@ int main(int argc, char **argv) {
   int source_path = (!strcmp(argv[1], "read") || !strcmp(argv[1], "write")) && length <= 1024 && length >= 9 && !strncmp(relative, "src/", 4) &&
       !strchr(relative, '\\') && !strchr(relative, ':') &&
       (!strcmp(relative + length - 4, ".tsx") || !strcmp(relative + length - 4, ".jsx"));
-  if (!listing && !style_listing && !css_read && !creating && !backing && !config_io && !metadata_read && !source_path) fail("path-rejected");
+  if (!listing && !style_listing && !audit_listing && !audit_read && !css_read && !creating && !backing && !config_io && !metadata_read && !source_path) fail("path-rejected");
   if ((!strcmp(argv[1], "create") && !creating) || (!strcmp(argv[1], "backup") && !backing)) fail("path-rejected");
   char *canonical = realpath(root, NULL);
   if (!canonical || strcmp(canonical, root)) fail("path-rejected");
   free(canonical);
   struct stat granted, visible;
   if (fstat(3, &granted) || !S_ISDIR(granted.st_mode) || stat(root, &visible) || !same_inode(&granted, &visible)) fail("path-rejected");
-  if (listing || style_listing) {
-    int source = openat(3, "src", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  if (listing || style_listing || audit_listing) {
+    int source = openat(3, style_listing ? "." : "src", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     if (source < 0) fail("path-rejected");
     puts("OK");
-    list_source(source, "src", 0, style_listing);
+    list_source(source, style_listing ? "" : "src", 0, audit_listing ? 2 : style_listing);
     return 0;
   }
   parent_fd = dup(3);
@@ -210,7 +219,7 @@ int main(int argc, char **argv) {
     if (fd < 0) fail(errno == ENOENT ? "file-not-found" : "path-rejected");
     original = read_source(fd, &size, &metadata);
   }
-  if (!strcmp(argv[1], "read") || css_read) {
+  if (!strcmp(argv[1], "read") || css_read || audit_read) {
     printf("OK %u %zu\n", (unsigned)(metadata.st_mode & 07777), size);
     if (fwrite(original, 1, size, stdout) != size) fail("read-failed");
     return 0;

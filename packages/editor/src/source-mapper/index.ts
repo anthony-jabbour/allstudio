@@ -25,6 +25,10 @@ import type {
 
 export type { DiffHunk, DiffLine, LineDiff } from "./diff.ts";
 export { createLineDiff, formatLineDiff } from "./diff.ts";
+export {
+  type ResponsiveBuildConfig,
+  validateResponsiveProject,
+} from "./responsive-project.ts";
 export type {
   DescribeElementResult,
   ElementClassName,

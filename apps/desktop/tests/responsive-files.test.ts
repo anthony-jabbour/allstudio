@@ -76,6 +76,28 @@ describe("readonly responsive metadata native boundary", () => {
     try {
       await writeFile(join(f.root, "src/theme.css"), '@import "tailwindcss";');
       expect(await files.listStyles()).toEqual(["src/theme.css"]);
+      await writeFile(join(f.root, "src/helper.ts"), 'import "./theme.css";');
+      expect(await files.listAuditSources()).toEqual(["src/helper.ts"]);
+      expect(
+        (await files.readAuditSource("src/helper.ts")).bytes.toString(),
+      ).toBe('import "./theme.css";');
+      expect(await files.listStyles()).toEqual(["src/theme.css"]);
+      await expect(
+        files.write(
+          "src/helper.ts",
+          Buffer.from('import "./theme.css";'),
+          Buffer.from("changed"),
+        ),
+      ).rejects.toThrow();
+      for (const target of [
+        "../secret.ts",
+        "helper.ts",
+        "src/../../secret.ts",
+        "src/theme.css",
+        "package.json",
+      ]) {
+        await expect(files.readAuditSource(target)).rejects.toThrow();
+      }
       expect((await files.readCss("src/theme.css")).bytes.toString()).toBe(
         '@import "tailwindcss";',
       );

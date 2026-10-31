@@ -677,6 +677,36 @@ describe("DevWorkspace route discovery and selection", () => {
 });
 
 describe("responsive breakpoint audit", () => {
+  it("refuses unbound external stylesheet imports and project-root CSS/build configuration", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    for (const path of ["theme.css", ".postcssrc.json"]) {
+      await writeFile(
+        join(workspaceDir, path),
+        path.endsWith("css") ? "@theme{--breakpoint-md:900px}" : "{}",
+      );
+      expect((await workspace.getResponsiveCapabilities()).status).toBe(
+        "unsupported",
+      );
+      await rm(join(workspaceDir, path));
+    }
+    const layout = join(workspaceDir, "src/app/layout.tsx");
+    const before = await readFile(layout, "utf8");
+    await writeFile(
+      layout,
+      before.replace("./globals.css", "../../outside.css"),
+    );
+    expect((await workspace.getResponsiveCapabilities()).status).toBe(
+      "unsupported",
+    );
+    await writeFile(layout, before);
+    await writeFile(
+      join(workspaceDir, "next.config.ts"),
+      "export default getCustomConfig();",
+    );
+    expect((await workspace.getResponsiveCapabilities()).status).toBe(
+      "unsupported",
+    );
+  });
   it("returns eligibility only and refuses scoped edits after external theme changes", async () => {
     const workspace = await DevWorkspace.open(workspaceDir);
     expect(await workspace.getResponsiveCapabilities()).toEqual({

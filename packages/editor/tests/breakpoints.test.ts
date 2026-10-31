@@ -10,6 +10,16 @@ const input = (
   styles: [{ path: "src/app/globals.css", text }],
 });
 describe("bounded default breakpoint audit", () => {
+  it("refuses package-level build transforms", () => {
+    for (const key of ["postcss", "babel", "browser"]) {
+      const value = input();
+      value.packageJson = JSON.stringify({
+        devDependencies: { tailwindcss: "^4" },
+        [key]: {},
+      });
+      expect(auditDefaultBreakpoints(value).status).toBe("unsupported");
+    }
+  });
   it("accepts default Tailwind4 CSS and project colour/font theme aliases", () => {
     expect(
       auditDefaultBreakpoints(
@@ -143,6 +153,7 @@ describe("bounded metadata collection", () => {
     );
     const calls: string[] = [];
     const result = await readResponsiveMetadata({
+      validateProject: async () => true,
       listStyles: async () => ["src/app/globals.css"],
       readCss: async (path) => {
         calls.push(path);
@@ -168,6 +179,7 @@ describe("bounded metadata collection", () => {
     );
     let reads = 0;
     const reader = {
+      validateProject: async () => true,
       listStyles: async () => ["src/theme.scss"],
       readCss: async () => {
         reads++;

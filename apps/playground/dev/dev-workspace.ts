@@ -48,6 +48,7 @@ import {
   editElementText,
   formatLineDiff,
   listOids,
+  validateResponsiveProject,
 } from "@allstudio/editor/source-mapper";
 
 const EDITABLE_EXTENSIONS = [".tsx", ".jsx"];
@@ -308,49 +309,69 @@ export class DevWorkspace implements SourceEditWorkspace {
         throw error;
       }
     };
+    const listMetadata = async (sources = false) => {
+      const paths: string[] = [];
+      let entries = 0;
+      const walk = async (relative: string, depth: number): Promise<void> => {
+        const absolute = join(this.root, relative);
+        if (depth > 32 || (await realpath(absolute)) !== absolute)
+          throw new Error("Unsafe directory");
+        for (const entry of await readdir(absolute, {
+          withFileTypes: true,
+        })) {
+          if (++entries > 10000) throw new Error("Style entry limit");
+          const path = relative ? `${relative}/${entry.name}` : entry.name;
+          if (SKIPPED_DIRECTORIES.has(entry.name)) continue;
+          if (entry.isSymbolicLink()) throw new Error("Symlink in styles");
+          if (entry.isDirectory()) {
+            if (!SKIPPED_DIRECTORIES.has(entry.name))
+              await walk(path, depth + 1);
+          } else if (
+            sources
+              ? /\.(tsx|jsx|ts|js|mjs|cjs)$/.test(entry.name)
+              : /\.(css|scss|sass|less|pcss|postcss|styl|stylus)$/i.test(
+                  entry.name,
+                ) ||
+                /^(?:postcss\.config\.|\.postcssrc|tailwind\.config\.|babel\.config\.|\.babelrc|\.swcrc$)/.test(
+                  entry.name,
+                )
+          ) {
+            const info = await lstat(join(this.root, path));
+            if (
+              !info.isFile() ||
+              info.nlink !== 1 ||
+              info.size > MAX_FILE_BYTES ||
+              path.length > 1024 ||
+              paths.length >= 1000
+            )
+              throw new Error("Unsafe style");
+            paths.push(path);
+          }
+        }
+      };
+      await walk(sources ? "src" : "", 0);
+      return paths.sort();
+    };
     return readResponsiveMetadata({
+      listStyles: () => listMetadata(),
+      validateProject: (styles) =>
+        validateResponsiveProject(
+          {
+            listSources: () => listMetadata(true),
+            readSource: async (path) => {
+              const value = await readBounded(path, true);
+              if (!value) throw new Error("Missing module");
+              return value;
+            },
+            readConfig: (path) => readBounded(path, true),
+          },
+          styles,
+        ),
       readRootMetadata: (path) => readBounded(path, true),
       readCss: async (path) => {
         const bytes = await readBounded(path);
         if (!bytes) throw new Error("Missing CSS");
         return bytes;
-      },
-      listStyles: async () => {
-        const paths: string[] = [];
-        let entries = 0;
-        const walk = async (relative: string, depth: number): Promise<void> => {
-          const absolute = join(this.root, relative);
-          if (depth > 32 || (await realpath(absolute)) !== absolute)
-            throw new Error("Unsafe directory");
-          for (const entry of await readdir(absolute, {
-            withFileTypes: true,
-          })) {
-            if (++entries > 10000) throw new Error("Style entry limit");
-            const path = `${relative}/${entry.name}`;
-            if (entry.isSymbolicLink()) throw new Error("Symlink in styles");
-            if (entry.isDirectory()) {
-              if (!SKIPPED_DIRECTORIES.has(entry.name))
-                await walk(path, depth + 1);
-            } else if (
-              /\.(css|scss|sass|less|pcss|postcss|styl|stylus)$/i.test(
-                entry.name,
-              )
-            ) {
-              const info = await lstat(join(this.root, path));
-              if (
-                !info.isFile() ||
-                info.nlink !== 1 ||
-                info.size > MAX_FILE_BYTES ||
-                path.length > 1024 ||
-                paths.length >= 1000
-              )
-                throw new Error("Unsafe style");
-              paths.push(path);
-            }
-          }
-        };
-        await walk("src", 0);
-        return paths.sort();
       },
     });
   }

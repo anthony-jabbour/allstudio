@@ -42,9 +42,17 @@ export class NativeFiles {
   async readCss(path: string): Promise<{ bytes: Buffer; mode: number }> {
     return this.readChecked("read-css", path);
   }
+  async readAuditSource(
+    path: string,
+  ): Promise<{ bytes: Buffer; mode: number }> {
+    return this.readChecked("read-audit-source", path);
+  }
+  async listAuditSources(): Promise<string[]> {
+    return this.listChecked("list-audit-sources");
+  }
 
   private async readChecked(
-    operation: "read" | "read-css",
+    operation: "read" | "read-css" | "read-audit-source",
     path: string,
   ): Promise<{ bytes: Buffer; mode: number }> {
     const result = await this.run(operation, path);
@@ -83,7 +91,7 @@ export class NativeFiles {
   }
 
   private async listChecked(
-    operation: "list" | "list-styles",
+    operation: "list" | "list-styles" | "list-audit-sources",
   ): Promise<string[]> {
     const output = await this.run(operation, "src");
     if (output.subarray(0, 3).toString() !== "OK\n")
@@ -195,6 +203,8 @@ export class NativeFiles {
           operation === "read" ||
           operation === "list" ||
           operation === "read-css" ||
+          operation === "read-audit-source" ||
+          operation === "list-audit-sources" ||
           operation === "list-styles" ||
           output.toString() === "READY\nPREPARED\nOK\n"
         )

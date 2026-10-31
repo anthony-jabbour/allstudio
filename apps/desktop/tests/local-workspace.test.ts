@@ -78,6 +78,32 @@ describe("real local workspace", () => {
         breakpoint: "md" as const,
       };
       expect((await current.previewClassEdit(request)).ok).toBe(true);
+      // Repeated audits must not consume the persistent grant's directory offset.
+      expect((await current.getResponsiveCapabilities()).status).toBe(
+        "supported-defaults",
+      );
+      for (const [path, content] of [
+        ["theme.css", "@theme{--breakpoint-md:900px}"],
+        [".postcssrc.json", '{"plugins":{"custom":{}}}'],
+      ]) {
+        await writeFile(join(root, path), content);
+        expect((await current.getResponsiveCapabilities()).status).toBe(
+          "unsupported",
+        );
+        expect(await current.applyClassEdit(request)).toMatchObject({
+          ok: false,
+          reason: "unsupported-breakpoints",
+        });
+        await rm(join(root, path));
+      }
+      await writeFile(
+        join(root, "src/page.tsx"),
+        'import "../../outside.css";\n' + source,
+      );
+      expect((await current.getResponsiveCapabilities()).status).toBe(
+        "unsupported",
+      );
+      await writeFile(join(root, "src/page.tsx"), source);
       expect(await readFile(join(root, "src/page.tsx"), "utf8")).toBe(source);
       await writeFile(
         join(root, "src/globals.css"),

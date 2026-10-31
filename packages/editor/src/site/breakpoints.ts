@@ -20,6 +20,7 @@ export type ResponsiveRootMetadata =
   | "tailwind.config.js"
   | "tailwind.config.cjs";
 export interface ResponsiveMetadataReader {
+  validateProject(stylePaths: readonly string[]): Promise<boolean>;
   listStyles(): Promise<string[]>;
   readCss(path: string): Promise<Uint8Array>;
   readRootMetadata(path: ResponsiveRootMetadata): Promise<Uint8Array | null>;
@@ -59,6 +60,8 @@ export async function readResponsiveMetadata(
         return { status: "unsupported", reason: "limits" };
       styles.push({ path, text: decoder.decode(bytes) });
     }
+    if (!(await reader.validateProject(paths)))
+      return { status: "unsupported", reason: "config" };
     return auditDefaultBreakpoints({
       packageJson: decoder.decode(pkg),
       configs,
@@ -159,6 +162,8 @@ export function auditDefaultBreakpoints(
   if (input.configs.length) return unsupported("config");
   try {
     const pkg = JSON.parse(input.packageJson);
+    if (["postcss", "babel", "browser"].some((key) => Object.hasOwn(pkg, key)))
+      return unsupported("config");
     const version =
       pkg?.dependencies?.tailwindcss ?? pkg?.devDependencies?.tailwindcss;
     if (
