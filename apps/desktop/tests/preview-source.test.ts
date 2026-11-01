@@ -3,6 +3,7 @@ import {
   editElementClassName,
   editElementText,
   listOids,
+  reorderSibling,
 } from "../../../packages/editor/src/source-mapper/index.ts";
 import {
   preparePreviewSource,
@@ -10,6 +11,36 @@ import {
 } from "../../../scripts/spikes/preview-source.ts";
 
 describe("preview-only instrumentation feasibility", () => {
+  it("restores moved virtual attributes by identity and remaps the moved ordinal", () => {
+    const source =
+      "export default function Page(){return <main><h1 data-oid = 'user-heading'>Hello</h1>\n <p data-oid=\"user-p\">Keep</p></main>}";
+    const preview = preparePreviewSource("src/app/page.tsx", source);
+    const [root, heading, paragraph] = preview.injectedOids;
+    if (!root || !heading || !paragraph) throw new Error("Missing IDs");
+    const swapped = reorderSibling(preview.content, heading, paragraph, "down");
+    if (!swapped.ok) throw new Error(swapped.reason);
+    expect(() => stripPreviewOids(swapped.generated, preview)).toThrow();
+    const restored = stripPreviewOids(
+      swapped.generated,
+      preview,
+      swapped.oidOrder,
+    );
+    expect(restored).toBe(
+      "export default function Page(){return <main><p data-oid=\"user-p\">Keep</p>\n <h1 data-oid = 'user-heading'>Hello</h1></main>}",
+    );
+    const next = preparePreviewSource("src/app/page.tsx", restored);
+    expect(swapped.movedOrdinal).toBe(2);
+    expect(next.injectedOids[swapped.movedOrdinal]).not.toBe(
+      next.injectedOids[1],
+    );
+    expect(() =>
+      stripPreviewOids(swapped.generated, preview, [
+        root,
+        paragraph,
+        paragraph,
+      ]),
+    ).toThrow();
+  });
   const source =
     'export default function Page() { return <main><h1 className="old">Hello</h1><p data-oid="user-id">Keep</p></main>; }';
   it("creates stable preview IDs without modifying original source or existing IDs", () => {

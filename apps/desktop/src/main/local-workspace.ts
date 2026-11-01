@@ -8,6 +8,7 @@ import {
   isEditBreakpoint,
   type LocateElementResult,
   type ProjectRoutesSnapshot,
+  type ReorderEditRequest,
   type ResponsiveCapabilities,
   readResponsiveMetadata,
   resolvePreviewRouteUrl,
@@ -25,7 +26,9 @@ import {
   editElementClassName,
   editElementText,
   formatLineDiff,
+  inspectSiblingReorder,
   listOids,
+  reorderSibling,
   type SourceLocation,
   validateResponsiveProject,
 } from "@allstudio/editor/source-mapper";
@@ -351,6 +354,11 @@ export class LocalWorkspace implements SourceEditWorkspace {
               location: originalLocation(described.location, preview),
               text: described.text,
               className: described.className,
+              reorder: (await this.discoverRoutes()).routes.some(
+                (route) => route.sourcePath === path,
+              )
+                ? inspectSiblingReorder(preview.content, oid)
+                : { ok: false, reason: "unsupported-reorder" },
             },
           });
         } catch {
@@ -380,10 +388,16 @@ export class LocalWorkspace implements SourceEditWorkspace {
   applyClassEdit(request: ClassEditRequest) {
     return this.enqueue(() => this.edit(request, "className", true));
   }
+  previewReorder(request: ReorderEditRequest) {
+    return this.edit(request, "reorder", false);
+  }
+  applyReorder(request: ReorderEditRequest) {
+    return this.enqueue(() => this.edit(request, "reorder", true));
+  }
 
   private async edit(
-    request: TextEditRequest | ClassEditRequest,
-    field: "text" | "className",
+    request: TextEditRequest | ClassEditRequest | ReorderEditRequest,
+    field: "text" | "className" | "reorder",
     write: boolean,
   ): Promise<TextEditResult> {
     if (!isSourcePath(request.path)) return sourceEditFailure("path-rejected");
@@ -410,20 +424,6 @@ export class LocalWorkspace implements SourceEditWorkspace {
         join(this.root, request.path),
         source,
       );
-      const value =
-        field === "text"
-          ? (request as TextEditRequest).text
-          : (request as ClassEditRequest).className;
-      const described = describeElement(preview.content, request.oid);
-      if (!described.ok) return sourceEditFailure(described.reason);
-      const current = field === "text" ? described.text : described.className;
-      if (!current.ok) return sourceEditFailure(current.reason);
-      const currentValue =
-        field === "text" && described.text.ok
-          ? described.text.text
-          : described.className.ok
-            ? (described.className.value ?? "")
-            : null;
       const noop = {
         ok: true as const,
         written: false,
@@ -431,27 +431,70 @@ export class LocalWorkspace implements SourceEditWorkspace {
         sha256: hash(before),
         diff: "",
       };
-      if (currentValue === value) return noop;
-      const patched =
-        field === "text"
-          ? editElementText(preview.content, request.oid, value)
-          : editElementClassName(preview.content, request.oid, value);
-      if (!patched.ok) return sourceEditFailure(patched.reason);
-      const check = describeElement(patched.generated, request.oid);
-      const readBack = check.ok
-        ? field === "text" && check.text.ok
-          ? check.text.text
-          : check.className.ok
-            ? (check.className.value ?? "")
-            : null
-        : null;
-      if (
-        readBack !== value ||
-        JSON.stringify(listOids(preview.content)?.sort()) !==
-          JSON.stringify(listOids(patched.generated)?.sort())
-      )
-        return sourceEditFailure("invalid-patch");
-      const generated = stripPreviewOids(patched.generated, preview);
+      let patchedContent: string;
+      let reordered: Extract<
+        ReturnType<typeof reorderSibling>,
+        { ok: true }
+      > | null = null;
+      if (field === "reorder") {
+        if (
+          !(await this.discoverRoutes()).routes.some(
+            (route) => route.sourcePath === request.path,
+          )
+        )
+          return sourceEditFailure("unsupported-reorder");
+        const move = request as ReorderEditRequest;
+        const result = reorderSibling(
+          preview.content,
+          move.oid,
+          move.siblingOid,
+          move.direction,
+        );
+        if (!result.ok) return sourceEditFailure(result.reason);
+        reordered = result;
+        patchedContent = result.generated;
+      } else {
+        const value =
+          field === "text"
+            ? (request as TextEditRequest).text
+            : (request as ClassEditRequest).className;
+        const described = describeElement(preview.content, request.oid);
+        if (!described.ok) return sourceEditFailure(described.reason);
+        const current = field === "text" ? described.text : described.className;
+        if (!current.ok) return sourceEditFailure(current.reason);
+        const currentValue =
+          field === "text" && described.text.ok
+            ? described.text.text
+            : described.className.ok
+              ? (described.className.value ?? "")
+              : null;
+        if (currentValue === value) return noop;
+        const patched =
+          field === "text"
+            ? editElementText(preview.content, request.oid, value)
+            : editElementClassName(preview.content, request.oid, value);
+        if (!patched.ok) return sourceEditFailure(patched.reason);
+        const check = describeElement(patched.generated, request.oid);
+        const readBack = check.ok
+          ? field === "text" && check.text.ok
+            ? check.text.text
+            : check.className.ok
+              ? (check.className.value ?? "")
+              : null
+          : null;
+        if (
+          readBack !== value ||
+          JSON.stringify(listOids(preview.content)?.sort()) !==
+            JSON.stringify(listOids(patched.generated)?.sort())
+        )
+          return sourceEditFailure("invalid-patch");
+        patchedContent = patched.generated;
+      }
+      const generated = stripPreviewOids(
+        patchedContent,
+        preview,
+        reordered?.oidOrder,
+      );
       if (!listOids(generated)) return sourceEditFailure("invalid-patch");
       if (generated === source) return noop;
       const after = Buffer.from(generated);
@@ -460,10 +503,15 @@ export class LocalWorkspace implements SourceEditWorkspace {
         join(this.root, request.path),
         generated,
       );
-      const ordinal = preview.injectedOids.indexOf(request.oid);
+      const ordinal =
+        reordered?.movedOrdinal ?? preview.injectedOids.indexOf(request.oid);
       const nextOid = next.injectedOids[ordinal];
       if (!nextOid || next.injectedOids.length !== preview.injectedOids.length)
         return sourceEditFailure("invalid-patch");
+      const siblingOid = reordered
+        ? next.injectedOids[reordered.siblingOrdinal]
+        : undefined;
+      if (reordered && !siblingOid) return sourceEditFailure("invalid-patch");
       const diff = formatLineDiff(
         createLineDiff(source, generated),
         request.path,
@@ -487,6 +535,17 @@ export class LocalWorkspace implements SourceEditWorkspace {
         noop: false,
         sha256: write ? hash(after) : hash(before),
         oid: write ? nextOid : request.oid,
+        ...(reordered && siblingOid
+          ? {
+              reorder: {
+                oid: write ? nextOid : request.oid,
+                siblingOid: write
+                  ? siblingOid
+                  : (request as ReorderEditRequest).siblingOid,
+                direction: (request as ReorderEditRequest).direction,
+              },
+            }
+          : {}),
         diff,
       };
     } catch (error) {

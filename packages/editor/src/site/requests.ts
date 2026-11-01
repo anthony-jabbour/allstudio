@@ -1,6 +1,7 @@
 import { isEditBreakpoint } from "./class-tokens.ts";
 import type {
   ClassEditRequest,
+  ReorderEditRequest,
   SelectRouteRequest,
   TextEditRequest,
 } from "./source-edit-workspace.ts";
@@ -10,6 +11,34 @@ const MAX_CLASS_LENGTH = 1000;
 const MAX_ROUTE_LENGTH = 256;
 const OID_PATTERN = /^[a-z0-9\-._:]{1,64}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
+export function parseReorderBody(body: unknown): ReorderEditRequest | null {
+  if (
+    !hasExactKeys(body, [
+      "path",
+      "oid",
+      "siblingOid",
+      "direction",
+      "expectedSha256",
+    ])
+  )
+    return null;
+  const { path, oid, siblingOid, direction, expectedSha256 } = body;
+  if (
+    typeof path !== "string" ||
+    path.length > 1024 ||
+    typeof oid !== "string" ||
+    !OID_PATTERN.test(oid) ||
+    typeof siblingOid !== "string" ||
+    !OID_PATTERN.test(siblingOid) ||
+    oid === siblingOid ||
+    (direction !== "up" && direction !== "down") ||
+    typeof expectedSha256 !== "string" ||
+    !SHA256_PATTERN.test(expectedSha256)
+  )
+    return null;
+  return { path, oid, siblingOid, direction, expectedSha256 };
+}
 
 export function hasExactKeys(
   value: unknown,

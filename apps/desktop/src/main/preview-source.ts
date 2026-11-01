@@ -15,19 +15,42 @@ export interface PreviewSource {
 export function stripPreviewOids(
   content: string,
   preview: PreviewSource,
+  expectedOrder: readonly string[] = preview.injectedOids,
 ): string {
   const ranges = listOidAttributes(content);
   if (
     !ranges ||
     JSON.stringify(ranges.map((item) => item.oid)) !==
-      JSON.stringify(preview.injectedOids)
+      JSON.stringify(expectedOrder) ||
+    expectedOrder.length !== preview.injectedOids.length ||
+    new Set(expectedOrder).size !== expectedOrder.length ||
+    JSON.stringify([...expectedOrder].sort()) !==
+      JSON.stringify([...preview.injectedOids].sort())
   )
     throw new Error("Preview attributes missing or ambiguous");
+  let originalIndex = 0;
+  const byOid = new Map(
+    preview.injectedOids.map((oid, index) => {
+      const attribute = preview.attributes[index];
+      if (!attribute) throw new Error("Preview mapping missing");
+      return [
+        oid,
+        {
+          ...attribute,
+          originalOid:
+            attribute.original === ""
+              ? null
+              : preview.originalOids[originalIndex++],
+        },
+      ] as const;
+    }),
+  );
   let original = content;
-  const edits = ranges.map((range, i) => ({
-    range,
-    attribute: preview.attributes[i],
-  }));
+  const edits = ranges.map((range) => {
+    const attribute = byOid.get(range.oid);
+    if (!attribute) throw new Error("Preview mapping missing");
+    return { range, attribute };
+  });
   for (const { range, attribute } of edits.sort(
     (a, b) => b.range.start - a.range.start,
   )) {
@@ -38,7 +61,15 @@ export function stripPreviewOids(
       original.slice(0, start) + attribute.original + original.slice(range.end);
   }
   if (
-    JSON.stringify(listOids(original)) !== JSON.stringify(preview.originalOids)
+    JSON.stringify(listOids(original)) !==
+    JSON.stringify(
+      expectedOrder.flatMap((oid) => {
+        const originalOid = byOid.get(oid)?.originalOid;
+        return originalOid === null || originalOid === undefined
+          ? []
+          : [originalOid];
+      }),
+    )
   )
     throw new Error("Original source IDs changed");
   return original;

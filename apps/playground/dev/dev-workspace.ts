@@ -29,6 +29,8 @@ import {
   isEditBreakpoint,
   type LocateElementResult,
   type ProjectRoutesSnapshot,
+  type ReorderEditRequest,
+  type ReorderReceipt,
   type ResponsiveCapabilities,
   readResponsiveMetadata,
   resolvePreviewRouteUrl,
@@ -47,7 +49,9 @@ import {
   editElementClassName,
   editElementText,
   formatLineDiff,
+  inspectSiblingReorder,
   listOids,
+  reorderSibling,
   validateResponsiveProject,
 } from "@allstudio/editor/source-mapper";
 
@@ -233,6 +237,11 @@ export class DevWorkspace implements SourceEditWorkspace {
           location: described.location,
           text: described.text,
           className: described.className,
+          reorder: (await this.discoverRoutes()).routes.some(
+            (route) => route.sourcePath === path,
+          )
+            ? inspectSiblingReorder(content, oid)
+            : { ok: false, reason: "unsupported-reorder" },
         },
       });
     }
@@ -243,6 +252,14 @@ export class DevWorkspace implements SourceEditWorkspace {
     return matches[0] ?? sourceEditFailure("oid-not-found");
   }
 
+  previewReorder(request: ReorderEditRequest): Promise<TextEditResult> {
+    return this.edit(request.path, { ...request, kind: "reorder" }, false);
+  }
+  applyReorder(request: ReorderEditRequest): Promise<TextEditResult> {
+    return this.serialized(request.path, () =>
+      this.edit(request.path, { ...request, kind: "reorder" }, true),
+    );
+  }
   previewTextEdit(request: TextEditRequest): Promise<TextEditResult> {
     return this.edit(request.path, toTextEdit(request), false);
   }
@@ -438,7 +455,7 @@ export class DevWorkspace implements SourceEditWorkspace {
 
   private async edit(
     path: string,
-    edit: ElementEditRequest,
+    edit: ElementEditRequest | (ReorderEditRequest & { kind: "reorder" }),
     write: boolean,
   ): Promise<TextEditResult> {
     const resolved = await this.resolve(path);
@@ -457,16 +474,6 @@ export class DevWorkspace implements SourceEditWorkspace {
       return sourceEditFailure("stale-file");
     }
 
-    const described = describeElement(content, edit.oid, {
-      filename: resolved.relative,
-    });
-    if (!described.ok) {
-      return sourceEditFailure(described.reason);
-    }
-    const current = edit.kind === "text" ? described.text : described.className;
-    if (!current.ok) {
-      return sourceEditFailure(current.reason);
-    }
     const noop = {
       ok: true as const,
       written: false,
@@ -474,24 +481,60 @@ export class DevWorkspace implements SourceEditWorkspace {
       sha256: currentSha,
       diff: "",
     };
-    if (renderedValue(described, edit.kind) === expectedValue(edit)) {
-      return noop;
-    }
+    let generated: string;
+    let reorder: ReorderReceipt | undefined;
+    if (edit.kind === "reorder") {
+      if (
+        !(await this.discoverRoutes()).routes.some(
+          (route) => route.sourcePath === path,
+        )
+      )
+        return sourceEditFailure("unsupported-reorder");
+      const result = reorderSibling(
+        content,
+        edit.oid,
+        edit.siblingOid,
+        edit.direction,
+      );
+      if (!result.ok) return sourceEditFailure(result.reason);
+      generated = result.generated;
+      reorder = {
+        oid: edit.oid,
+        siblingOid: edit.siblingOid,
+        direction: edit.direction,
+      };
+    } else {
+      const described = describeElement(content, edit.oid, {
+        filename: resolved.relative,
+      });
+      if (!described.ok) {
+        return sourceEditFailure(described.reason);
+      }
+      const current =
+        edit.kind === "text" ? described.text : described.className;
+      if (!current.ok) {
+        return sourceEditFailure(current.reason);
+      }
+      if (renderedValue(described, edit.kind) === expectedValue(edit)) {
+        return noop;
+      }
 
-    const patched = this.editElement(content, edit);
-    if (!patched.ok) {
-      return sourceEditFailure(patched.reason);
-    }
-    if (patched.generated === content) {
-      return noop;
-    }
-    const failure = validatePatch(content, patched.generated, edit);
-    if (failure) {
-      return sourceEditFailure(failure);
-    }
+      const patched = this.editElement(content, edit);
+      if (!patched.ok) {
+        return sourceEditFailure(patched.reason);
+      }
+      if (patched.generated === content) {
+        return noop;
+      }
+      const failure = validatePatch(content, patched.generated, edit);
+      if (failure) {
+        return sourceEditFailure(failure);
+      }
 
+      generated = patched.generated;
+    }
     const diff = formatLineDiff(
-      createLineDiff(content, patched.generated),
+      createLineDiff(content, generated),
       resolved.relative,
     );
     if (!write) {
@@ -501,6 +544,7 @@ export class DevWorkspace implements SourceEditWorkspace {
         noop: false,
         sha256: currentSha,
         diff,
+        ...(reorder ? { oid: edit.oid, reorder } : {}),
       };
     }
 
@@ -517,7 +561,7 @@ export class DevWorkspace implements SourceEditWorkspace {
     }
     const written = await writeAtomically(
       resolved.absolute,
-      patched.generated,
+      generated,
       before.mode & 0o7777,
       // A directory swapped for a symlink since `resolve` must not redirect
       // the rename.
@@ -535,8 +579,9 @@ export class DevWorkspace implements SourceEditWorkspace {
       ok: true,
       written: true,
       noop: false,
-      sha256: sha256(patched.generated),
+      sha256: sha256(generated),
       diff,
+      ...(reorder ? { oid: edit.oid, reorder } : {}),
     };
   }
 }

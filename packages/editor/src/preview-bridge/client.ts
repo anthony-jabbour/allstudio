@@ -17,9 +17,10 @@ export interface PreviewBridgeConfig {
 
 const EDITOR_SOURCE = "allstudio-editor";
 const PREVIEW_SOURCE = "allstudio-preview";
-const VERSION = 7;
+const VERSION = 8;
 const OID_ATTRIBUTE = "data-oid";
 const MAX_TEXT_LENGTH = 2000;
+const MAX_INSTANCES = 10_000;
 const MAX_LAYER_NODES = 1000;
 const MAX_LAYER_DEPTH = 64;
 const MAX_LAYER_LABEL_LENGTH = 80;
@@ -106,6 +107,19 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
       `[${OID_ATTRIBUTE}="${CSS.escape(oid)}"]`,
     ).length;
     const rect = element.getBoundingClientRect();
+    const neighbor = (sibling: Element | null) => {
+      const oid = sibling?.getAttribute(OID_ATTRIBUTE);
+      if (!sibling?.isConnected || !validOid(oid)) return null;
+      const instances = document.querySelectorAll(
+        `[${OID_ATTRIBUTE}="${CSS.escape(oid)}"]`,
+      ).length;
+      if (instances < 1 || instances > MAX_INSTANCES) return null;
+      return {
+        oid,
+        nodeId: nodeId(sibling),
+        instances,
+      };
+    };
     const typography = Object.fromEntries(
       TYPOGRAPHY_KEYS.map((key) => [key, null]),
     ) as Record<(typeof TYPOGRAPHY_KEYS)[number], string | null>;
@@ -140,6 +154,10 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
       // A detached/unavailable measurement is not a default property value.
     }
     return {
+      neighbors: {
+        previous: neighbor(element.previousElementSibling),
+        next: neighbor(element.nextElementSibling),
+      },
       layout,
       appearance,
       spacing,

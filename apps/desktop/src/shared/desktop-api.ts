@@ -28,6 +28,14 @@ export interface DesktopApi {
     request: ClassEditRequest,
   ): Promise<TextEditResult>;
   selectRoute(projectId: string, route: string): Promise<SelectRouteResult>;
+  previewReorder(
+    projectId: string,
+    request: ReorderEditRequest,
+  ): Promise<TextEditResult>;
+  applyReorder(
+    projectId: string,
+    request: ReorderEditRequest,
+  ): Promise<TextEditResult>;
   getResponsiveCapabilities(projectId: string): Promise<ResponsiveCapabilities>;
   undo(projectId: string): Promise<TextEditResult>;
   redo(projectId: string): Promise<TextEditResult>;
@@ -40,6 +48,7 @@ import type {
   ClassEditRequest,
   DiscoveredRoute,
   LocateElementResult,
+  ReorderEditRequest,
   ResponsiveCapabilities,
   SelectRouteResult,
   TextEditRequest,

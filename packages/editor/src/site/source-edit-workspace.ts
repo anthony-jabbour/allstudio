@@ -1,4 +1,8 @@
 import type {
+  ReorderDirection,
+  ReorderInspection,
+} from "../source-mapper/reorder.ts";
+import type {
   ElementClassName,
   ElementTextContent,
   SourceLocation,
@@ -16,6 +20,8 @@ import type { EditBreakpoint } from "./class-tokens.ts";
 import type { DiscoveredRoute, UnsupportedRoute } from "./routes.ts";
 
 export interface SourceEditWorkspace {
+  previewReorder?(request: ReorderEditRequest): Promise<TextEditResult>;
+  applyReorder?(request: ReorderEditRequest): Promise<TextEditResult>;
   getResponsiveCapabilities?(): Promise<ResponsiveCapabilities>;
   locate(oid: string): Promise<LocateElementResult>;
   /** Computes the patch for review. Never writes. */
@@ -46,6 +52,7 @@ export interface SelectRouteSuccess {
 export type SelectRouteResult = SelectRouteSuccess | SourceEditFailure;
 
 export interface SourceElementInfo {
+  reorder?: ReorderInspection;
   /** Workspace-relative POSIX path, e.g. `src/app/page.tsx`. */
   path: string;
   /** SHA-256 of the file content the location was read from. */
@@ -60,6 +67,18 @@ export interface TextEditRequest {
   oid: string;
   expectedSha256: string;
   text: string;
+}
+export interface ReorderEditRequest {
+  path: string;
+  oid: string;
+  siblingOid: string;
+  direction: ReorderDirection;
+  expectedSha256: string;
+}
+export interface ReorderReceipt {
+  oid: string;
+  siblingOid: string;
+  direction: ReorderDirection;
 }
 
 export interface ClassEditRequest {
@@ -107,6 +126,7 @@ export type TextEditResult =
       sha256: string;
       /** Replacement preview ID when the adapter binds IDs to source versions. */
       oid?: string;
+      reorder?: ReorderReceipt;
       /** Unified diff of the change, empty for no-ops. */
       diff: string;
     }
@@ -129,6 +149,8 @@ const FAILURE_MESSAGES: Record<SourceEditFailureReason, string> = {
   "unconfined-patch":
     "This edit would change code outside the selected element (for example by reformatting). Nothing was written.",
   "invalid-request": "The edit request was malformed.",
+  "unsupported-reorder":
+    "Only adjacent static siblings in the default page component can be rearranged. Comments, expressions, reused instances and component-call ownership are not guessed.",
   "unsupported-breakpoints":
     "Default project breakpoints could not be validated. Scoped changes were not written; Base editing remains available.",
   unauthorized: "The workspace rejected the request.",
@@ -179,6 +201,7 @@ export {
   hasExactKeys,
   parseClassEditBody,
   parseLocateBody,
+  parseReorderBody,
   parseSelectRouteBody,
   parseTextEditBody,
 } from "./requests.ts";

@@ -762,3 +762,51 @@ describe("responsive breakpoint audit", () => {
     );
   });
 });
+
+describe("bounded sibling reorder workspace", () => {
+  it("previews then persists only the adjacent source swap and refuses stale or unrelated targets", async () => {
+    const workspace = await DevWorkspace.open(workspaceDir);
+    const { oid, element } = await heading(workspace);
+    const inspected = await workspace.locate(oid);
+    if (
+      !inspected.ok ||
+      !inspected.element.reorder?.ok ||
+      !inspected.element.reorder.up
+    )
+      throw new Error("Missing supported neighbor");
+    const siblingOid = inspected.element.reorder.up.oid;
+    const request = {
+      path: element.path,
+      oid,
+      siblingOid,
+      direction: "up" as const,
+      expectedSha256: element.sha256,
+    };
+    const before = await readFile(pageFile, "utf8");
+    const patch = await workspace.previewReorder(request);
+    expect(patch).toMatchObject({ ok: true, written: false, noop: false });
+    expect(await readFile(pageFile, "utf8")).toBe(before);
+    const result = await workspace.applyReorder(request);
+    expect(result).toMatchObject({
+      ok: true,
+      written: true,
+      reorder: { oid, siblingOid, direction: "up" },
+    });
+    const after = await readFile(pageFile, "utf8");
+    expect(after.indexOf('id="hero-heading"')).toBeLessThan(
+      after.indexOf("allstudio fixture"),
+    );
+    expect(await workspace.applyReorder(request)).toMatchObject({
+      ok: false,
+      reason: "stale-file",
+    });
+    expect(await readFile(pageFile, "utf8")).toBe(after);
+    expect(
+      await workspace.applyReorder({
+        ...request,
+        expectedSha256: sha256(after),
+        siblingOid: oid,
+      }),
+    ).toMatchObject({ ok: false, reason: "unsupported-reorder" });
+  });
+});
