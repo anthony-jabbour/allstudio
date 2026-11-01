@@ -633,3 +633,14 @@ code,
   position: absolute;
   inset: 0 auto auto 0;
 }
+.layer-row[draggable="true"] {
+  cursor: grab;
+}
+.layer-row.layer-drop-target {
+  outline: 2px solid #3879ff;
+  outline-offset: -2px;
+}
+.structure-inspector {
+  padding-block: 12px;
+  border-bottom: 1px solid var(--studio-border);
+}

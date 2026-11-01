@@ -2,6 +2,7 @@ import {
   type ClassEditRequest,
   type DiscoveredRoute,
   type LocateElementResult,
+  type ReorderEditRequest,
   type ResponsiveCapabilities,
   type SelectRouteResult,
   type SourceEditWorkspace,
@@ -40,6 +41,10 @@ export function createHttpWorkspace(
   }
 
   return {
+    previewReorder: (request: ReorderEditRequest) =>
+      call<TextEditResult>("preview-reorder", request),
+    applyReorder: (request: ReorderEditRequest) =>
+      call<TextEditResult>("apply-reorder", request),
     getResponsiveCapabilities: () =>
       call<ResponsiveCapabilities>("responsive-capabilities", {}),
     locate: (oid) => call<LocateElementResult>("locate", { oid }),

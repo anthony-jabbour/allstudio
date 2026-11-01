@@ -99,6 +99,14 @@ async function toolbar(page, name) {
   await expect(button).toBeEnabled();
   await button.press("Enter");
 }
+async function showRootRoute(page) {
+  await page
+    .getByText("Preview bridge: connected", { exact: false })
+    .waitFor({ timeout: 60000 });
+  const root = page.locator('button.page-item[data-route="/"]');
+  await root.click();
+  await expect(root).toHaveAttribute("aria-current", "page");
+}
 
 async function launch() {
   application = await _electron.launch({
@@ -212,7 +220,15 @@ async function launch() {
     await application.evaluate(({ app }) => app.getPath("userData")),
     profile,
   );
-  return application.firstWindow();
+  const page = await application.firstWindow();
+  await application.evaluate(({ BrowserWindow }) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.setBackgroundThrottling(false);
+      window.on("show", () => window.hide());
+      window.hide();
+    }
+  });
+  return page;
 }
 
 const occupied = createServer((_request, response) =>
@@ -1192,7 +1208,10 @@ try {
     .context()
     .tracing.stop({ path: join(evidence, "reopen-trace.zip") });
   const reopenedPreview = page.frameLocator('iframe[title="Project preview"]');
-  await reopenedPreview.locator("h1").click();
+  await reopenedPreview.locator("h1").click({ position: { x: 8, y: 8 } });
+  await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+    "Saved locally",
+  );
   await page.getByLabel("Text", { exact: true }).fill("Recovered local edit");
   const beforeCrash = await readFile(sourceFile, "utf8");
   orphanPid = await application.evaluate(() => globalThis.previewPid);
@@ -1424,6 +1443,7 @@ try {
   }
   if (fixtureName === "nextjs-site-fixture") {
     await toolbar(page, "Reopen");
+    await showRootRoute(page);
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
@@ -1448,6 +1468,7 @@ try {
     application = undefined;
     page = await launch();
     await toolbar(page, "Reopen");
+    await showRootRoute(page);
     await expect
       .poll(
         () =>
@@ -1490,6 +1511,7 @@ try {
     application = undefined;
     page = await launch();
     await toolbar(page, "Reopen");
+    await showRootRoute(page);
     await expect
       .poll(
         () =>
@@ -1547,6 +1569,7 @@ try {
     application = undefined;
     page = await launch();
     await toolbar(page, "Reopen");
+    await showRootRoute(page);
     await expect
       .poll(
         () =>
@@ -1614,6 +1637,7 @@ try {
     application = undefined;
     page = await launch();
     await toolbar(page, "Reopen");
+    await showRootRoute(page);
     await expect
       .poll(
         () =>
@@ -1664,6 +1688,7 @@ try {
         await readFile(join(fixture, "next.config.ts"), "utf8"),
       );
       await toolbar(page, "Reopen");
+      await showRootRoute(page);
       await page
         .getByText("Preview bridge: connected", { exact: false })
         .waitFor({ timeout: 60000 });
@@ -1747,6 +1772,7 @@ try {
     application = undefined;
     page = await launch();
     await toolbar(page, "Reopen");
+    await showRootRoute(page);
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
@@ -1782,6 +1808,111 @@ try {
     await page.screenshot({ path: join(evidence, "responsive-reopened.png") });
     pass(
       "scoped typography/spacing/appearance/sizing: exact native source diff, undo/redo, real rendering and full offline-capable quit/reopen persistence",
+    );
+  }
+  if (fixtureName === "nextjs-site-fixture") {
+    const live = () => page.frameLocator('iframe[title="Project preview"]');
+    await live().locator("h1").click();
+    await expect(
+      page.getByRole("button", { name: "Move layer up", exact: true }),
+    ).toBeEnabled();
+    const beforeMove = await readFile(sourceFile, "utf8");
+    const first = beforeMove.match(
+      /<p\b[^>]*>[\s\S]*?allstudio fixture[\s\S]*?<\/p>/,
+    )?.[0];
+    const heading = beforeMove.match(/<h1\b[\s\S]*?<\/h1>/)?.[0];
+    if (!first || !heading) throw new Error("Missing static move pair");
+    const gap = beforeMove.slice(
+      beforeMove.indexOf(first) + first.length,
+      beforeMove.indexOf(heading),
+    );
+    const afterMove = beforeMove.replace(
+      first + gap + heading,
+      heading + gap + first,
+    );
+    const performMove = async (direction) => {
+      const current = await readFile(sourceFile, "utf8");
+      await toolbar(page, `Move layer ${direction}`);
+      assert.equal(await readFile(sourceFile, "utf8"), current);
+      await toolbar(page, "Apply layer move");
+      await expect(page.getByText(/Saved sibling order.*observed/)).toBeVisible(
+        { timeout: 30000 },
+      );
+    };
+    await performMove("up");
+    assert.equal(await readFile(sourceFile, "utf8"), afterMove);
+    await expect
+      .poll(() =>
+        live()
+          .locator("main")
+          .evaluate((el) =>
+            [...el.children].slice(0, 2).map((child) => child.tagName),
+          ),
+      )
+      .toEqual(["H1", "P"]);
+    await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+      "Recovered local edit",
+    );
+    await toolbar(page, "Undo saved edit");
+    await expect.poll(() => readFile(sourceFile, "utf8")).toBe(beforeMove);
+    await toolbar(page, "Redo saved edit");
+    await expect.poll(() => readFile(sourceFile, "utf8")).toBe(afterMove);
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    await live().locator("h1").click();
+    await expect(
+      page.getByRole("button", { name: "Move layer down", exact: true }),
+    ).toBeEnabled();
+    const movedOid = await live().locator("h1").getAttribute("data-oid"),
+      peerOid = await live()
+        .locator("main > p")
+        .first()
+        .getAttribute("data-oid");
+    const tree = page.getByRole("tree", { name: "Rendered layers" });
+    await tree
+      .locator(`[data-source-oid="${movedOid}"] > .layer-row`)
+      .dragTo(tree.locator(`[data-source-oid="${peerOid}"] > .layer-row`));
+    assert.equal(await readFile(sourceFile, "utf8"), afterMove);
+    await toolbar(page, "Apply layer move");
+    await expect(page.getByText(/Saved sibling order.*observed/)).toBeVisible({
+      timeout: 30000,
+    });
+    assert.equal(await readFile(sourceFile, "utf8"), beforeMove);
+    await performMove("up");
+    assert.equal(await readFile(sourceFile, "utf8"), afterMove);
+    await application.close();
+    application = undefined;
+    page = await launch();
+    await toolbar(page, "Reopen");
+    await showRootRoute(page);
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    await expect
+      .poll(
+        () =>
+          live()
+            .locator("main")
+            .evaluate((el) =>
+              [...el.children].slice(0, 2).map((child) => child.tagName),
+            ),
+        { timeout: 30000 },
+      )
+      .toEqual(["H1", "P"]);
+    await live().locator("h1").click();
+    await expect(
+      page.getByRole("button", { name: "Move layer down", exact: true }),
+    ).toBeEnabled();
+    await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+      "Recovered local edit",
+    );
+    assert.equal(await readFile(sourceFile, "utf8"), afterMove);
+    await writeFile(join(evidence, "reorder-before.tsx"), beforeMove);
+    await writeFile(join(evidence, "reorder-after.tsx"), afterMove);
+    await page.screenshot({ path: join(evidence, "reorder-reopened.png") });
+    pass(
+      "source-safe sibling buttons and layer drag preserve exact JSX/identity; undo/redo and full quit/reopen retain actual DOM order",
     );
   }
   console.log(`${checks} local-workflow checks passed. Evidence: ${evidence}`);

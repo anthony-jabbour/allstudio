@@ -1,0 +1,6 @@
+PASS pending moves guard property/viewport/route changes and Escape cancels without a write
+PASS button preview/Apply changes exact JSX, actual sibling order/geometry and retains moved identity
+PASS selected-layer drag previews the same adjacent swap and Apply restores exact original source/order
+PASS external source revision refuses a queued structural write without losing external bytes
+PASS statement-level conditional JSX stays non-reorderable while existing static text editing remains available
+PASS repeated component instances remain uneditable by reorder controls

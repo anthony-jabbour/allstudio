@@ -58,6 +58,8 @@ function App() {
       previewClassEdit: (request) =>
         window.allstudio.previewClassEdit(id, request),
       applyClassEdit: (request) => window.allstudio.applyClassEdit(id, request),
+      previewReorder: (request) => window.allstudio.previewReorder(id, request),
+      applyReorder: (request) => window.allstudio.applyReorder(id, request),
       selectRoute: (route) => window.allstudio.selectRoute(id, route),
       getResponsiveCapabilities: () =>
         window.allstudio.getResponsiveCapabilities(id),

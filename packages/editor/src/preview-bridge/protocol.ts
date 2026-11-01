@@ -4,7 +4,7 @@
  * every inbound message is checked for the expected origin, the expected
  * window, the session nonce, and a strict shape before the editor acts on it.
  */
-export const PREVIEW_BRIDGE_VERSION = 7;
+export const PREVIEW_BRIDGE_VERSION = 8;
 export const EDITOR_MESSAGE_SOURCE = "allstudio-editor";
 export const PREVIEW_MESSAGE_SOURCE = "allstudio-preview";
 
@@ -40,6 +40,7 @@ export interface PreviewRect {
 }
 
 export interface PreviewElementSnapshot {
+  neighbors: { previous: PreviewNeighbor | null; next: PreviewNeighbor | null };
   layout: PreviewLayout;
   appearance: PreviewAppearance;
   spacing: PreviewSpacing;
@@ -54,6 +55,64 @@ export interface PreviewElementSnapshot {
   rect: PreviewRect;
   /** Number of rendered elements sharing this oid (e.g. `.map()` items). */
   instances: number;
+}
+
+export interface PreviewNeighbor {
+  nodeId: string;
+  oid: string;
+  instances: number;
+}
+function parseNeighbor(value: unknown): PreviewNeighbor | null | undefined {
+  if (value === null) return null;
+  if (!isRecord(value) || !hasOnlyKeys(value, ["nodeId", "oid", "instances"]))
+    return undefined;
+  const { nodeId, oid, instances } = value;
+  if (
+    typeof nodeId !== "string" ||
+    !NODE_ID_PATTERN.test(nodeId) ||
+    !isValidOid(oid) ||
+    typeof instances !== "number" ||
+    !Number.isInteger(instances) ||
+    instances < 1 ||
+    instances > MAX_INSTANCES
+  )
+    return undefined;
+  return { nodeId, oid, instances };
+}
+function parseNeighbors(
+  value: unknown,
+  oid: string,
+  nodeId: string,
+  instances: number,
+): PreviewElementSnapshot["neighbors"] | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, ["previous", "next"]))
+    return null;
+  const previous = parseNeighbor(value.previous),
+    next = parseNeighbor(value.next);
+  if (
+    previous === undefined ||
+    next === undefined ||
+    previous?.nodeId === nodeId ||
+    next?.nodeId === nodeId ||
+    (previous && next && previous.nodeId === next.nodeId)
+  )
+    return null;
+  const groups = new Map<string, { nodes: Set<string>; instances: number }>();
+  for (const entry of [{ oid, nodeId, instances }, previous, next]) {
+    if (!entry) continue;
+    const group = groups.get(entry.oid);
+    if (group) {
+      if (group.instances !== entry.instances) return null;
+      group.nodes.add(entry.nodeId);
+    } else
+      groups.set(entry.oid, {
+        nodes: new Set([entry.nodeId]),
+        instances: entry.instances,
+      });
+  }
+  if ([...groups.values()].some((group) => group.nodes.size > group.instances))
+    return null;
+  return { previous, next };
 }
 
 /** Fixed selected-element layout measurement; each value is bounded or null. */
@@ -295,7 +354,10 @@ function parseSnapshot(
   ) {
     return undefined;
   }
+  const neighbors = parseNeighbors(value.neighbors, oid, nodeId, instances);
+  if (!neighbors) return undefined;
   return {
+    neighbors,
     nodeId,
     oid,
     tagName,

@@ -24,7 +24,6 @@ describe("EditorShell", () => {
   it("states the slice scope and needs a workspace to edit", () => {
     expect(EDITOR_STATUS).toBe("text-and-class-edit-slice");
     const html = renderToStaticMarkup(createElement(EditorShell));
-    expect(html).toContain("not implemented yet");
     expect(html).toContain("No preview workspace connected.");
     expect(html).not.toContain("<iframe");
   });

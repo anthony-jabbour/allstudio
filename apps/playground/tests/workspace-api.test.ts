@@ -61,6 +61,28 @@ const goodHeaders = {
   [SESSION_HEADER]: TOKEN,
 };
 
+it("authenticates bounded reorder requests and preserves the stale-hash guard", async () => {
+  const invalid = {
+    path: "src/app/page.tsx",
+    oid: "a",
+    siblingOid: "b",
+    direction: "down",
+    expectedSha256: "0".repeat(64),
+  };
+  expect((await post("preview-reorder", invalid)).status).toBe(409);
+  expect(
+    (await post("apply-reorder", { ...invalid, command: "overwrite" })).status,
+  ).toBe(400);
+  expect(
+    (
+      await post("apply-reorder", invalid, {
+        ...goodHeaders,
+        origin: "http://evil.test",
+      })
+    ).status,
+  ).toBe(403);
+});
+
 it("exposes only authenticated, empty-body breakpoint eligibility", async () => {
   expect((await post("responsive-capabilities", {})).body).toEqual({
     status: "supported-defaults",

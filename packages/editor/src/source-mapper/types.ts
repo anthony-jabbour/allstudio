@@ -32,7 +32,8 @@ export type SourceMapperError =
   | "unsupported-dynamic-children"
   | "unsupported-multiline-text"
   | "unsupported-className-value"
-  | "unconfined-patch";
+  | "unconfined-patch"
+  | "unsupported-reorder";
 
 export interface InstrumentOptions {
   /**

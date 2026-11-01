@@ -26,6 +26,13 @@ import type {
 export type { DiffHunk, DiffLine, LineDiff } from "./diff.ts";
 export { createLineDiff, formatLineDiff } from "./diff.ts";
 export {
+  inspectSiblingReorder,
+  type ReorderDirection,
+  type ReorderInspection,
+  type ReorderNeighbor,
+  reorderSibling,
+} from "./reorder.ts";
+export {
   type ResponsiveBuildConfig,
   validateResponsiveProject,
 } from "./responsive-project.ts";

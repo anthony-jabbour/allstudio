@@ -15,6 +15,7 @@ import {
   hasExactKeys,
   parseClassEditBody,
   parseLocateBody,
+  parseReorderBody,
   parseSelectRouteBody,
   parseTextEditBody,
   type SourceEditFailureReason,
@@ -132,6 +133,18 @@ export function createWorkspaceApiMiddleware(options: WorkspaceApiOptions) {
         return;
       }
       const body = await readJson(req);
+      if (action === "preview-reorder" || action === "apply-reorder") {
+        const parsed = parseReorderBody(body);
+        if (!parsed) {
+          fail(res, "invalid-request");
+          return;
+        }
+        const result = await (action === "apply-reorder"
+          ? workspace.applyReorder(parsed)
+          : workspace.previewReorder(parsed));
+        send(res, result.ok ? 200 : (STATUS[result.reason] ?? 422), result);
+        return;
+      }
       if (action === "responsive-capabilities") {
         if (!hasExactKeys(body, [])) {
           fail(res, "invalid-request");

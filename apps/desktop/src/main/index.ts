@@ -5,6 +5,7 @@ import {
   hasExactKeys,
   parseClassEditBody,
   parseLocateBody,
+  parseReorderBody,
   parseSelectRouteBody,
   parseTextEditBody,
   sourceEditFailure,
@@ -212,6 +213,17 @@ app
         const parsed = parseLocateBody(value.request);
         return parsed
           ? current.workspace.locate(parsed.oid)
+          : sourceEditFailure("invalid-request");
+      }
+      if (
+        value.action === "preview-reorder" ||
+        value.action === "apply-reorder"
+      ) {
+        const parsed = parseReorderBody(value.request);
+        return parsed
+          ? value.action === "apply-reorder"
+            ? current.workspace.applyReorder(parsed)
+            : current.workspace.previewReorder(parsed)
           : sourceEditFailure("invalid-request");
       }
       if (value.action === "select-route") {

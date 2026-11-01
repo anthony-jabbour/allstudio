@@ -20,6 +20,7 @@ const expected = {
   nonce: "n".repeat(48),
 };
 const element = {
+  neighbors: { previous: null, next: null },
   layout: {
     display: "grid",
     flexDirection: "row",
@@ -70,6 +71,60 @@ const element = {
   rect: { x: 10, y: 20, width: 300, height: 60 },
   instances: 1,
 };
+
+describe("bounded direct source-backed neighbor observations", () => {
+  const neighbor = { nodeId: "n2", oid: "neighbor", instances: 1 };
+  it("accepts at most the two direct neighbors, including repeated-source observations for safe refusal", () => {
+    const parsed = parsePreviewMessage(
+      event({
+        type: "select",
+        clickedTag: "h1",
+        element: { ...element, neighbors: { previous: neighbor, next: null } },
+      }),
+      expected,
+    );
+    expect(parsed.ok).toBe(true);
+    const repeated = parsePreviewMessage(
+      event({
+        type: "select",
+        clickedTag: "h1",
+        element: {
+          ...element,
+          instances: 2,
+          neighbors: {
+            previous: { ...neighbor, oid: element.oid, instances: 2 },
+            next: null,
+          },
+        },
+      }),
+      expected,
+    );
+    expect(repeated.ok).toBe(true);
+  });
+  it.each([
+    undefined,
+    [],
+    { previous: null },
+    { previous: null, next: null, extra: [] },
+    { previous: { nodeId: "n2", oid: "x", instances: 0 }, next: null },
+    { previous: { nodeId: "n2", oid: "x", instances: 10001 }, next: null },
+    { previous: { nodeId: "n1", oid: "x", instances: 1 }, next: null },
+    { previous: { nodeId: "n2", oid: element.oid, instances: 1 }, next: null },
+    { previous: neighbor, next: neighbor },
+    { previous: { ...neighbor, path: "../../secret" }, next: null },
+  ])("refuses malformed/oversized/self/duplicate neighbor summaries", (neighbors) => {
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "h1",
+          element: { ...element, neighbors },
+        }),
+        expected,
+      ),
+    ).toMatchObject({ ok: false, reason: "malformed" });
+  });
+});
 
 function event(data: Record<string, unknown>, overrides = {}) {
   return {
@@ -529,7 +584,7 @@ describe("bounded selected appearance measurement", () => {
       expect(result.message.element?.appearance).toEqual(appearance);
   });
   it("is part of the protocol version that the runtime copy reports", () => {
-    expect(PREVIEW_BRIDGE_VERSION).toBe(7);
+    expect(PREVIEW_BRIDGE_VERSION).toBe(8);
     expect(
       parsePreviewMessage(
         event({ type: "boot", version: PREVIEW_BRIDGE_VERSION - 1 }),

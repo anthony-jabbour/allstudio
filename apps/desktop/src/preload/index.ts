@@ -25,6 +25,10 @@ if (process.isMainFrame) {
       request("preview-class", { projectId, request: value }),
     applyClassEdit: (projectId, value) =>
       request("apply-class", { projectId, request: value }),
+    previewReorder: (projectId, value) =>
+      request("preview-reorder", { projectId, request: value }),
+    applyReorder: (projectId, value) =>
+      request("apply-reorder", { projectId, request: value }),
     selectRoute: (projectId, route) =>
       request("select-route", { projectId, request: { route } }),
     getResponsiveCapabilities: (projectId) =>

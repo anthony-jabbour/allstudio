@@ -46,3 +46,8 @@ Secondary: whether reuse of a component instance (e.g. same card used in two pla
 
 B: both Move up/down buttons and layer drag/reorder, under the same adjacent static-sibling eligibility and source-safe transform. Drag does not expand supported structures or permit cross-parent moves.
 The current human reply supersedes the earlier recommendations/options above. No merge or phase PASS is authorized.
+
+
+## Implementation safety boundary —2026-10-31
+
+The founder preapproved all remaining Phase3 implementation decisions. Initial rearrangement is restricted to the static default component in a discovered static App Router page: existing mappings identify component definitions, not reliably their call sites, so cross-module component-instance movement remains unsupported. Reuse existing Babel and source-save contracts. Selected snapshots gain bounded direct neighbor observations (strict protocolv8) so source adjacency must agree with actual unique DOM siblings and post-save order is observable without introducing another document model. Layer drag previews the same adjacent operation as the buttons; explicit Apply writes source. No native permission is added.
