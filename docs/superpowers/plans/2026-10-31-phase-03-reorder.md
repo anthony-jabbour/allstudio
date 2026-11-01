@@ -21,4 +21,6 @@ UI: select a supported layer; Move up/down and dragging that selected layer onto
 - [x] Add typed ReorderEditRequest (path/oid/siblingOid/direction/expectedSha256), optional source reorder inspection and preview/apply methods; exact-key validators. Reuse existing safe workspace persistence paths; validate static route and fresh neighbor target each call. Test stale hash, no-op boundary, source readback, undo/recovery and old text/classes.
 - [x] Browser RED: button-preview/diff/Apply and layer drag use the same adjacent swap; actual DOM order and source diff change, repeat/mapped/unsupported/stale targets refuse. Add focused shared inspector/tree UI and reconcile moved virtual IDs.
 - [x] Native proof: canonical source, actual rendered sibling order/geometry, undo/redo and full restart, packaged offline; one harness/instance at a time. Preserve prior browser/native regressions; use disposable fixtures and installed dependencies.
-- [ ] Independent whole-slice review, fix Important findings RED→GREEN, append PHASE03 actual evidence/user guide, commit/push draft on responsive. No human gate or phase PASS claimed. Then3.7 assets.
+- [x] Independent whole-slice review, fix Important findings RED→GREEN, append PHASE03 actual evidence/user guide, commit/push draft on responsive. No human gate or phase PASS claimed. Then3.7 assets.
+
+Delivery: draftPR24 https://github.com/anthony-jabbour/allstudio/pull/24, implementation/evidence e1df53343866d564d637b7d2d6d636105f9a4baf, base responsivePR23 bfc4d91. Phase3 IN PROGRESS.
