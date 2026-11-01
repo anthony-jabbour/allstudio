@@ -6,6 +6,8 @@ import type { EditBreakpoint } from "../site/class-tokens.ts";
 import {
   type DiscoveredRoute,
   describeSourceEditFailure,
+  type ReorderEditRequest,
+  type ReorderReceipt,
   type SourceEditWorkspace,
   type SourceElementInfo,
   type UnsupportedRoute,
@@ -24,6 +26,7 @@ import {
   observesLayout,
 } from "./layout-confirmation.ts";
 import { LayoutInspector } from "./layout-inspector.tsx";
+import { observesReorder } from "./reorder-confirmation.ts";
 import {
   observesSpacing,
   type SpacingTarget,
@@ -117,6 +120,7 @@ type Status = { kind: "info" | "success" | "error"; text: string } | null;
 type EditKind = "text" | "className";
 
 interface PendingRefresh {
+  reorder?: ReorderReceipt;
   appearance?: AppearanceTarget[];
   layout?: LayoutTarget[];
   spacing?: SpacingTarget[];
@@ -128,7 +132,7 @@ interface PendingRefresh {
     | "design properties";
   typography?: TypographyTarget[];
   oid: string;
-  kind: EditKind;
+  kind: EditKind | "reorder";
   /** Value the preview must show before the edit counts as visible. */
   value: string;
   reloaded: boolean;
@@ -144,6 +148,10 @@ function previewShows(
   element: PreviewElementSnapshot,
   pending: PendingRefresh,
 ): boolean {
+  if (pending.kind === "reorder")
+    return Boolean(
+      pending.reorder && observesReorder(element, pending.reorder),
+    );
   const rendered = pending.kind === "text" ? element.text : element.className;
   return (
     normalizeWhitespace(rendered) === normalizeWhitespace(pending.value) &&
@@ -162,7 +170,8 @@ const NOOP_SUBJECT: Record<EditKind, string> = {
   className: "the classes already match",
 };
 
-const KIND_LABEL: Record<EditKind, string> = {
+const KIND_LABEL: Record<EditKind | "reorder", string> = {
+  reorder: "sibling order",
   text: "text",
   className: "classes",
 };
@@ -268,10 +277,7 @@ export function EditorShell({
       )}
       <footer className="studio-footer">
         <span>Local workspace · No account required</span>
-        <span>
-          Static text and class editing · Layout dragging and structure editing
-          are not implemented yet.
-        </span>
+        <span>Source-backed design editing</span>
       </footer>
     </main>
   );
@@ -349,6 +355,7 @@ function SourceElementEditor({
   const [appearanceValid, setAppearanceValid] = useState(true);
   const [layoutValid, setLayoutValid] = useState(true);
   const [pending, setPending] = useState<PendingRefresh | null>(null);
+  const [moveDraft, setMoveDraft] = useState<ReorderEditRequest | null>(null);
   const request = useRef(0);
   // Bumped on every selection so late edit responses for an older
   // selection are ignored.
@@ -458,6 +465,7 @@ function SourceElementEditor({
       setPending(null);
       setPendingRouteSwitch(null);
       setPendingContext(null);
+      setMoveDraft(null);
       setStatus(null);
       setSelected(element);
       if (!element) {
@@ -528,9 +536,12 @@ function SourceElementEditor({
           if (refreshed) {
             setStatus({
               kind: "success",
-              text: propertyLabel
-                ? `Saved ${propertyLabel} to ${refreshed.path}; observed the requested properties in the preview.`
-                : `Saved to ${refreshed.path} and the preview shows the new ${KIND_LABEL[kind]}.`,
+              text:
+                kind === "reorder"
+                  ? `Saved sibling order to ${refreshed.path}; observed the requested DOM adjacency.`
+                  : propertyLabel
+                    ? `Saved ${propertyLabel} to ${refreshed.path}; observed the requested properties in the preview.`
+                    : `Saved to ${refreshed.path} and the preview shows the new ${KIND_LABEL[kind]}.`,
             });
           }
         });
@@ -542,9 +553,10 @@ function SourceElementEditor({
     if (!pending) {
       return;
     }
-    const poll = pending.propertyLabel
-      ? window.setInterval(() => bridge.track(pending.oid), 250)
-      : null;
+    const poll =
+      pending.propertyLabel || pending.kind === "reorder"
+        ? window.setInterval(() => bridge.track(pending.oid), 250)
+        : null;
     const timer = window.setTimeout(() => {
       if (!pending.reloaded) {
         setPending({ ...pending, reloaded: true });
@@ -579,22 +591,26 @@ function SourceElementEditor({
     Boolean(source?.text.ok) &&
     selected?.instances === 1 &&
     bridge.connected &&
-    !busy;
+    !busy &&
+    !moveDraft;
   const classEditable =
     Boolean(source?.className.ok) &&
     selected?.instances === 1 &&
     bridge.connected &&
-    !busy;
-  const hasUnsavedDraft = hasUnsavedInspectorDraft({
-    source,
-    draft,
-    classDraft,
-    typographyValid,
-    spacingValid,
-    appearanceValid,
-    layoutValid,
-    hasPendingRefresh: pending !== null,
-  });
+    !busy &&
+    !moveDraft;
+  const hasUnsavedDraft =
+    Boolean(moveDraft) ||
+    hasUnsavedInspectorDraft({
+      source,
+      draft,
+      classDraft,
+      typographyValid,
+      spacingValid,
+      appearanceValid,
+      layoutValid,
+      hasPendingRefresh: pending !== null,
+    });
   const switchContext = (
     next: { width: number; scope: EditBreakpoint; manual: boolean },
     discard = false,
@@ -613,11 +629,16 @@ function SourceElementEditor({
       !spacingValid ||
       !appearanceValid ||
       !layoutValid;
+    if (moveDraft && !discard) {
+      setPendingContext(next);
+      return;
+    }
     if (styleDirty && !discard) {
       setPendingContext(next);
       return;
     }
     if (discard) {
+      setMoveDraft(null);
       setClassDraft(source?.className.ok ? (source.className.value ?? "") : "");
       setTypographyValid(true);
       setSpacingValid(true);
@@ -668,6 +689,7 @@ function SourceElementEditor({
     setPending(null);
     setPendingRouteSwitch(null);
     setBusy(false);
+    setMoveDraft(null);
     setTypographyValid(true);
     setSpacingValid(true);
     setAppearanceValid(true);
@@ -693,6 +715,160 @@ function SourceElementEditor({
       return;
     }
     void executeRouteSwitch(targetRoute);
+  };
+
+  const moveNeighbor = (direction: "up" | "down") => {
+    const route = currentRoutes.find((entry) => entry.route === currentRoute);
+    if (
+      !source?.reorder?.ok ||
+      !selected ||
+      selected.instances !== 1 ||
+      source.location.oid !== selected.oid ||
+      source.path !== route?.sourcePath
+    )
+      return null;
+    const target = source.reorder[direction];
+    const observed =
+      direction === "up"
+        ? selected.neighbors.previous
+        : selected.neighbors.next;
+    return target && observed?.oid === target.oid && observed.instances === 1
+      ? observed
+      : null;
+  };
+  const moveLocked =
+    busy ||
+    switchingRoute ||
+    !bridge.connected ||
+    hasUnsavedDraft ||
+    !workspace.previewReorder ||
+    !workspace.applyReorder;
+  const cancelMove = () => {
+    setMoveDraft(null);
+    setPendingContext(null);
+    setDiff("");
+    setStatus(null);
+  };
+  useEffect(() => {
+    if (!moveDraft || busy) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing) return;
+      event.preventDefault();
+      setMoveDraft(null);
+      setPendingContext(null);
+      setDiff("");
+      setStatus(null);
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [moveDraft, busy]);
+  const previewMove = async (direction: "up" | "down") => {
+    const peer = moveNeighbor(direction);
+    if (
+      moveLocked ||
+      !peer ||
+      !source ||
+      !selected ||
+      !workspace.previewReorder
+    )
+      return;
+    const move: ReorderEditRequest = {
+      path: source.path,
+      oid: selected.oid,
+      siblingOid: peer.oid,
+      direction,
+      expectedSha256: source.sha256,
+    };
+    const selectionAtStart = selection.current,
+      run = ++editRun.current;
+    setBusy(true);
+    const result = await workspace.previewReorder(move);
+    if (selectionAtStart !== selection.current || run !== editRun.current)
+      return;
+    setBusy(false);
+    if (!result.ok) {
+      setStatus({ kind: "error", text: result.message });
+      return;
+    }
+    if (result.noop) {
+      setStatus({
+        kind: "info",
+        text: "These siblings have identical source. Nothing was written.",
+      });
+      return;
+    }
+    setMoveDraft(move);
+    setDiff(result.diff);
+    setStatus({
+      kind: "info",
+      text: "Sibling move ready. Review the source diff, then Apply layer move.",
+    });
+  };
+  const applyMove = async () => {
+    const move = moveDraft;
+    if (!move || busy || !source || !selected || !workspace.applyReorder)
+      return;
+    if (
+      move.oid !== selected.oid ||
+      moveNeighbor(move.direction)?.oid !== move.siblingOid
+    ) {
+      setStatus({
+        kind: "error",
+        text: "The preview target changed. Cancel the move and select the layer again.",
+      });
+      return;
+    }
+    const selectionAtStart = selection.current,
+      run = ++editRun.current;
+    applying.current = run;
+    setBusy(true);
+    const result = await workspace.applyReorder(move);
+    if (applying.current === run) applying.current = null;
+    if (selectionAtStart !== selection.current || run !== editRun.current)
+      return;
+    if (!result.ok) {
+      setBusy(false);
+      setStatus({ kind: "error", text: result.message });
+      return;
+    }
+    setDiff(result.diff);
+    if (!result.written) {
+      setBusy(false);
+      setMoveDraft(null);
+      setStatus({ kind: "info", text: "No source order change was written." });
+      return;
+    }
+    setMoveDraft(null);
+    const receipt = result.reorder;
+    if (
+      !result.oid ||
+      !receipt ||
+      receipt.oid !== result.oid ||
+      receipt.direction !== move.direction
+    ) {
+      setBusy(false);
+      setSource(null);
+      setStatus({
+        kind: "error",
+        text: "The source was saved, but its moved identity is unavailable. Select the layer again; Undo remains available.",
+      });
+      return;
+    }
+    setSource({ ...source, sha256: result.sha256 });
+    setSelected({ ...selected, oid: receipt.oid });
+    setStatus({
+      kind: "info",
+      text: "Sibling source order saved. Waiting for the preview…",
+    });
+    setPending({
+      kind: "reorder",
+      reorder: receipt,
+      oid: receipt.oid,
+      value: "",
+      reloaded: false,
+      run,
+    });
+    bridge.track(receipt.oid);
   };
 
   const edit = async (kind: EditKind, apply: boolean, design = false) => {
@@ -935,6 +1111,11 @@ function SourceElementEditor({
         <div className="navigator-section">
           <h2>Layers</h2>
           <LayerTree
+            reorderTargets={{
+              up: !moveLocked ? (moveNeighbor("up")?.nodeId ?? null) : null,
+              down: !moveLocked ? (moveNeighbor("down")?.nodeId ?? null) : null,
+            }}
+            onReorder={(direction) => void previewMove(direction)}
             layers={bridge.layers}
             selected={selected}
             selectionVersion={selection.current}
@@ -1082,6 +1263,51 @@ function SourceElementEditor({
           ) : (
             <p>Click an element in the preview to select it.</p>
           )}
+          <section
+            className="structure-inspector"
+            aria-label="Layer arrangement"
+          >
+            <h2>Arrange layer</h2>
+            <p className="field-note">
+              Adjacent static siblings in the current page only. Select a
+              supported layer to drag it onto its adjacent row.
+            </p>
+            <div className="actions">
+              <button
+                type="button"
+                disabled={Boolean(moveLocked) || !moveNeighbor("up")}
+                onClick={() => void previewMove("up")}
+              >
+                Move layer up
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(moveLocked) || !moveNeighbor("down")}
+                onClick={() => void previewMove("down")}
+              >
+                Move layer down
+              </button>
+            </div>
+            {source?.reorder && !source.reorder.ok ? (
+              <p className="field-note">
+                {describeSourceEditFailure(source.reorder.reason)}
+              </p>
+            ) : null}
+            {moveDraft ? (
+              <div className="actions">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void applyMove()}
+                >
+                  Apply layer move
+                </button>
+                <button type="button" disabled={busy} onClick={cancelMove}>
+                  Cancel layer move
+                </button>
+              </div>
+            ) : null}
+          </section>
           <TypographyInspector
             scope={scope}
             key={`${selection.current}-${contextVersion}`}

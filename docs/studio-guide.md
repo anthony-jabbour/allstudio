@@ -15,3 +15,12 @@ Scoped property edits require a conservative audit of default Tailwind4 breakpoi
 Apply persists project source immediately. Undo/Redo covers saved edits for the current session; reopening retains disk edits, not prior-session history. Stale hashes, external modifications and unsupported expressions refuse safely. Clear may leave surrounding class whitespace because unrelated bytes are preserved.
 
 Phase3 remains in progress. Structural rearrangement and asset association are documented only after their implementation is verified. Human usability and assistive-technology validation remain a founder gate.
+
+
+## Supported layer arrangement
+
+Select a layer in the current static App Router page. Move layer up/down and dragging the selected layer onto an eligible adjacent row preview the same operation. Review the exact source diff, then Apply layer move. Cancel or Escape discards the pending move without writing. Property/text edits are locked while the move preview is pending; viewport and route switches protect it.
+
+The initial subset is deliberately narrow: literal/static JSX sibling chunks in the default page component's direct unconditional JSX return. Non-control-flow declarations may precede that return. Component definitions/call-site ownership across modules, conditional/loop/alias returns, mapped or dynamic descendants/attributes, spreads, comments or meaningful text between siblings, fragments, reused instances and cross-parent moves are refused. Keys, subtree bytes and inter-element whitespace stay intact.
+
+After saving, actual unique DOM neighbors must reflect the new source order before confirmation. Visual geometry alone is not the order proof; CSS positioning/reverse order can affect appearance. Native session Undo/Redo restores source, and disk order persists after reopening.

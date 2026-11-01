@@ -30,6 +30,7 @@ const layers = {
   ],
 };
 const selected = {
+  neighbors: { previous: null, next: null },
   layout: {
     display: null,
     flexDirection: null,

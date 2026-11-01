@@ -534,3 +534,31 @@ An additional read-only packaged offline reopen verified current breakpoint elig
 Remaining limits: direct subframe IPC probe unavailable; offline production next/font/google build NOT RUN; unfamiliar-user/assistive-technology gate pending; restrictive static configuration support; narrow Fit chrome allowance minor deferred. Slice3.5 recommendation: READY FOR REVIEW with these limits and the unexplained initial closure disclosed. Phase3 remains IN PROGRESS. Next approved slice:3.6 adjacent static sibling buttons and layer drag, then3.7 bounded public asset metadata/source association.
 
 Delivery: Slice3.5 draft [PR #23](https://github.com/anthony-jabbour/allstudio/pull/23), stacked on routes #22. Implementation/evidence head `989b3b19e3e328219444d56524da0085be2d0634`. No merge or phase PASS.
+
+
+## Slice3.6 — adjacent source-safe sibling arrangement (2026-11-01)
+
+Status: IN PROGRESS. Branch `feat/phase-03-reorder`, based on responsive draftPR23 `bfc4d91`; core command/protocol commit `7e54a60`. Founder approved both buttons and layer drag under the same static adjacency boundary. A separate visual finishing slice remains mandatory for Paper-style Home/Figma-style Studio in both themes; current functional UI is not claimed visually complete.
+
+Implemented: actual-source reorder inspection and exact range swap, explicit diff/Apply, selected-layer drag onto supported adjacent rows, rendered direct-neighbor verification, native virtual-ID restoration by identity and moved ordinal, existing hash/atomic/history/recovery pipeline. Protocolv8 adds at most two bounded direct-neighbor summaries to selection snapshots. No new dependency, engine, filesystem grant, Electron permission or privileged preview message.
+
+Static safety restriction: current discovered static page's default component must directly/unconditionally return the selected JSX subtree; only declarations may precede its final return. Literal/static chunks exclude spreads/evaluated attributes/dynamic descendants. No cross-module component-call ownership is guessed. This costs compatibility for valid dynamic/interactive structures and is explicitly surfaced as unsupported.
+
+TDD: missing source module/method/request/confirmation tests were observed RED before implementation. Exact keyed subtree/whitespace/OID order, native original attribute restoration and moved identity, stale hashes, unsupported source files/traversal and API unknown fields/origins became GREEN. Independent review found one Important statement-control-flow gap; five valid if/guard/loop/alias/unused-JSX cases were RED, then GREEN after direct-return binding. Full `bun run test`:841 tests/36 files passed; all seven `bun run typecheck` workspaces passed. Minor deferred to final interaction finishing: cancelling a move leaves its pending route confirmation visible; no source write or loss.
+
+Fresh frozen serial browser matrix passed: reorder6 scenario groups (draft guards/Escape, exact JSX, actual DOM order/geometry, moved identity, drag, stale source, statement conditionals and repeated refusal), responsive6 groups, text34, layers13, typography10, spacing12, appearance10, layout15, routes7. Early conditional-browser attempt used an old backend module; after restarting the dev server the refusal was demonstrated in the actual preview.
+
+`bun run test:desktop`:6 checks passed. `bun run test:local`:38 checks passed, including source buttons and drag, exact canonical JSX, moved identity, Undo/Redo, full quit/reopen and actual persisted DOM order. Native evidence: `apps/desktop/dist/local-workflow-6mRQIX`. Additional Lumen and Harbor native workflows each passed23 checks. An initial Lumen selection failed at a clipped heading center after Home→Studio. A read-only probe selected successfully; the harness now clicks visible heading text and checks source binding. Measured global overflow (889px document for818px viewport) remains a required visual-finishing fix.
+
+Build/type/lint and boundary checks ran against the implementation: lint passes with4 inherited test warnings/3 template infos; boundary444 files passed; production, desktop and packaged builds passed. Packaged security6 checks passed. Packaged offline verification is being recorded separately when complete; an initial attempt reached `/about` during a root-specific restart assertion and is not counted as passed.
+
+Source before/after text, diffs, actual browser/native screenshots and logs are under `docs/validation/evidence/phase-03-reorder/`. Human task observations/assistive technology, direct subframe IPC probe and the historical offline next/font/google production-build limitation remain unvalidated. No phase PASS or merge.
+
+
+### Slice3.6 packaged/offline result and delivery recommendation
+
+Packaged security6 checks passed. The isolated packaged offline repair passed38 checks, including exact structural source, buttons and layer drag, preserved identity, Undo/Redo and full quit/reopen DOM order. Evidence: `apps/desktop/dist/local-workflow-STw1ys`, `native-offline-reopened.png`, `native-packaged-offline.log`. Test windows are hidden with background throttling disabled; actual Electron/preload/native/filesystem behavior is exercised, while human OS focus/assistive-technology validation remains pending.
+
+An earlier offline attempt reached `/about` during a root-specific assertion. The cause of that navigation is not established. The repaired persistence harness explicitly chooses its target route after late reopens; it does not change production route defaults or security/timeouts. Lumen23 and Harbor23 repair results were also verified (`local-workflow-0KAQgh`, `local-workflow-pT5wE5`). No failed attempt is counted as a pass.
+
+Recommendation: READY FOR REVIEW for bounded3.6, with the static-source restrictions, stale-cancel route-dialog minor and window-scrolling issue disclosed. Phase3 remains IN PROGRESS; no merge/PASS. Next:3.7 local asset association, then mandatory PaperHome/FigmaStudio visual/interaction finishing.

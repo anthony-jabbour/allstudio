@@ -1,0 +1,7 @@
+PASS native shell uses the real preload IPC and shared editor
+PASS renderer has no Node or raw IPC access; sandbox and isolation enabled
+PASS ungranted preview navigation is denied before content can load
+PASS main rejects IPC from a different WebContents even with the real preload
+PASS untrusted top navigation and popups denied
+PASS app asset traversal denied
+6 desktop checks passed (packaged).

@@ -18,6 +18,8 @@ export type {
   EditBreakpoint,
   LocateElementResult,
   ProjectRoutesSnapshot,
+  ReorderEditRequest,
+  ReorderReceipt,
   ResolvePreviewRouteUrlResult,
   ResponsiveCapabilities,
   SelectRouteRequest,

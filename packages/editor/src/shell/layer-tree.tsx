@@ -13,6 +13,8 @@ import type {
 } from "../preview-bridge/protocol.ts";
 
 interface LayerTreeProps {
+  reorderTargets?: { up: string | null; down: string | null };
+  onReorder?(direction: "up" | "down"): void;
   layers: PreviewLayersSnapshot | null;
   selected: PreviewElementSnapshot | null;
   selectionVersion: number;
@@ -79,6 +81,8 @@ export function restoreLayerTreeFocus(options: {
 }
 
 export function LayerTree({
+  reorderTargets,
+  onReorder,
   layers,
   selected,
   selectionVersion,
@@ -86,6 +90,8 @@ export function LayerTree({
   onSelect,
 }: LayerTreeProps) {
   const tree = useRef<HTMLUListElement>(null);
+  const dragging = useRef<{ id: string; generation: number } | null>(null);
+  const [dropId, setDropId] = useState<string | null>(null);
   const treeHasFocus = useRef(false);
   const lostFocusId = useRef<string | null>(null);
   const previousNodes = useRef<readonly { id: string }[]>([]);
@@ -268,9 +274,87 @@ export function LayerTree({
             setFocused(node.id);
             onSelect(node.id);
           }}
+          draggable={
+            selectedId === node.id &&
+            Boolean(onReorder && (reorderTargets?.up || reorderTargets?.down))
+          }
+          onDragStart={(event) => {
+            if (event.target !== event.currentTarget) return;
+            if (
+              selectedId !== node.id ||
+              !onReorder ||
+              !layers ||
+              !(reorderTargets?.up || reorderTargets?.down)
+            ) {
+              event.preventDefault();
+              return;
+            }
+            event.stopPropagation();
+            dragging.current = { id: node.id, generation: layers.generation };
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData(
+              "application/x-allstudio-layer",
+              node.id,
+            );
+          }}
+          onDragOver={(event) => {
+            if (
+              !(event.target instanceof Element) ||
+              event.target.closest(".layer-row") !==
+                event.currentTarget.querySelector(":scope > .layer-row")
+            )
+              return;
+            if (
+              dragging.current?.id !== selectedId ||
+              dragging.current?.generation !== layers?.generation ||
+              !(
+                node.id === reorderTargets?.up ||
+                node.id === reorderTargets?.down
+              )
+            )
+              return;
+            event.preventDefault();
+            event.stopPropagation();
+            event.dataTransfer.dropEffect = "move";
+            setDropId(node.id);
+          }}
+          onDragLeave={(event) => {
+            if (
+              !(event.relatedTarget instanceof Node) ||
+              !event.currentTarget.contains(event.relatedTarget)
+            )
+              setDropId(null);
+          }}
+          onDrop={(event) => {
+            if (
+              !(event.target instanceof Element) ||
+              event.target.closest(".layer-row") !==
+                event.currentTarget.querySelector(":scope > .layer-row")
+            )
+              return;
+            event.preventDefault();
+            event.stopPropagation();
+            setDropId(null);
+            const active = dragging.current;
+            dragging.current = null;
+            if (
+              !active ||
+              active.id !== selectedId ||
+              active.generation !== layers?.generation
+            )
+              return;
+            if (node.id === reorderTargets?.up) onReorder?.("up");
+            else if (node.id === reorderTargets?.down) onReorder?.("down");
+          }}
+          onDragEnd={() => {
+            dragging.current = null;
+            setDropId(null);
+          }}
           onKeyDown={(event) => keyDown(event, node)}
         >
-          <div className="layer-row">
+          <div
+            className={`layer-row${dropId === node.id ? " layer-drop-target" : ""}`}
+          >
             {branch ? (
               <button
                 type="button"

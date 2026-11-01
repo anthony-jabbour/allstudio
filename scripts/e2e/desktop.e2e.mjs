@@ -105,6 +105,8 @@ try {
         "applyTextEdit",
         "previewClassEdit",
         "applyClassEdit",
+        "previewReorder",
+        "applyReorder",
         "selectRoute",
         "getResponsiveCapabilities",
         "undo",

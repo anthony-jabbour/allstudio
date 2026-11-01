@@ -53,3 +53,17 @@ Founder approved in chat: theme selector includes system/light/dark, follows sys
 Slice 3.1 can expose the shell, current preview and existing static text/classes; it must clearly describe layers/properties not yet connected. Add controls only with working behavior, or clearly disabled future labels if genuinely useful. Slice 3.2 supplies the real hierarchy; 3.3+ supplies visual properties. A pretty shell alone does not satisfy these later slices.
 
 For each palette, inspect Home/empty/loading/project/selection/unsupported/error/diff states at representative desktop window sizes; tab through controls; assert no offscreen inspector actions. Execute source patch/HMR/history/restart workflows, not screenshots alone. Screenshot evidence captures the actual fixture, not reference artwork. Unfamiliar-user task sessions remain pending human validation. No Phase 3 usability result is claimed yet.
+
+
+## Founder visual acceptance clarification —2026-10-31
+
+Phase3 delivery must include a Paper-inspired Home and Figma-inspired Studio, using the founder's two new screenshots as visual references. This is an explicit delivery requirement, not an optional future polish pass. Current functional controls do not establish visual acceptance. Preserve both light and dark themes.
+
+Home: restrained workspace sidebar, clear Recents heading/search/open action, spacious project card grid, consistent typography, subtle borders and original allstudio identity. Studio: compact toolbar/global rail, dense pages/layers navigation, large visually dominant canvas, precise contextual inspector, compact viewport/zoom/history controls and useful contextual tools. Remove prototype-style clutter and technical status noise from the primary flow while retaining accessible diagnostics/source context.
+
+Complete a focused visual finishing slice after structural/assets integration and before the Phase3 review recommendation. Compare real Home/Studio screenshots in both themes and representative window widths against these references; verify that selected properties, source persistence, undo/redo, keyboard flow and untrusted preview isolation still work. No placeholder cloud/team/MCP/vector functionality, competitor branding or protected illustrations are implied by a screenshot. Founder screenshots remain conversation reference assets; they are not copied into the public repository.
+
+
+Phase3 interaction-finishing backlog from independent3.6 review: cancelling/Escaping a pending move should also clear its pending route confirmation. This is a minor transient-state issue (no source write or loss), deferred from the3.6 fix pass and required during final interaction/visual finishing.
+
+Additional measured finishing issue: a reopened Lumen Studio can have document scrollHeight889px for an818px viewport, allowing application chrome to scroll and the fixed preview to clip. Final layout must constrain the application viewport and give canvas/navigator/inspector their own scrolling; verify selection at clipped edges and after Home→Studio transitions. A native regression selection was updated to click visible heading text rather than its clipped full-width center.
