@@ -5,7 +5,7 @@ import { Home } from "./home/home.tsx";
 import { useRoute } from "./router.ts";
 import { ToastProvider } from "./ui/controls.tsx";
 import { useTheme } from "./ui/theme.ts";
-import { FileViewer } from "./viewer/file-viewer.tsx";
+import { FileEditor } from "./viewer/file-editor.tsx";
 import { WorkspaceDashboard } from "./workspace/workspace-dashboard.tsx";
 
 export function App() {
@@ -16,7 +16,11 @@ export function App() {
     <FileStoreContext.Provider value={store}>
       <ToastProvider>
         {route.name === "file" ? (
-          <FileViewer id={route.id} />
+          <FileEditor
+            id={route.id}
+            resolvedTheme={theme.resolved}
+            onTheme={theme.set}
+          />
         ) : route.name === "studio" ? (
           <WorkspaceDashboard
             section={route.section}

@@ -28,7 +28,17 @@ export function nodeStyle(node: BoardNode): CSSProperties {
     height: node.height,
     opacity: node.opacity ?? 1,
     background: nodeBackground(node),
-    borderRadius: node.type === "ellipse" ? "50%" : (node.radius ?? 0),
+    borderRadius:
+      node.type === "ellipse"
+        ? "50%"
+        : node.radii
+          ? node.radii.map((r) => `${r}px`).join(" ")
+          : (node.radius ?? 0),
+    filter: node.blur ? `blur(${node.blur}px)` : undefined,
+    mixBlendMode:
+      node.blendMode && node.blendMode !== "normal"
+        ? node.blendMode
+        : undefined,
     boxSizing: "border-box",
     transform: node.rotation ? `rotate(${node.rotation}deg)` : undefined,
     display: node.hidden ? "none" : undefined,

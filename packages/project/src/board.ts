@@ -31,6 +31,43 @@ export interface BoardStroke {
   width: number;
 }
 
+export const BLEND_MODES = [
+  "normal",
+  "multiply",
+  "screen",
+  "overlay",
+  "darken",
+  "lighten",
+  "color-dodge",
+  "color-burn",
+  "difference",
+  "exclusion",
+  "hue",
+  "saturation",
+  "color",
+  "luminosity",
+] as const;
+export type BlendMode = (typeof BLEND_MODES)[number];
+
+/**
+ * Auto layout ("stack") for frames. Children are positioned by the layout
+ * engine in the editor package; their stored x/y are always the computed
+ * result, so every renderer can treat them as absolutely positioned.
+ */
+export interface BoardLayout {
+  direction: "row" | "column";
+  gap: number;
+  /** [top, right, bottom, left] */
+  padding: [number, number, number, number];
+  /** Cross-axis alignment. */
+  align: "start" | "center" | "end" | "stretch";
+  /** Main-axis distribution. */
+  justify: "start" | "center" | "end" | "space-between";
+  /** Size the frame to its content on that axis. */
+  hugWidth?: boolean;
+  hugHeight?: boolean;
+}
+
 export interface BoardShadow {
   color: string;
   x: number;
@@ -56,12 +93,18 @@ interface BoardNodeBase {
   gradient?: [number, string, string] | null;
   stroke?: BoardStroke | null;
   radius?: number;
+  /** Per-corner radii [top-left, top-right, bottom-right, bottom-left]; overrides `radius`. */
+  radii?: [number, number, number, number] | null;
   shadow?: BoardShadow | null;
+  /** Layer blur in px. */
+  blur?: number;
+  blendMode?: BlendMode;
 }
 
 export interface BoardFrameNode extends BoardNodeBase {
   type: "frame";
   clip?: boolean;
+  layout?: BoardLayout | null;
   children: BoardNode[];
 }
 
@@ -281,6 +324,23 @@ function parseNode(
     path,
   );
   if (radius !== undefined) base.radius = radius;
+  if (value.radii !== undefined) {
+    const r = value.radii;
+    if (r === null) base.radii = null;
+    else if (Array.isArray(r) && r.length === 4) {
+      base.radii = r.map((v, i) =>
+        num(v, `${path}.radii[${i}]`, 0, 100_000),
+      ) as [number, number, number, number];
+    } else fail(`${path}.radii`, "must be four numbers or null.");
+  }
+  const blur = optional(value, "blur", (v, p) => num(v, p, 0, 500), path);
+  if (blur !== undefined) base.blur = blur;
+  if (value.blendMode !== undefined) {
+    if (!BLEND_MODES.includes(value.blendMode as BlendMode)) {
+      fail(`${path}.blendMode`, "is not a supported blend mode.");
+    }
+    base.blendMode = value.blendMode as BlendMode;
+  }
   if (value.shadow !== undefined) {
     const s = value.shadow;
     if (s === null) base.shadow = null;
@@ -311,6 +371,12 @@ function parseNode(
           fail(`${path}.clip`, "must be a boolean.");
         }
         node.clip = value.clip;
+      }
+      if (value.layout !== undefined) {
+        node.layout =
+          value.layout === null
+            ? null
+            : parseLayout(value.layout, `${path}.layout`);
       }
       return node;
     }
@@ -354,6 +420,50 @@ function parseNode(
       return { ...base, type, src: value.src, fit };
     }
   }
+}
+
+function parseLayout(value: unknown, path: string): BoardLayout {
+  if (!isRecord(value)) fail(path, "must be an object or null.");
+  const { direction, align, justify, padding } = value;
+  if (direction !== "row" && direction !== "column") {
+    fail(`${path}.direction`, "must be row or column.");
+  }
+  if (
+    align !== "start" &&
+    align !== "center" &&
+    align !== "end" &&
+    align !== "stretch"
+  ) {
+    fail(`${path}.align`, "must be start, center, end or stretch.");
+  }
+  if (
+    justify !== "start" &&
+    justify !== "center" &&
+    justify !== "end" &&
+    justify !== "space-between"
+  ) {
+    fail(`${path}.justify`, "must be start, center, end or space-between.");
+  }
+  if (!Array.isArray(padding) || padding.length !== 4) {
+    fail(`${path}.padding`, "must be four numbers.");
+  }
+  const layout: BoardLayout = {
+    direction,
+    gap: num(value.gap, `${path}.gap`, 0, 100_000),
+    padding: padding.map((v, i) =>
+      num(v, `${path}.padding[${i}]`, 0, 100_000),
+    ) as [number, number, number, number],
+    align,
+    justify,
+  };
+  for (const flag of ["hugWidth", "hugHeight"] as const) {
+    if (value[flag] !== undefined) {
+      if (typeof value[flag] !== "boolean")
+        fail(`${path}.${flag}`, "must be a boolean.");
+      layout[flag] = value[flag] as boolean;
+    }
+  }
+  return layout;
 }
 
 function timestamp(value: unknown, path: string): string {

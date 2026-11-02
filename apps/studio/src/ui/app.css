@@ -1035,26 +1035,6 @@ code {
   color: var(--text-2);
 }
 
-/* Read-only viewer (replaced by the board editor) */
-.viewer {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  height: 100%;
-}
-.viewer-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--sidebar);
-}
-.viewer-stage {
-  position: relative;
-  min-height: 0;
-  background: var(--canvas);
-}
-
 @media (max-width: 900px) {
   .home,
   .workspace {

@@ -122,6 +122,7 @@
         "@allstudio/project": "workspace:*",
         "@babel/standalone": "^7.27.0",
         "@babel/types": "^7.27.0",
+        "lucide-react": "1.58.0",
         "tailwind-merge": "^3.2.0",
       },
       "devDependencies": {
