@@ -46,6 +46,24 @@
         "vite": "^7.1.7",
       },
     },
+    "apps/studio": {
+      "name": "@allstudio/studio",
+      "version": "0.0.0",
+      "dependencies": {
+        "@allstudio/editor": "workspace:*",
+        "@allstudio/project": "workspace:*",
+        "lucide-react": "1.58.0",
+        "react": "19.3.0",
+        "react-dom": "19.3.0",
+      },
+      "devDependencies": {
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "@vitejs/plugin-react": "^5.0.4",
+        "typescript": "^5",
+        "vite": "^7.1.7",
+      },
+    },
     "examples/nested-components-fixture": {
       "name": "@allstudio/nested-components-fixture",
       "version": "0.1.0",
@@ -146,6 +164,8 @@
     "@allstudio/playground": ["@allstudio/playground@workspace:apps/playground"],
 
     "@allstudio/project": ["@allstudio/project@workspace:packages/project"],
+
+    "@allstudio/studio": ["@allstudio/studio@workspace:apps/studio"],
 
     "@allstudio/tailwind-variants-fixture": ["@allstudio/tailwind-variants-fixture@workspace:examples/tailwind-variants-fixture"],
 
@@ -864,6 +884,8 @@
     "lowercase-keys": ["lowercase-keys@2.0.0", "", {}, "sha512-tqNXrS78oMOE73NMxK4EMLQsQowWf8jKooH9g7xPavRT706R6bkQJ6DY2Te7QukaZsulxa30wQ7bk0pm4XiHmA=="],
 
     "lru-cache": ["lru-cache@5.1.1", "", { "dependencies": { "yallist": "^3.0.2" } }, "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="],
+
+    "lucide-react": ["lucide-react@1.58.0", "", { "peerDependencies": { "@types/react": "*", "react": "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-hXaFNm6mk6QVtBnDGBn1YAs8j2tGUk0A4s/CpclIcczfxeXiW1rdOLVo6zCsoIih9XXsGvDODQerl749a2n7bA=="],
 
     "magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
 
