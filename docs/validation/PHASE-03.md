@@ -575,7 +575,7 @@ Independent static review identified case-insensitive JSX attribute interpretati
 
 ## Slice 3.7 and Studio finishing — 2026-11-02
 
-Status: **READY FOR REVIEW for the implemented slices; overall Phase 3 remains IN PROGRESS and is not PASS.** Work stays on `feat/phase-03-assets` at baseline `94b034f`; changes are uncommitted and the remote main/PR stack has not been merged.
+Status: **READY FOR REVIEW for the implemented slices; overall Phase 3 remains IN PROGRESS and is not PASS.** Branch `feat/phase-03-assets` is committed at `221dfd8`, based directly on PR #24 head `fd535ca`.
 
 The approved local asset workflow is implemented end to end. The shared editor lists bounded metadata for existing supported files under the granted `public/` directory and applies exact source-backed associations for static `<img>` and verified `next/image` aliases. Apply rechecks the source hash and current project asset listing; successful edits are confirmed from a visible, loaded preview image and retain undo/redo and recovery behavior. New preview protocol v10 payloads are schema-validated and bounded. Thumbnail capture is initiated only by the trusted Electron renderer/main path, crops to the current preview, and stores a bounded JPEG in app data; preview content receives no new native capability.
 
@@ -601,3 +601,5 @@ Fresh independent whole-branch review was read-only against this branch's uncomm
 Known gate limits: unfamiliar-user task sessions and assistive-technology validation remain pending founder/human review; the direct subframe IPC probe is unavailable. The full build passed in this environment, while the historical offline production `next/font/google` limitation was not independently revalidated here. No screenshot or automated check establishes Phase 3 product acceptance by itself. No merge or phase PASS is recorded.
 
 Recommendation: **READY FOR FOUNDER REVIEW of the implemented Phase 3 slices; IN PROGRESS for the phase gate.** Phase 4 boards and Phase 5 AI remain future work. The final phase gate requires the founder to validate the real-user scenarios and review this implementation.
+
+Delivery: draft [PR #28](https://github.com/anthony-jabbour/allstudio/pull/28), stacked on draft PR #24. No merge or phase PASS.
