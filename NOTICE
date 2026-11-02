@@ -15,10 +15,8 @@ This product depends on Lucide icons (lucide-react, https://github.com/lucide-ic
 Copyright (c) Lucide Icons and Contributors, licensed under the ISC License.
 Used for Studio chrome icons in apps/studio and packages/editor (board editor).
 
-This product depends on DiceBear (@dicebear/core and @dicebear/notionists,
+This product depends on DiceBear (@dicebear/core and @dicebear/open-peeps,
 https://github.com/dicebear/dicebear), Copyright (c) 2024 Florian Körner,
-licensed under the MIT License. The "Notionists" illustration set it renders
-is by Zoish (https://heyzoish.gumroad.com/l/notionists), released under
-CC0 1.0. It is an independent illustration set and is not affiliated with
-Notion Labs, Inc.; no Notion artwork is used. Used for chat character avatars
-in apps/studio/src/chat.
+licensed under the MIT License. The "Open Peeps" illustration library it
+renders is by Pablo Stanley (https://www.openpeeps.com/), released under
+CC0 1.0. Used for agent characters in apps/studio/src/chat.

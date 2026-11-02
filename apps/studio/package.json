@@ -14,7 +14,7 @@
     "@allstudio/editor": "workspace:*",
     "@allstudio/project": "workspace:*",
     "@dicebear/core": "9.4.2",
-    "@dicebear/notionists": "9.4.2",
+    "@dicebear/open-peeps": "9.4.2",
     "lucide-react": "1.58.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"

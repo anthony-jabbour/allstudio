@@ -36,19 +36,20 @@ Build the AI chat feature for paying users from the allstudio design folder, as 
 
 | Repository | Stars | License | Decision |
 |---|---:|---|---|
-| [dicebear/dicebear](https://github.com/dicebear/dicebear) (`@dicebear/core`, `@dicebear/notionists` 9.4.2) | ~10.0k (GitHub page) | MIT code; Notionists art by Zoish **CC0 1.0** | **Adopted.** Hand-drawn characters in the requested style, generated locally from a seed (no avatar service), openly licensed. Only the one style package is installed, not the full collection. |
+| [dicebear/dicebear](https://github.com/dicebear/dicebear) (`@dicebear/core`, `@dicebear/open-peeps` 9.4.2) | ~10.0k (GitHub page) | MIT code; **Open Peeps** art by Pablo Stanley, **CC0 1.0** | **Adopted.** Hand-drawn, artistic agent characters rendered locally (no avatar service). Each agent's head, face, skin and clothing is pinned explicitly, so the cast stays stable. Only the one style package is installed. |
+| DiceBear styles compared (2026-11-02, rendered side by side) | — | Lorelei (CC0), Open Peeps (CC0), Micah, Adventurer, Personas, Dylan, Big Smile (all CC BY 4.0), Notionists (CC0) | The founder rejected Notionists (the first version). Open Peeps was chosen as the most illustrative set that needs no attribution beyond NOTICE. Lorelei (CC0) and Micah (CC BY) are the runner-ups. |
 | [assistant-ui/assistant-ui](https://github.com/assistant-ui/assistant-ui) | not verified (GitHub API blocked in this session) | MIT | Not adopted. Its thread/composer primitives are good, but it assumes its own runtime and styling. Our surface is small and must match the existing chrome. Worth reconsidering when the BYOK streaming runtime lands. |
 | [vercel/ai](https://github.com/vercel/ai) (AI SDK) | not verified (same reason) | Apache-2.0 | Deferred to Phase 5. It is the likely transport for BYOK streaming behind `ChatAgent`; nothing calls a model yet. |
 | [remarkjs/react-markdown](https://github.com/remarkjs/react-markdown) | not verified | MIT | Not needed yet. The local agent emits plain text; add it when model output arrives. |
 
-Notion's own illustrations are proprietary and were not used or imitated. The characters come from the independent CC0 Notionists set.
+**Characters belong to agents only.** The user never gets a character: their messages carry no avatar, and the account menu shows an initial.
 
 ## Founder decisions needed
 
 1. **Entitlement source and gate.** Today the plan is read from local storage, with a visible "Preview Pro locally". Should the public/local build hide chat entirely for free users, keep the preview, or offer BYOK chat for free (PRD P-009) with Pro reserved for the cloud agent?
 2. **Agent naming.** "Alli" and the five helper names and roles are placeholders.
 3. **Conversation storage.** Conversations are in browser localStorage (bounded: 200 chats, 400 messages each). Should desktop store them next to boards on disk (`.allstudio/chats`)?
-4. **Adopting DiceBear** (new runtime dependency, about 870 kB unpacked across two packages, tree-shaken in the bundle). Approve, or replace with commissioned original characters?
+4. **Adopting DiceBear + Open Peeps** (new runtime dependency). Approve it, pick another style from the comparison, or commission original characters.
 
 ## Delivery record
 

@@ -18,7 +18,7 @@ import { Menu, PromptDialog, useToast } from "../ui/controls.tsx";
 import { Icon } from "../ui/icons.tsx";
 import type { ThemePreference } from "../ui/theme.ts";
 import { type ChatAgent, LocalStudioAgent } from "./agent.ts";
-import { ALLI, Avatar, CAST, CharacterAvatar } from "./avatars.tsx";
+import { ALLI, CAST, CharacterAvatar } from "./avatars.tsx";
 import {
   type ActivityItem,
   CHAT_LIMITS,
@@ -214,11 +214,9 @@ function Part({
 
 function Message({
   message,
-  userName,
   onOpen,
 }: {
   message: ChatMessage;
-  userName: string;
   onOpen: (id: string) => void;
 }) {
   if (message.role === "user") {
@@ -232,7 +230,6 @@ function Message({
             ) : null,
           )}
         </div>
-        <Avatar seed={`user-${userName}`} background="dfe9f7" size={30} />
       </article>
     );
   }
@@ -787,7 +784,9 @@ export function ChatPage({
           align="start"
           trigger={
             <>
-              <Avatar seed={`user-${userName}`} background="dfe9f7" size={26} />
+              <span className="avatar small" aria-hidden="true">
+                {(files.settings().displayName || "L")[0]?.toUpperCase()}
+              </span>
               <span>{files.settings().displayName || "Local studio"}</span>
             </>
           }
@@ -895,12 +894,7 @@ export function ChatPage({
                 </div>
               </div>
               {conversation.messages.map((message) => (
-                <Message
-                  key={message.id}
-                  message={message}
-                  userName={userName}
-                  onOpen={open}
-                />
+                <Message key={message.id} message={message} onOpen={open} />
               ))}
             </div>
           </div>

@@ -99,6 +99,17 @@ async function session(colorScheme) {
     "I want to create a homepage",
   );
   pass("agent generates a real board, preview and activity panel update");
+  if (
+    (await page
+      .locator(".ch-msg.user img, .ch-account img, .ws-account img")
+      .count()) !== 0
+  )
+    throw new Error("user must not have a character avatar");
+  await expect(page.locator(".ch-msg.agent img").first()).toHaveAttribute(
+    "alt",
+    "Alli, Design agent",
+  );
+  pass("only agents have characters; the user has none");
   await shot(page, "04-chat-generated");
 
   // Refine with quick actions.
