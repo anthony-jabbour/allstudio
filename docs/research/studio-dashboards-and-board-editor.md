@@ -40,3 +40,13 @@ Not used. No authorized target/CDP session was supplied, and Paper/Framer behavi
 - Board JSON is untrusted input: strict schema (bounded pages/nodes/depth/text), finite numbers, color allow-list (blocks `url(...)`/CSS injection), image `src` limited to inline `data:image/(png|jpeg|gif|webp);base64` (no remote fetches, no SVG).
 - Rendering uses React text children and inline styles only; no `dangerouslySetInnerHTML`.
 - Storage quota failures are surfaced; damaged entries refuse to open instead of rendering partially.
+
+## Board editor (editor PR)
+
+Code: `packages/editor/src/board/{model,geometry,history}.ts` (pure, unit tested) and `packages/editor/src/board/editor/*` (React UI), hosted at `#/file/:id` in `apps/studio`.
+
+Implemented: Pages/Layers/Assets panel (page add/rename/duplicate/delete; layer tree with expand/collapse, hide/lock, rename, drag to reorder or nest, keyboard arrows); infinite dotted canvas with wheel pan, Ctrl/Cmd-wheel zoom at cursor, space/hand/middle-button pan, zoom menu and fit; frame/rectangle/ellipse/text/image tools (drawn layers nest in the frame under the pointer); click/shift/marquee selection, drag-move with edge/center snapping guides, drop-to-reparent, 8 resize handles (Shift keeps aspect), arrow nudge; inline text editing; Style inspector (position, size, rotation, radius, opacity, fill/gradient, stroke, shadow, text family/size/weight/line/letter/align/color, frame clip and size presets, image fit/replace, alignment, multi-select with "Mixed"); label scrubbing; undo/redo with one step per gesture; copy/cut/paste (validated through the board schema), ⌘D, ⌘G / ⇧⌘G, ⌘[ ⌘], ⇧⌘H, ⇧⌘L; image upload/drop/paste; 350 ms autosave to the file store and flush on exit; `.board.json` export; light/dark chrome. The Agent tab states it is not connected and only offers local deterministic actions.
+
+Known limits: rotation renders but selection/handles use the unrotated box; no multi-selection scaling; no vector paths, components, auto-layout, prototyping, comments, multiplayer or PNG/SVG export; text uses system font stacks (no font files); fonts/layout of exported JSON are not converted to site code. Board storage is browser-local in this host; Electron `.allstudio/boards/` persistence is not wired.
+
+Evidence: `node scripts/e2e/board-editor.e2e.mjs` — 18 checks (template open, canvas selection ↔ layers, font-size edit, drag + single-step undo/redo, resize, nested draw, fill, inline text, image upload, duplicate/delete, frame selection, pages, agent quick actions, reload persistence, export JSON schema v1, back to files, no page errors). Screenshots in `docs/validation/evidence/board-editor/`.
