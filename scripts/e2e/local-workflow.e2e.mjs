@@ -1079,18 +1079,17 @@ try {
   await page
     .getByLabel("Text", { exact: true })
     .fill("Must not overwrite external edit");
+  const applyText = page.getByRole("button", {
+    name: "Apply text",
+    exact: true,
+  });
+  await expect(applyText).toBeEnabled();
   const external = `${saved}\n// External editor change\n`;
   await writeFile(sourceFile, external);
-  await page
-    .getByText(/Project files changed|source file changed/)
-    .waitFor({ timeout: 10_000 });
-  await page.getByRole("button", { name: "Apply text", exact: true }).click();
-  await page
-    .getByText(/file changed since this element was selected/)
-    .waitFor();
+  await expect(applyText).toBeDisabled({ timeout: 10_000 });
   assert.equal(await readFile(sourceFile, "utf8"), external);
   pass(
-    "file watching detects external change; a stale save is non-destructive",
+    "file watching disables stale source edits and preserves the external change",
   );
 
   const outsideDir = join(evidence, "outside-dir");
