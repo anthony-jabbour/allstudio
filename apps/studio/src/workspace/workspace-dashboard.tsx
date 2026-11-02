@@ -169,15 +169,7 @@ export function WorkspaceDashboard({
             href({ name: "home", section: "recents" }),
             false,
           )}
-          <span
-            className="ws-nav disabled"
-            aria-disabled="true"
-            title="Local AI (bring your own key) is planned for Phase 5."
-          >
-            <Icon.Chat />
-            <span>Chat</span>
-            <span className="pill">Soon</span>
-          </span>
+          {navItem("Chat", <Icon.Chat />, href({ name: "chat" }), false)}
         </nav>
         <h2 className="ws-heading">Your projects</h2>
         <nav aria-label="Your projects" className="ws-projects">
