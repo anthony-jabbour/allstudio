@@ -114,3 +114,4 @@ export function parseProjectManifest(value: unknown): ProjectManifestV1 {
 
   return manifest;
 }
+export * from "./board.ts";

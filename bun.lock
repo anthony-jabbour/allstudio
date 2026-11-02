@@ -46,6 +46,23 @@
         "vite": "^7.1.7",
       },
     },
+    "apps/studio": {
+      "name": "@allstudio/studio",
+      "version": "0.0.0",
+      "dependencies": {
+        "@allstudio/editor": "workspace:*",
+        "@allstudio/project": "workspace:*",
+        "react": "19.3.0",
+        "react-dom": "19.3.0",
+      },
+      "devDependencies": {
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "@vitejs/plugin-react": "^5.0.4",
+        "typescript": "^5",
+        "vite": "^7.1.7",
+      },
+    },
     "examples/nested-components-fixture": {
       "name": "@allstudio/nested-components-fixture",
       "version": "0.1.0",
@@ -146,6 +163,8 @@
     "@allstudio/playground": ["@allstudio/playground@workspace:apps/playground"],
 
     "@allstudio/project": ["@allstudio/project@workspace:packages/project"],
+
+    "@allstudio/studio": ["@allstudio/studio@workspace:apps/studio"],
 
     "@allstudio/tailwind-variants-fixture": ["@allstudio/tailwind-variants-fixture@workspace:examples/tailwind-variants-fixture"],
 

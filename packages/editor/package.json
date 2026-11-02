@@ -10,7 +10,8 @@
     "./shell": "./src/shell/index.ts",
     "./source-mapper": "./src/source-mapper/index.ts",
     "./site": "./src/site/source-edit-workspace.ts",
-    "./preview-bridge": "./src/preview-bridge/protocol.ts"
+    "./preview-bridge": "./src/preview-bridge/protocol.ts",
+    "./board": "./src/board/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
