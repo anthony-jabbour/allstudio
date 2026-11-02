@@ -21,6 +21,12 @@ import { promisify } from "node:util";
 import { _electron, expect } from "@playwright/test";
 import { clickPreview, getRenderedPreviewRect } from "./preview-pointer.mjs";
 
+// shortcut: CI omits optional window screenshots after Xvfb capture timed out; restore when runner capture is reliable.
+const captureVisualEvidence = process.env.CI !== "true";
+const takeScreenshot = async (page, options) => {
+  if (captureVisualEvidence) await page.screenshot(options);
+};
+
 const desktop = resolve("apps/desktop");
 const executablePath = process.argv
   .slice(2)
@@ -216,7 +222,7 @@ async function launch() {
   );
   await application
     .context()
-    .tracing.start({ screenshots: true, snapshots: true });
+    .tracing.start({ screenshots: captureVisualEvidence, snapshots: true });
   assert.equal(
     await application.evaluate(({ app }) => app.getPath("userData")),
     profile,
@@ -428,7 +434,7 @@ try {
     );
     await writeFile(join(evidence, "spacing-before.tsx"), spacingBefore);
     await writeFile(join(evidence, "spacing-after.tsx"), spacingAfter);
-    await page.screenshot({ path: join(evidence, "spacing.png") });
+    await takeScreenshot(page, { path: join(evidence, "spacing.png") });
     pass(
       "Spacing inspector applies an exact persistent JSX patch and observes all four rendered padding sides",
     );
@@ -531,7 +537,7 @@ try {
     assert.equal(await readFile(sourceFile, "utf8"), typographyAfter);
     await writeFile(join(evidence, "typography-before.tsx"), typographyBefore);
     await writeFile(join(evidence, "typography-after.tsx"), typographyAfter);
-    await page.screenshot({ path: join(evidence, "typography.png") });
+    await takeScreenshot(page, { path: join(evidence, "typography.png") });
     pass(
       "six typography controls save the exact JSX diff and confirm actual Electron rendering",
     );
@@ -616,7 +622,7 @@ try {
     assert.equal(await readFile(sourceFile, "utf8"), appearanceAfter);
     await writeFile(join(evidence, "appearance-before.tsx"), appearanceBefore);
     await writeFile(join(evidence, "appearance-after.tsx"), appearanceAfter);
-    await page.screenshot({ path: join(evidence, "appearance.png") });
+    await takeScreenshot(page, { path: join(evidence, "appearance.png") });
     pass(
       "appearance inspector applies an exact persistent JSX colour and radius patch and observes rendered CSS",
     );
@@ -696,7 +702,7 @@ try {
     assert.equal(await readFile(sourceFile, "utf8"), layoutAfter);
     await writeFile(join(evidence, "layout-before.tsx"), layoutBefore);
     await writeFile(join(evidence, "layout-after.tsx"), layoutAfter);
-    await page.screenshot({ path: join(evidence, "layout.png") });
+    await takeScreenshot(page, { path: join(evidence, "layout.png") });
     pass(
       "layout inspector applies an exact persistent JSX width/display/justify patch and observes rendered CSS",
     );
@@ -892,10 +898,10 @@ try {
         : Infinity;
     })
     .toBeLessThan(2);
-  await page.screenshot({ path: join(evidence, "studio-dark.png") });
+  await takeScreenshot(page, { path: join(evidence, "studio-dark.png") });
   await page.getByLabel("Appearance", { exact: true }).selectOption("light");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await page.screenshot({ path: join(evidence, "studio-light.png") });
+  await takeScreenshot(page, { path: join(evidence, "studio-light.png") });
   pass(
     "Studio theme and panel controls preserve the live frame, unsaved drafts and source",
   );
@@ -919,7 +925,7 @@ try {
   await expect(
     page.getByRole("button", { name: "Preview text patch", exact: true }),
   ).toBeFocused();
-  await page.screenshot({
+  await takeScreenshot(page, {
     path: join(evidence, "studio-narrow.png"),
     fullPage: false,
   });
@@ -1227,7 +1233,7 @@ try {
   pass(
     "no Clerk/Railway requests; local editing makes no model-provider requests",
   );
-  await page.screenshot({ path: join(evidence, "saved.png") });
+  await takeScreenshot(page, { path: join(evidence, "saved.png") });
   await application
     .context()
     .tracing.stop({ path: join(evidence, "edit-trace.zip") });
@@ -1249,11 +1255,11 @@ try {
   await projectSearch.fill("");
   await page.getByRole("button", { name: "List view", exact: true }).click();
   await expect(page.locator(".project-grid")).toHaveClass(/project-list/);
-  await page.screenshot({ path: join(evidence, "home-list-light.png") });
+  await takeScreenshot(page, { path: join(evidence, "home-list-light.png") });
   await page.getByRole("button", { name: "Grid view", exact: true }).click();
-  await page.screenshot({ path: join(evidence, "home-light.png") });
+  await takeScreenshot(page, { path: join(evidence, "home-light.png") });
   await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
-  await page.screenshot({ path: join(evidence, "home-dark.png") });
+  await takeScreenshot(page, { path: join(evidence, "home-dark.png") });
   const storedPreview = page.locator(".project-card-preview img").first();
   await expect(storedPreview).toBeVisible();
   assert.ok(
@@ -1331,7 +1337,7 @@ try {
     })
     .toBe(true);
   assert.equal(await readFile(sourceFile, "utf8"), beforeCrash);
-  await page.screenshot({ path: join(evidence, "interrupted.png") });
+  await takeScreenshot(page, { path: join(evidence, "interrupted.png") });
   const mainProcess = application.process();
   const exited = once(mainProcess, "exit");
   mainProcess.kill("SIGKILL");
@@ -1566,7 +1572,9 @@ try {
       join(evidence, "typography-reopened.tsx"),
       persistedTypography,
     );
-    await page.screenshot({ path: join(evidence, "typography-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "typography-reopened.png"),
+    });
     pass(
       "typography source and actual appearance persist across full Electron quit and reopen",
     );
@@ -1613,7 +1621,9 @@ try {
       .toEqual(["36px", "16px", "16px"]);
     assert.equal(await readFile(sourceFile, "utf8"), persistedSpacing);
     await writeFile(join(evidence, "spacing-reopened.tsx"), persistedSpacing);
-    await page.screenshot({ path: join(evidence, "spacing-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "spacing-reopened.png"),
+    });
     pass(
       "Spacing source and actual appearance persist across full Electron quit and reopen",
     );
@@ -1683,7 +1693,9 @@ try {
       join(evidence, "appearance-reopened.tsx"),
       persistedAppearance,
     );
-    await page.screenshot({ path: join(evidence, "appearance-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "appearance-reopened.png"),
+    });
     pass(
       "appearance source and actual colour/radius persist across full Electron quit and reopen",
     );
@@ -1741,7 +1753,7 @@ try {
       .toEqual(["240px", "flex", "center", "rgb(17, 34, 51)", "12px"]);
     assert.equal(await readFile(sourceFile, "utf8"), persistedLayout);
     await writeFile(join(evidence, "layout-reopened.tsx"), persistedLayout);
-    await page.screenshot({ path: join(evidence, "layout-reopened.png") });
+    await takeScreenshot(page, { path: join(evidence, "layout-reopened.png") });
     pass(
       "layout source and actual width/display/justify persist across full Electron quit and reopen",
     );
@@ -1886,7 +1898,9 @@ try {
     );
     await writeFile(join(evidence, "responsive-before.tsx"), beforeResponsive);
     await writeFile(join(evidence, "responsive-after.tsx"), scopedSource);
-    await page.screenshot({ path: join(evidence, "responsive-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "responsive-reopened.png"),
+    });
     pass(
       "scoped typography/spacing/appearance/sizing: exact native source diff, undo/redo, real rendering and full offline-capable quit/reopen persistence",
     );
@@ -1991,7 +2005,9 @@ try {
     assert.equal(await readFile(sourceFile, "utf8"), afterMove);
     await writeFile(join(evidence, "reorder-before.tsx"), beforeMove);
     await writeFile(join(evidence, "reorder-after.tsx"), afterMove);
-    await page.screenshot({ path: join(evidence, "reorder-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "reorder-reopened.png"),
+    });
     pass(
       "source-safe sibling buttons and layer drag preserve exact JSX/identity; undo/redo and full quit/reopen retain actual DOM order",
     );
@@ -2069,7 +2085,7 @@ try {
     assert.equal(await readFile(assetSource, "utf8"), afterAsset);
     await writeFile(join(evidence, "assets-before.tsx"), beforeAsset);
     await writeFile(join(evidence, "assets-after.tsx"), afterAsset);
-    await page.screenshot({ path: join(evidence, "assets-reopened.png") });
+    await takeScreenshot(page, { path: join(evidence, "assets-reopened.png") });
     pass(
       "project asset association: img and next/image exact source, loaded render, undo/redo and full reopen persistence",
     );
