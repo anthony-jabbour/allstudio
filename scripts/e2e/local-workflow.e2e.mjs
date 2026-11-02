@@ -266,7 +266,23 @@ try {
     .getByLabel("Edit breakpoint", { exact: true })
     .selectOption("base");
   const preview = page.frameLocator('iframe[title="Project preview"]');
+  await preview.locator("h1").evaluate((heading) => {
+    window.__allstudioE2ePointerHit = false;
+    window.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (event.composedPath().includes(heading))
+          window.__allstudioE2ePointerHit = true;
+      },
+      { capture: true, once: true },
+    );
+  });
   await clickPreview(page, preview.locator("h1"));
+  assert.equal(
+    await preview.locator("h1").evaluate(() => window.__allstudioE2ePointerHit),
+    true,
+    "Canvas pointer must reach the preview heading",
+  );
   const originalHeading = await preview.locator("h1").innerText();
   const headingOid = await preview.locator("h1").getAttribute("data-oid");
   const layers = page.getByRole("tree", { name: "Rendered layers" });
@@ -1272,7 +1288,7 @@ try {
   await expect(recent.locator(".project-card-path")).not.toContainText(
     "/Users/",
   );
-  await recent.getByRole("button").first().click();
+  await recent.locator(".project-card").first().click();
   pass(
     "Home search filters remembered local projects and a project card reopens the existing grant; appearance survives restart",
   );

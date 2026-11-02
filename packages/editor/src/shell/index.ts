@@ -52,3 +52,11 @@ export {
   EditorShell,
   hasUnsavedInspectorDraft,
 } from "./editor-shell.tsx";
+export type {
+  WorkspaceHomeNavigationItem,
+  WorkspaceHomeProject,
+  WorkspaceHomeProps,
+  WorkspaceHomeSection,
+  WorkspaceHomeView,
+} from "./workspace-home.tsx";
+export { WorkspaceHome } from "./workspace-home.tsx";

@@ -604,3 +604,13 @@ Known gate limits: unfamiliar-user task sessions and assistive-technology valida
 Recommendation: **READY FOR FOUNDER REVIEW of the implemented Phase 3 slices; IN PROGRESS for the phase gate.** Phase 4 boards and Phase 5 AI remain future work. The final phase gate requires the founder to validate the real-user scenarios and review this implementation.
 
 Delivery: draft [PR #28](https://github.com/anthony-jabbour/allstudio/pull/28), stacked on draft PR #24. No merge or phase PASS.
+
+### Shared Home extraction — 2026-11-02 (IN PROGRESS)
+
+The Electron renderer now consumes `WorkspaceHome` from `@allstudio/editor/shell`. The shared React component receives host-provided navigation, cards, previews and callbacks; native project grants, project metadata, recent-project persistence and file opening remain in the Electron host. PR #25's web Home has not yet been updated to consume this component, so exact component-source reuse across the two surfaces is still pending. The board model from PR #26 and chat/agent UI from PR #27 remain out of Phase 3.
+
+After the desktop rebuild, `bun run test:local` exercised the new Home and passed 38 reported scenario checks, including Home search/card open, source edits, restart/recovery, security and reorder. The founder then asked that local Electron runs stop; the process was interrupted before its final asset scenario and summary, so this is **not** a full E2E pass. No further Electron app will be launched locally; the next complete native workflow must come from GitHub CI.
+
+Noninteractive verification after this extraction: `bun run test` passed 43 files/895 tests; `bun run typecheck` passed all seven workspaces; `bun run lint` passed 190 files; `bun run validate:public-boundary` passed 538 files; `bun run build` built the playground and all three Next.js fixtures; and `bun run build:desktop` completed successfully. The new `WorkspaceHome` render test passed 1/1. These checks do not replace the interrupted native workflow.
+
+The latest completed GitHub run is head `b956a02`: quality passed; `electron-smoke` failed at the initial canvas-selection assertion, with the target layer still `aria-selected=false`. The current working tree adds a test-only window-capture pointer probe before that selection to distinguish pointer delivery from bridge selection; this has not yet run on GitHub. The working-tree shared Home change and updated pointer probe have not had a final independent whole-branch review. Phase 3 remains **IN PROGRESS**, no merge or phase PASS; recommendation is **INCOMPLETE** until the latest code is reviewed, remote Electron CI passes, PR #25 consumes the shared UI where possible, and founder validation is complete.
