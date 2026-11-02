@@ -1296,7 +1296,19 @@ try {
     .context()
     .tracing.stop({ path: join(evidence, "reopen-trace.zip") });
   const reopenedPreview = page.frameLocator('iframe[title="Project preview"]');
-  await clickInPreview(reopenedPreview.locator("h1"), { x: 8, y: 8 });
+  const reopenedHeadingOid = await reopenedPreview
+    .locator("h1")
+    .getAttribute("data-oid");
+  assert.ok(
+    reopenedHeadingOid,
+    "The reopened heading must retain its source ID",
+  );
+  const reopenedLayers = page.getByRole("tree", { name: "Rendered layers" });
+  const reopenedHeadingLayer = reopenedLayers.locator(
+    `[data-source-oid="${reopenedHeadingOid}"]`,
+  );
+  await reopenedHeadingLayer.locator(":scope > .layer-row").click();
+  await expect(reopenedHeadingLayer).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
     "Saved locally",
   );
