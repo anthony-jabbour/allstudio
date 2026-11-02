@@ -10,3 +10,7 @@ licensed under the Apache License, Version 2.0. Adapted files are under
 packages/editor/src/source-mapper/ and carry headers describing the
 upstream path and allstudio modifications; see docs/provenance/README.md.
 Onlook's name, trademarks, and assets are not used or redistributed.
+
+This product depends on Lucide icons (lucide-react, https://github.com/lucide-icons/lucide),
+Copyright (c) Lucide Icons and Contributors, licensed under the ISC License.
+Used for Studio chrome icons in apps/studio and packages/editor (board editor).

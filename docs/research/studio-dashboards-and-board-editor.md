@@ -40,3 +40,7 @@ Not used. No authorized target/CDP session was supplied, and Paper/Framer behavi
 - Board JSON is untrusted input: strict schema (bounded pages/nodes/depth/text), finite numbers, color allow-list (blocks `url(...)`/CSS injection), image `src` limited to inline `data:image/(png|jpeg|gif|webp);base64` (no remote fetches, no SVG).
 - Rendering uses React text children and inline styles only; no `dangerouslySetInnerHTML`.
 - Storage quota failures are surfaced; damaged entries refuse to open instead of rendering partially.
+
+## Icon set (founder delegated the choice, 2026-11-02)
+
+The founder asked for "the same icon library as Paper.design". No public icon library from Paper was found: searches found only unrelated "Paper" icon themes, and `paper.design` is not reachable from this environment. If Paper's icons are its own artwork, they are not ours to copy. Chosen instead: **Lucide** (`lucide-react@1.58.0`, exact pin, published 2026-10-16), from [lucide-icons/lucide](https://github.com/lucide-icons/lucide). It had 25,448★ on 2026-11-02, uses the ISC licence, has no runtime dependencies, and icons can be imported individually. Its thin, rounded 24-grid strokes are the closest open match to the Paper/Framer chrome. Alternatives considered: tabler-icons (22.5k★, MIT, heavier 2px stroke), iconoir (4.6k★, MIT), radix icons (2.7k★, MIT, about 300 icons). The allstudio ✱ logo remains original artwork. Attribution is in `NOTICE`.
