@@ -4,6 +4,7 @@ import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
+import { clickPreview } from "./preview-pointer.mjs";
 
 const evidence = await mkdtemp(join(tmpdir(), "allstudio-appearance-e2e-"));
 console.log(`Evidence: ${evidence}`);
@@ -50,7 +51,7 @@ try {
   await page
     .getByLabel("Edit breakpoint", { exact: true })
     .selectOption("base");
-  await preview.locator("#harbor-cta").click();
+  await clickPreview(page, preview.locator("#harbor-cta"));
   await expect(page.getByTestId("source-location")).toBeVisible();
   await page.getByLabel("Classes", { exact: true }).fill(CTA);
   await page
@@ -200,7 +201,7 @@ try {
     await page
       .getByLabel("Edit breakpoint", { exact: true })
       .selectOption("base");
-    await preview.locator("#harbor-cta").click();
+    await clickPreview(page, preview.locator("#harbor-cta"));
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       /bg-\[#112233\]/,
     );
@@ -253,7 +254,7 @@ try {
   await page
     .getByLabel("Edit breakpoint", { exact: true })
     .selectOption("base");
-  await preview.locator("#harbor-cta").click();
+  await clickPreview(page, preview.locator("#harbor-cta"));
   await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
     /bg-\[#445566\]/,
   );
@@ -301,7 +302,7 @@ try {
     "a mixed typography and appearance draft verifies both groups through one source patch",
   );
 
-  await preview.locator("#harbor-secondary").click();
+  await clickPreview(page, preview.locator("#harbor-secondary"));
   await expect(
     page.getByText("className is an expression", { exact: false }),
   ).toBeVisible();
@@ -316,7 +317,7 @@ try {
     "dynamic class expressions keep appearance disabled and static text editable",
   );
 
-  await preview.locator("#harbor-cta").click();
+  await clickPreview(page, preview.locator("#harbor-cta"));
   await expect(
     page.getByLabel("Background colour preset", { exact: true }),
   ).toBeEnabled();

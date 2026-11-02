@@ -18,6 +18,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { clickPreview } from "./preview-pointer.mjs";
 
 // CommonJS resolution so a global install on NODE_PATH is found.
 const { chromium } = createRequire(import.meta.url)("playwright");
@@ -110,7 +111,7 @@ async function select(locator, expectedLocation) {
             response.url().endsWith("/locate") &&
             response.request().postDataJSON()?.oid === oid,
         ),
-        locator.click({ position }),
+        clickPreview(page, locator, position),
       ]);
       const result = await response.json();
       assert.equal(result.ok, true);
@@ -190,7 +191,7 @@ async function applyEdit({ file, kind, value, label }) {
 }
 
 async function expectRefusal(locator, message, label) {
-  await locator.click();
+  await clickPreview(page, locator);
   await page.getByText(message).first().waitFor();
   record(label, message);
 }
@@ -220,6 +221,14 @@ try {
     .getByText("Preview bridge: connected")
     .waitFor({ timeout: 60_000 });
   await preview.locator("#hero-heading").waitFor();
+  const sourceClasses = page.locator("details.source-class-controls");
+  assert.equal(await sourceClasses.evaluate((details) => details.open), false);
+  await sourceClasses.locator("summary").focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await sourceClasses.evaluate((details) => details.open), true);
+  record(
+    "source classes disclosure starts collapsed and opens from the keyboard",
+  );
   await page.screenshot({ path: join(outDir, "01-loaded.png") });
 
   // --- Happy path -------------------------------------------------------
@@ -293,7 +302,7 @@ try {
     },
     { times: 1 },
   );
-  await preview.locator("main p").nth(1).click();
+  await clickPreview(page, preview.locator("main p").nth(1));
   // The select message arrives asynchronously; well inside the 1.5 s delay
   // the field must be cleared and disabled while the lookup is pending.
   await page.waitForFunction(
@@ -331,7 +340,7 @@ try {
   record("external change since selection reports a conflict");
 
   // --- Dynamic children (layout <body>{children}</body>) ------------------
-  await preview.locator("body").click({ position: { x: 4, y: 4 } });
+  await clickPreview(page, preview.locator("body"), { x: 4, y: 4 });
   await page.getByText("renders expressions or nested elements").waitFor();
   assert.ok(await textInput.isDisabled());
   record("dynamic {children} element is refused");
@@ -344,7 +353,7 @@ try {
   await frame.evaluate(() => {
     document.querySelector("main p")?.setAttribute("data-oid", "zzzzzzz");
   });
-  await preview.locator("main p").first().click();
+  await clickPreview(page, preview.locator("main p").first());
   await page.getByText("has no matching data-oid").waitFor();
   record("DOM oid missing from source is refused");
 
@@ -353,7 +362,7 @@ try {
     const heading = document.getElementById("hero-heading");
     heading?.after(heading.cloneNode(true));
   });
-  await preview.locator("#hero-heading").first().click();
+  await clickPreview(page, preview.locator("#hero-heading").first());
   await page.getByText("renders 2 times").waitFor();
   assert.ok(await textInput.isDisabled());
   record("ambiguous rendered oid is refused");
@@ -367,7 +376,7 @@ try {
     window.parent.postMessage(
       {
         source: "allstudio-preview",
-        version: 8,
+        version: 10,
         type: "select",
         nonce: "forged",
         clickedTag: "h1",
@@ -376,13 +385,17 @@ try {
       "*",
     );
   });
-  await page.getByText("rejected a preview message (stale-nonce)").waitFor();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="preview-rejection"]')
+        ?.textContent === "stale-nonce",
+  );
   const shownBefore = await page.locator(".inspector").textContent();
   await page.evaluate(() => {
     window.postMessage(
       {
         source: "allstudio-preview",
-        version: 8,
+        version: 10,
         type: "select",
         nonce: "x",
         clickedTag: "h1",

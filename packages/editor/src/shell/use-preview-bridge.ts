@@ -48,6 +48,7 @@ export function usePreviewBridge(
   const [lastRejection, setLastRejection] =
     useState<PreviewMessageRejection | null>(null);
   const nonce = useRef<string | null>(null);
+  const generation = useRef(0);
   const connectedRef = useRef(false);
   const tracked = useRef<string | null>(null);
   const handlersRef = useRef(handlers);
@@ -66,10 +67,11 @@ export function usePreviewBridge(
   const sendHello = useCallback(() => {
     const next = createBridgeNonce();
     nonce.current = next;
+    generation.current += 1;
     connectedRef.current = false;
     setConnected(false);
     setLayers(null);
-    post({ type: "hello", nonce: next });
+    post({ type: "hello", nonce: next, generation: generation.current });
   }, [post]);
 
   useEffect(() => {
@@ -78,6 +80,7 @@ export function usePreviewBridge(
         previewOrigin,
         previewWindow: frame.current?.contentWindow ?? null,
         nonce: nonce.current,
+        generation: generation.current,
       });
       if (!parsed.ok) {
         // Other origins (devtools, extensions) are dropped without noise.
@@ -140,7 +143,7 @@ export function usePreviewBridge(
 
   const handleFrameLoad = useCallback(() => {
     // `boot` normally arrives first; this covers a boot sent before we listened.
-    if (!connectedRef.current) {
+    if (!nonce.current) {
       sendHello();
     }
   }, [sendHello]);

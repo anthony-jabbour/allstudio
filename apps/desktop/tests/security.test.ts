@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assetPath, isTrustedRequest } from "../src/main/security.ts";
+import { isPreviewBounds } from "../src/shared/desktop-api.ts";
 
 describe("desktop trust boundary", () => {
   const mainFrame = { url: "app://editor/index.html" };
@@ -55,4 +56,16 @@ describe("desktop trust boundary", () => {
       expect(assetPath(url, "/renderer")).toBeNull();
     }
   });
+});
+it("accepts only bounded thumbnail rectangles with no extra IPC fields", () => {
+  expect(isPreviewBounds({ x: 20, y: 80, width: 800, height: 450 })).toBe(true);
+  for (const bounds of [
+    { x: -1, y: 0, width: 800, height: 450 },
+    { x: 0, y: 0, width: Infinity, height: 450 },
+    { x: 0, y: 0, width: 2050, height: 450 },
+    { x: 0, y: 0, width: 800, height: 1600 },
+    { x: 0, y: 0, width: 800, height: 450, path: "/tmp/private" },
+    null,
+  ])
+    expect(isPreviewBounds(bounds)).toBe(false);
 });

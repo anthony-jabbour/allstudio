@@ -5,6 +5,19 @@ export interface RuntimeInfo {
 }
 
 export interface DesktopApi {
+  listAssets(projectId: string): Promise<ProjectAsset[]>;
+  previewAssetEdit(
+    projectId: string,
+    request: AssetEditRequest,
+  ): Promise<TextEditResult>;
+  applyAssetEdit(
+    projectId: string,
+    request: AssetEditRequest,
+  ): Promise<TextEditResult>;
+  captureProjectPreview(
+    projectId: string,
+    bounds: PreviewBounds,
+  ): Promise<boolean>;
   runtime(): Promise<RuntimeInfo>;
   recent(): Promise<RecentProject[]>;
   chooseProject(): Promise<ProjectResult>;
@@ -45,9 +58,11 @@ export interface DesktopApi {
 export const RUNTIME_CHANNEL = "allstudio:runtime";
 
 import type {
+  AssetEditRequest,
   ClassEditRequest,
   DiscoveredRoute,
   LocateElementResult,
+  ProjectAsset,
   ReorderEditRequest,
   ResponsiveCapabilities,
   SelectRouteResult,
@@ -60,6 +75,29 @@ export interface RecentProject {
   id: string;
   name: string;
   path: string;
+  thumbnail?: string;
+}
+export interface PreviewBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export function isPreviewBounds(value: unknown): value is PreviewBounds {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const item = value as Record<string, unknown>;
+  return (
+    Object.keys(item).sort().join(",") === "height,width,x,y" &&
+    [item.x, item.y, item.width, item.height].every(
+      (number) => typeof number === "number" && Number.isFinite(number),
+    ) &&
+    (item.x as number) >= 0 &&
+    (item.y as number) >= 0 &&
+    (item.width as number) >= 160 &&
+    (item.height as number) >= 120 &&
+    (item.width as number) <= 2048 &&
+    (item.height as number) <= 1536
+  );
 }
 export interface OpenProject extends RecentProject {
   previewUrl: string;

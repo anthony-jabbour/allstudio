@@ -1,6 +1,6 @@
 # Phase 03 — validation report
 
-Status: IN PROGRESS — baseline and research only; no Phase 3 runtime slice accepted.
+Status: IN PROGRESS — implementation evidence recorded through Slice 3.7; founder and human validation remain pending.
 Date: 2026-10-27 (America/Los_Angeles).
 Repository: public `anthony-jabbour/allstudio`.
 Branch: `feat/phase-03-studio-foundation`.
@@ -564,3 +564,40 @@ An earlier offline attempt reached `/about` during a root-specific assertion. Th
 Recommendation: READY FOR REVIEW for bounded3.6, with the static-source restrictions, stale-cancel route-dialog minor and window-scrolling issue disclosed. Phase3 remains IN PROGRESS; no merge/PASS. Next:3.7 local asset association, then mandatory PaperHome/FigmaStudio visual/interaction finishing.
 
 Delivery: Slice3.6 draft [PR #24](https://github.com/anthony-jabbour/allstudio/pull/24), stacked on responsive #23. Implementation/evidence head `e1df53343866d564d637b7d2d6d636105f9a4baf`. No merge or phase PASS.
+
+### Slice 3.7 implementation checkpoint — 2026-11-01 (IN PROGRESS)
+
+Branch `feat/phase-03-assets`, baseline `94b034f`, uncommitted implementation. Added bounded public asset metadata listing, static image source transforms, typed adapters and shared inspector. Native integration verifies exact src persistence, stale hash refusal, undo/redo and workspace reopen. Latest targeted command: `bun run test apps/playground/tests/dev-workspace.test.ts apps/desktop/tests/assets-files.test.ts packages/editor/tests/image-source.test.ts packages/editor/tests/preview-bridge.test.ts` — 157 tests passed across four files.
+
+Browser asset interaction saved and rendered the changed img, but confirmation failed. Diagnosis: the playground adapter omitted the selected OID from successful asset receipts; the inspector requires that receipt to continue tracking. Added the asset OID receipt. Browser confirmation must be rerun before claiming success. Earlier browser run also had a selector ambiguity, corrected in the harness. No passing browser gate or desktop UI asset proof is claimed at this checkpoint.
+
+Independent static review identified case-insensitive JSX attribute interpretation and a symlinked playground public root; both fixed with regression coverage. Native reserved-character filtering now skips unrepresentable unrelated entries. Full regression/build/package checks and final review remain pending. Phase 3 remains IN PROGRESS; Paper Home/Figma Studio finishing and human validation remain required.
+
+## Slice 3.7 and Studio finishing — 2026-11-02
+
+Status: **READY FOR REVIEW for the implemented slices; overall Phase 3 remains IN PROGRESS and is not PASS.** Work stays on `feat/phase-03-assets` at baseline `94b034f`; changes are uncommitted and the remote main/PR stack has not been merged.
+
+The approved local asset workflow is implemented end to end. The shared editor lists bounded metadata for existing supported files under the granted `public/` directory and applies exact source-backed associations for static `<img>` and verified `next/image` aliases. Apply rechecks the source hash and current project asset listing; successful edits are confirmed from a visible, loaded preview image and retain undo/redo and recovery behavior. New preview protocol v10 payloads are schema-validated and bounded. Thumbnail capture is initiated only by the trusted Electron renderer/main path, crops to the current preview, and stores a bounded JPEG in app data; preview content receives no new native capability.
+
+The shared Studio/Home finishing uses the local website project and the existing editor source pipeline. Home shows local Recents, search, grid/list, open/reopen and current-project screenshots in light/dark themes without exposing absolute paths in cards. Studio retains the actual Pages/layer tree, canvas tools, viewport/zoom and property inspector; source file references stay visible while raw class editing and source identity are disclosed separately. PR #25's Paper-like workspace hierarchy was adapted to real local website projects. PR #26's independent board model and PR #27's AI surface remain out of Phase 3; no competing site document model, cloud store or AI dependency was introduced.
+
+Fresh verification on this branch:
+
+- `bun run lint` — passed, 188 files; no warnings or formatting errors.
+- `bun run typecheck` — all seven workspaces passed.
+- `bun run test` — 42 files and 894 tests passed, including restored-symlink race coverage.
+- `bun run validate:public-boundary` — passed, 533 files scanned.
+- `bun run build` — playground and all three real Next.js fixtures built successfully.
+- `bun run build:desktop` and `bun run package:desktop` — passed; macOS arm64 package produced unsigned with the configured default icon.
+- `bun run test:desktop` — 6 desktop isolation/security checks passed; the harness reports its runtime as development.
+- `bun run test:local` — 39 Electron workflow checks passed, including source-backed typography/spacing/appearance/layout, undo/redo, route changes, external conflicts, permission checks, local Home search/reopen, save/restart/offline recovery, adjacent sibling reorder, and both `img`/`next/image` asset associations.
+- Fresh after security fixes, browser E2E: layers 14 checks (including mouse/keyboard activation and link navigation refusal) and asset association 2 checks (`img` and `next/image`). Earlier in this branch, browser E2E passed text edit 35, responsive 6, route navigation 7, reorder 6, typography 10, spacing 12, appearance 10, and layout 15 checks; the final disclosure revision was additionally exercised by text edit, responsive, assets, and native workflows.
+- `git diff --check` — passed.
+
+Evidence from the final native workflow, including Home/Studio light/dark and narrow-window screenshots, exact before/after source files, restart captures and browser screenshots, is in [`docs/validation/evidence/phase-03-workspace/`](evidence/phase-03-workspace/README.md). Raw traces remain local because their archives contain machine paths and temporary session tokens. Asset-specific source evidence remains in [`docs/validation/evidence/phase-03-assets/`](evidence/phase-03-assets/).
+
+Fresh independent whole-branch review was read-only against this branch's uncommitted diff. It found (1) preview selection on `pointerdown` did not suppress subsequent click activation/navigation, and (2) the playground asset scanner could follow a transient symlink during a path-based `lstat` and return outside metadata after the directory was restored. Both are fixed. Regression evidence: the new layers browser case was observed RED when the injected button handler ran, then GREEN with mouse and keyboard actions and anchor navigation blocked; the restored-directory-swap unit test was observed RED when outside file size was returned, then GREEN after `ctimeNs` identity rechecks on every scanned directory, verified on the current macOS filesystem. The full 894-test suite, fresh 14-check layers run, 2-check asset run, and 39-check Electron workflow passed after those changes. The reviewer also noted a duplicated unreachable thumbnail IPC branch at `apps/desktop/src/main/index.ts`; this minor was deferred without changing behavior. The reviewer ran before the fixes and was not asked to re-review; the fixes are covered by the new red-to-green regressions and full suite.
+
+Known gate limits: unfamiliar-user task sessions and assistive-technology validation remain pending founder/human review; the direct subframe IPC probe is unavailable. The full build passed in this environment, while the historical offline production `next/font/google` limitation was not independently revalidated here. No screenshot or automated check establishes Phase 3 product acceptance by itself. No merge or phase PASS is recorded.
+
+Recommendation: **READY FOR FOUNDER REVIEW of the implemented Phase 3 slices; IN PROGRESS for the phase gate.** Phase 4 boards and Phase 5 AI remain future work. The final phase gate requires the founder to validate the real-user scenarios and review this implementation.

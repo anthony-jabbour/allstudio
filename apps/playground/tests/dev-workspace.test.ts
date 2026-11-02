@@ -59,6 +59,50 @@ async function heading(workspace: DevWorkspace) {
   }
   return { oid, element: located.element };
 }
+it("lists project-owned assets and applies a static image source patch in the browser workspace", async () => {
+  const workspace = await DevWorkspace.open(workspaceDir);
+  const assets = await workspace.listAssets();
+  expect(assets.some((asset) => asset.path === "public/studio-arc.svg")).toBe(
+    true,
+  );
+  const path = "src/app/assets/page.tsx";
+  const file = join(workspaceDir, path);
+  const before = await readFile(file, "utf8");
+  const oid = before.match(/<img[^>]*data-oid="([^"]+)"/)?.[1];
+  if (!oid) throw new Error("Fixture image OID missing");
+  const located = await workspace.locate(oid);
+  if (!located.ok) throw new Error(located.reason);
+  expect(located.element.image).toMatchObject({
+    ok: true,
+    src: "/studio-orbit.svg",
+  });
+  const request = {
+    path,
+    oid,
+    expectedSha256: located.element.sha256,
+    assetPath: "public/studio-arc.svg",
+  };
+  expect(await workspace.previewAssetEdit(request)).toMatchObject({
+    ok: true,
+    written: false,
+  });
+  expect(await readFile(file, "utf8")).toBe(before);
+  expect(await workspace.applyAssetEdit(request)).toMatchObject({
+    ok: true,
+    written: true,
+  });
+  expect(await readFile(file, "utf8")).toContain('src="/studio-arc.svg"');
+  expect(await workspace.applyAssetEdit(request)).toMatchObject({
+    ok: false,
+    reason: "stale-file",
+  });
+});
+it("refuses a symlinked public asset root", async () => {
+  await rm(join(workspaceDir, "public"), { recursive: true });
+  await symlink(fixtureDir, join(workspaceDir, "public"), "dir");
+  const workspace = await DevWorkspace.open(workspaceDir);
+  await expect(workspace.listAssets()).rejects.toThrow("Asset root");
+});
 
 describe("prepareWorkspace", () => {
   it("copies and instruments the fixture without touching examples/", async () => {
@@ -600,6 +644,7 @@ describe("DevWorkspace path confinement", () => {
     });
     expect(await workspace.listSourceFiles()).toEqual([
       "src/app/about/page.tsx",
+      "src/app/assets/page.tsx",
       "src/app/journal/[slug]/page.tsx",
       "src/app/layout.tsx",
       "src/app/page.tsx",
@@ -624,6 +669,7 @@ describe("DevWorkspace route discovery and selection", () => {
     expect(snapshot.routes).toEqual([
       { route: "/", sourcePath: "src/app/page.tsx" },
       { route: "/about", sourcePath: "src/app/about/page.tsx" },
+      { route: "/assets", sourcePath: "src/app/assets/page.tsx" },
     ]);
     expect(snapshot.unsupported).toEqual([
       expect.objectContaining({

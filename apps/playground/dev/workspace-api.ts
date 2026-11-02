@@ -13,6 +13,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   hasExactKeys,
+  parseAssetEditBody,
   parseClassEditBody,
   parseLocateBody,
   parseReorderBody,
@@ -133,6 +134,27 @@ export function createWorkspaceApiMiddleware(options: WorkspaceApiOptions) {
         return;
       }
       const body = await readJson(req);
+      if (action === "list-assets") {
+        if (!hasExactKeys(body, [])) {
+          fail(res, "invalid-request");
+          return;
+        }
+        send(res, 200, await workspace.listAssets());
+        return;
+      }
+      if (action === "preview-asset" || action === "apply-asset") {
+        const parsed = parseAssetEditBody(body);
+        if (!parsed) {
+          fail(res, "invalid-request");
+          return;
+        }
+        const result =
+          action === "apply-asset"
+            ? await workspace.applyAssetEdit(parsed)
+            : await workspace.previewAssetEdit(parsed);
+        send(res, result.ok ? 200 : (STATUS[result.reason] ?? 422), result);
+        return;
+      }
       if (action === "preview-reorder" || action === "apply-reorder") {
         const parsed = parseReorderBody(body);
         if (!parsed) {

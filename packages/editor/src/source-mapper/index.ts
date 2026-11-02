@@ -26,6 +26,11 @@ import type {
 export type { DiffHunk, DiffLine, LineDiff } from "./diff.ts";
 export { createLineDiff, formatLineDiff } from "./diff.ts";
 export {
+  describeImageSource,
+  editElementImageSource,
+  type ImageSourceInfo,
+} from "./image.ts";
+export {
   inspectSiblingReorder,
   type ReorderDirection,
   type ReorderInspection,

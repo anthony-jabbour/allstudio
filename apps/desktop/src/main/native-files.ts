@@ -1,6 +1,11 @@
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { type FileHandle, open, realpath } from "node:fs/promises";
+import {
+  assetFromMetadata,
+  MAX_ASSET_FILES,
+  type ProjectAsset,
+} from "@allstudio/editor/site";
 
 export class FileFailure extends Error {
   constructor(public reason: string) {
@@ -88,6 +93,39 @@ export class NativeFiles {
 
   async listStyles(): Promise<string[]> {
     return this.listChecked("list-styles");
+  }
+  async listAssets(): Promise<ProjectAsset[]> {
+    const output = await this.run("list-assets", "public");
+    if (output.subarray(0, 3).toString() !== "OK\n")
+      throw new FileFailure("read-failed");
+    const assets: ProjectAsset[] = [];
+    let offset = 3;
+    while (offset < output.length) {
+      const end = output.indexOf(10, offset);
+      const header = /^([1-9][0-9]{0,3}) (0|[1-9][0-9]{0,15})$/.exec(
+        output.subarray(offset, end).toString(),
+      );
+      if (end < offset || !header) throw new FileFailure("read-failed");
+      const length = Number(header[1]),
+        size = Number(header[2]);
+      if (
+        length > 1024 ||
+        end + 1 + length > output.length ||
+        assets.length >= MAX_ASSET_FILES
+      )
+        throw new FileFailure("scan-limit");
+      const path = new TextDecoder("utf-8", { fatal: true }).decode(
+        output.subarray(end + 1, end + 1 + length),
+      );
+      const asset = assetFromMetadata(path, size);
+      if (!asset || assets.some((item) => item.path === path))
+        throw new FileFailure("path-rejected");
+      assets.push(asset);
+      offset = end + 1 + length;
+    }
+    return assets.sort((a, b) =>
+      a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+    );
   }
 
   private async listChecked(
@@ -202,6 +240,7 @@ export class NativeFiles {
         } else if (
           operation === "read" ||
           operation === "list" ||
+          operation === "list-assets" ||
           operation === "read-css" ||
           operation === "read-audit-source" ||
           operation === "list-audit-sources" ||

@@ -24,10 +24,15 @@ import {
 } from "node:fs/promises";
 import { dirname, isAbsolute, join, sep } from "node:path";
 import {
+  type AssetEditRequest,
+  assetFromMetadata,
+  assetUrl,
   type ClassEditRequest,
   discoverAppRouterRoutes,
   isEditBreakpoint,
+  isUsableAsset,
   type LocateElementResult,
+  MAX_ASSET_FILES,
   type ProjectRoutesSnapshot,
   type ReorderEditRequest,
   type ReorderReceipt,
@@ -45,8 +50,10 @@ import {
   createLineDiff,
   type DescribeElementResult,
   describeElement,
+  describeImageSource,
   type ElementEditResult,
   editElementClassName,
+  editElementImageSource,
   editElementText,
   formatLineDiff,
   inspectSiblingReorder,
@@ -237,6 +244,7 @@ export class DevWorkspace implements SourceEditWorkspace {
           location: described.location,
           text: described.text,
           className: described.className,
+          image: describeImageSource(content, oid),
           reorder: (await this.discoverRoutes()).routes.some(
             (route) => route.sourcePath === path,
           )
@@ -254,6 +262,90 @@ export class DevWorkspace implements SourceEditWorkspace {
 
   previewReorder(request: ReorderEditRequest): Promise<TextEditResult> {
     return this.edit(request.path, { ...request, kind: "reorder" }, false);
+  }
+  async listAssets() {
+    const found: NonNullable<ReturnType<typeof assetFromMetadata>>[] = [];
+    const root = join(this.root, "public");
+    const rootStat = await lstat(root).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    if (!rootStat) return found;
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink())
+      throw new Error("Asset root is not a project directory");
+    let visited = 0;
+    const directories: Array<{
+      path: string;
+      dev: bigint;
+      ino: bigint;
+      ctimeNs: bigint;
+    }> = [];
+    const scan = async (
+      directory: string,
+      prefix: string,
+      depth: number,
+    ): Promise<void> => {
+      if (depth > 32) throw new Error("Asset scan depth exceeded");
+      const before = await lstat(directory, { bigint: true });
+      if (!before.isDirectory() || before.isSymbolicLink())
+        throw new Error("Asset directory changed during scan");
+      // ctime catches a directory swapped out and restored during an awaited lookup.
+      directories.push({
+        path: directory,
+        dev: before.dev,
+        ino: before.ino,
+        ctimeNs: before.ctimeNs,
+      });
+      const names = await readdir(directory);
+      const after = await lstat(directory, { bigint: true });
+      if (
+        !after.isDirectory() ||
+        after.isSymbolicLink() ||
+        after.dev !== before.dev ||
+        after.ino !== before.ino ||
+        after.ctimeNs !== before.ctimeNs
+      )
+        throw new Error("Asset directory changed during scan");
+      for (const name of names) {
+        if (++visited > 10000) throw new Error("Asset scan limit exceeded");
+        const relative = prefix ? `${prefix}/${name}` : name;
+        if (Buffer.byteLength(`public/${relative}`) > 1024)
+          throw new Error("Asset path too long");
+        const absolute = join(directory, name);
+        const stat = await lstat(absolute);
+        if (stat.isSymbolicLink()) throw new Error("Asset path is a link");
+        if (stat.isDirectory()) await scan(absolute, relative, depth + 1);
+        else if (/\.(svg|png|jpe?g|webp|gif|avif)$/i.test(name)) {
+          if (!stat.isFile() || stat.nlink !== 1)
+            throw new Error("Asset path is unsafe");
+          const asset = assetFromMetadata(`public/${relative}`, stat.size);
+          if (!asset || found.length >= MAX_ASSET_FILES)
+            throw new Error("Asset metadata is unsafe");
+          found.push(asset);
+        }
+      }
+    };
+    await scan(root, "", 0);
+    for (const expected of directories) {
+      const current = await lstat(expected.path, { bigint: true });
+      if (
+        !current.isDirectory() ||
+        current.isSymbolicLink() ||
+        current.dev !== expected.dev ||
+        current.ino !== expected.ino ||
+        current.ctimeNs !== expected.ctimeNs
+      )
+        throw new Error("Asset directory changed during scan");
+    }
+    return found.sort((a, b) => a.path.localeCompare(b.path));
+  }
+  previewAssetEdit(request: AssetEditRequest): Promise<TextEditResult> {
+    return this.edit(request.path, { ...request, kind: "asset" }, false);
+  }
+  applyAssetEdit(request: AssetEditRequest): Promise<TextEditResult> {
+    return this.serialized(request.path, () =>
+      this.edit(request.path, { ...request, kind: "asset" }, true),
+    );
   }
   applyReorder(request: ReorderEditRequest): Promise<TextEditResult> {
     return this.serialized(request.path, () =>
@@ -455,7 +547,10 @@ export class DevWorkspace implements SourceEditWorkspace {
 
   private async edit(
     path: string,
-    edit: ElementEditRequest | (ReorderEditRequest & { kind: "reorder" }),
+    edit:
+      | ElementEditRequest
+      | (ReorderEditRequest & { kind: "reorder" })
+      | (AssetEditRequest & { kind: "asset" }),
     write: boolean,
   ): Promise<TextEditResult> {
     const resolved = await this.resolve(path);
@@ -483,7 +578,30 @@ export class DevWorkspace implements SourceEditWorkspace {
     };
     let generated: string;
     let reorder: ReorderReceipt | undefined;
-    if (edit.kind === "reorder") {
+    if (edit.kind === "asset") {
+      const url = assetUrl(edit.assetPath);
+      if (
+        !url ||
+        !(await this.listAssets()).some(
+          (asset) => asset.path === edit.assetPath && isUsableAsset(asset),
+        )
+      )
+        return sourceEditFailure("path-rejected");
+      const current = describeImageSource(content, edit.oid);
+      if (!current.ok) return sourceEditFailure(current.reason);
+      if (current.src === url) return noop;
+      const patched = editElementImageSource(content, edit.oid, url);
+      if (!patched.ok) return sourceEditFailure(patched.reason);
+      const check = describeImageSource(patched.generated, edit.oid);
+      if (
+        !check.ok ||
+        check.src !== url ||
+        JSON.stringify(listOids(content)?.sort()) !==
+          JSON.stringify(listOids(patched.generated)?.sort())
+      )
+        return sourceEditFailure("invalid-patch");
+      generated = patched.generated;
+    } else if (edit.kind === "reorder") {
       if (
         !(await this.discoverRoutes()).routes.some(
           (route) => route.sourcePath === path,
@@ -544,6 +662,7 @@ export class DevWorkspace implements SourceEditWorkspace {
         noop: false,
         sha256: currentSha,
         diff,
+        ...(edit.kind === "asset" ? { oid: edit.oid } : {}),
         ...(reorder ? { oid: edit.oid, reorder } : {}),
       };
     }
@@ -581,6 +700,7 @@ export class DevWorkspace implements SourceEditWorkspace {
       noop: false,
       sha256: sha256(generated),
       diff,
+      ...(edit.kind === "asset" ? { oid: edit.oid } : {}),
       ...(reorder ? { oid: edit.oid, reorder } : {}),
     };
   }

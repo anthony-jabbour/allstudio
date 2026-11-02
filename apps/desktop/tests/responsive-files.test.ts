@@ -131,8 +131,8 @@ describe("readonly responsive metadata native boundary", () => {
         ["read-css", "src/../outside.css"],
         ["list-styles", "public"],
         ["list-styles", "src/page.tsx"],
-      ]) {
-        const result = f.run(operation!, path!);
+      ] as [string, string][]) {
+        const result = f.run(operation, path);
         expect(result.status).not.toBe(0);
         expect(result.stdout.toString()).toContain("ERR path-rejected");
       }

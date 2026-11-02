@@ -1,10 +1,30 @@
+import { assetUrl } from "./assets.ts";
 import { isEditBreakpoint } from "./class-tokens.ts";
 import type {
+  AssetEditRequest,
   ClassEditRequest,
   ReorderEditRequest,
   SelectRouteRequest,
   TextEditRequest,
 } from "./source-edit-workspace.ts";
+
+export function parseAssetEditBody(body: unknown): AssetEditRequest | null {
+  if (!hasExactKeys(body, ["path", "oid", "expectedSha256", "assetPath"]))
+    return null;
+  const { path, oid, expectedSha256, assetPath } = body;
+  if (
+    typeof path !== "string" ||
+    path.length > 1024 ||
+    typeof oid !== "string" ||
+    !OID_PATTERN.test(oid) ||
+    typeof expectedSha256 !== "string" ||
+    !SHA256_PATTERN.test(expectedSha256) ||
+    typeof assetPath !== "string" ||
+    !assetUrl(assetPath)
+  )
+    return null;
+  return { path, oid, expectedSha256, assetPath };
+}
 
 const MAX_TEXT_LENGTH = 500;
 const MAX_CLASS_LENGTH = 1000;

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
+import { clickPreview } from "./preview-pointer.mjs";
 
 const evidence = await mkdtemp(join(tmpdir(), "allstudio-routes-e2e-"));
 console.log(`Evidence: ${evidence}`);
@@ -72,7 +73,7 @@ try {
   const initialRootHeading =
     (await preview.locator("#hero-heading").textContent())?.trim() ?? "";
   assert.ok(initialRootHeading.length > 0);
-  await preview.locator("#hero-heading").click();
+  await clickPreview(page, preview.locator("#hero-heading"));
   await expect(page.getByTestId("source-location")).toContainText(
     "src/app/page.tsx",
   );
@@ -133,7 +134,7 @@ try {
     "Discard and switch navigates preview to /about, refreshes layers, clears inspector selection/drafts, and leaves root source untouched",
   );
 
-  await preview.locator("#about-heading").click();
+  await clickPreview(page, preview.locator("#about-heading"));
   await expect(page.getByTestId("source-location")).toContainText(
     "src/app/about/page.tsx",
   );

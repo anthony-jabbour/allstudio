@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   hasExactKeys,
+  parseAssetEditBody,
   parseClassEditBody,
   parseLocateBody,
   parseReorderBody,
@@ -21,6 +22,7 @@ import {
 } from "electron";
 import {
   CHANGE_CHANNEL,
+  isPreviewBounds,
   PROJECT_CHANNEL,
   RUNTIME_CHANNEL,
   type RuntimeInfo,
@@ -198,10 +200,27 @@ app
       if (!current || value.projectId !== current.info.id)
         return sourceEditFailure("unauthorized");
       if (
+        value.action === "capture-project-preview" &&
+        hasExactKeys(value, ["action", "projectId", "bounds"]) &&
+        isPreviewBounds(value.bounds)
+      )
+        return projects.captureThumbnail(current.info.id, value.bounds);
+      if (
         value.action === "responsive-capabilities" &&
         hasExactKeys(value, ["action", "projectId"])
       )
         return current.workspace.getResponsiveCapabilities();
+      if (
+        value.action === "capture-project-preview" &&
+        hasExactKeys(value, ["action", "projectId", "bounds"]) &&
+        isPreviewBounds(value.bounds)
+      )
+        return projects.captureThumbnail(current.info.id, value.bounds);
+      if (
+        value.action === "list-assets" &&
+        hasExactKeys(value, ["action", "projectId"])
+      )
+        return current.workspace.listAssets();
       if (
         (value.action === "undo" || value.action === "redo") &&
         hasExactKeys(value, ["action", "projectId"])
@@ -213,6 +232,14 @@ app
         const parsed = parseLocateBody(value.request);
         return parsed
           ? current.workspace.locate(parsed.oid)
+          : sourceEditFailure("invalid-request");
+      }
+      if (value.action === "preview-asset" || value.action === "apply-asset") {
+        const parsed = parseAssetEditBody(value.request);
+        return parsed
+          ? value.action === "apply-asset"
+            ? current.workspace.applyAssetEdit(parsed)
+            : current.workspace.previewAssetEdit(parsed)
           : sourceEditFailure("invalid-request");
       }
       if (

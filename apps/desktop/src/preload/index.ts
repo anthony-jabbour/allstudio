@@ -10,6 +10,13 @@ if (process.isMainFrame) {
   const request = (action: string, fields: object = {}) =>
     ipcRenderer.invoke(PROJECT_CHANNEL, { action, ...fields });
   const api: DesktopApi = {
+    listAssets: (projectId) => request("list-assets", { projectId }),
+    previewAssetEdit: (projectId, value) =>
+      request("preview-asset", { projectId, request: value }),
+    applyAssetEdit: (projectId, value) =>
+      request("apply-asset", { projectId, request: value }),
+    captureProjectPreview: (projectId, bounds) =>
+      request("capture-project-preview", { projectId, bounds }),
     runtime: () => ipcRenderer.invoke(RUNTIME_CHANNEL),
     recent: () => request("recent"),
     chooseProject: () => request("choose"),

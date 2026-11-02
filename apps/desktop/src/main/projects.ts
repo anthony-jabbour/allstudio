@@ -1,5 +1,15 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { constants } from "node:fs";
+import {
+  type FileHandle,
+  mkdir,
+  open,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { basename, join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import {
@@ -9,6 +19,7 @@ import {
 import { type BrowserWindow, dialog } from "electron";
 import type {
   OpenProject,
+  PreviewBounds,
   ProjectResult,
   RecentProject,
 } from "../shared/desktop-api.ts";
@@ -65,6 +76,7 @@ export class Projects {
   } | null = null;
   private preview: Preview | null = null;
   private tail: Promise<unknown> = Promise.resolve();
+  private thumbnailTail: Promise<boolean> = Promise.resolve(false);
   private disposed = false;
   constructor(
     private data: string,
@@ -108,11 +120,118 @@ export class Projects {
     }
   }
   async recent(): Promise<RecentProject[]> {
-    return (await this.saved()).map(({ id, name, path }) => ({
-      id,
-      name,
-      path,
-    }));
+    return Promise.all(
+      (await this.saved()).map(async ({ id, name, path }, index) => ({
+        id,
+        name,
+        path,
+        ...(index < 24 ? { thumbnail: await this.readThumbnail(id) } : {}),
+      })),
+    );
+  }
+  private async readThumbnail(id: string): Promise<string | undefined> {
+    if (!/^[a-f0-9]{64}$/.test(id)) return undefined;
+    const file = join(this.data, "thumbnails", `${id}.jpg`);
+    let handle: FileHandle | undefined;
+    try {
+      handle = await open(
+        file,
+        constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+      );
+      const info = await handle.stat();
+      if (
+        !info.isFile() ||
+        info.nlink !== 1 ||
+        info.size < 4 ||
+        info.size > 96 * 1024
+      )
+        return undefined;
+      const bytes = await handle.readFile();
+      if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
+      return `data:image/jpeg;base64,${bytes.toString("base64")}`;
+    } catch {
+      return undefined;
+    } finally {
+      await handle?.close().catch(() => {});
+    }
+  }
+  async captureThumbnail(id: string, bounds: PreviewBounds): Promise<boolean> {
+    const capture = this.thumbnailTail.then(
+      () => this.captureThumbnailNow(id, bounds),
+      () => this.captureThumbnailNow(id, bounds),
+    );
+    this.thumbnailTail = capture;
+    return capture;
+  }
+  private async captureThumbnailNow(
+    id: string,
+    bounds: PreviewBounds,
+  ): Promise<boolean> {
+    if (
+      !this.current ||
+      this.current.info.id !== id ||
+      !/^[a-f0-9]{64}$/.test(id)
+    )
+      return false;
+    const [windowWidth, windowHeight] = this.window().getContentSize();
+    const { x, y, width, height } = bounds;
+    if (
+      ![x, y, width, height].every(Number.isFinite) ||
+      x < 0 ||
+      y < 0 ||
+      width < 160 ||
+      height < 120 ||
+      x + width > windowWidth ||
+      y + height > windowHeight ||
+      width > 2048 ||
+      height > 1536
+    )
+      return false;
+    try {
+      const contents = this.window().webContents;
+      await contents.executeJavaScript(
+        'document.documentElement.dataset.allstudioThumbnail = "true"; new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+      );
+      const image = await contents.capturePage({
+        x: Math.round(x),
+        y: Math.round(y),
+        width: Math.round(width),
+        height: Math.round(height),
+      });
+      const size = image.getSize();
+      const cropWidth = Math.min(size.width, Math.round(size.height * 1.6));
+      const cropHeight = Math.min(size.height, Math.round(size.width / 1.6));
+      const thumbnail = image.crop({
+        x: Math.max(0, Math.round((size.width - cropWidth) / 2)),
+        y: 0,
+        width: cropWidth,
+        height: cropHeight,
+      });
+      const bytes = thumbnail
+        .resize({ width: 420, quality: "good" })
+        .toJPEG(68);
+      if (bytes.length > 96 * 1024) return false;
+      const directory = join(this.data, "thumbnails");
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const target = join(directory, `${id}.jpg`);
+      const temporary = `${target}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
+      await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
+      try {
+        await rename(temporary, target);
+      } catch (error) {
+        await rm(temporary, { force: true });
+        throw error;
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      await this.window()
+        .webContents.executeJavaScript(
+          "delete document.documentElement.dataset.allstudioThumbnail",
+        )
+        .catch(() => {});
+    }
   }
   private operation(
     task: () => Promise<ProjectResult>,

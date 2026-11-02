@@ -1,5 +1,12 @@
 import { EditorShell, type SourceEditWorkspace } from "@allstudio/editor/shell";
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import {
+  StrictMode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createRoot } from "react-dom/client";
 import type {
   DesktopApi,
@@ -22,13 +29,46 @@ function App() {
   const [error, setError] = useState(false);
   const [project, setProject] = useState<OpenProject | null>(null);
   const [recent, setRecent] = useState<RecentProject[]>([]);
-  const [recentId, setRecentId] = useState("");
+  const searchInput = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"grid" | "list">(() => {
+    try {
+      return localStorage.getItem("allstudio:project-view") === "list"
+        ? "list"
+        : "grid";
+    } catch {
+      return "grid";
+    }
+  });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
     "Choose a local project. Applying an edit saves it to disk.",
   );
   const [session, setSession] = useState(0);
+  const projectId = project?.id;
+  const capturePreview = useCallback(() => {
+    if (!projectId) return;
+    const rect = document
+      .querySelector<HTMLIFrameElement>('iframe[title="Project preview"]')
+      ?.getBoundingClientRect();
+    if (rect && rect.width > 0 && rect.height >= 120)
+      void window.allstudio.captureProjectPreview(projectId, {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      });
+  }, [projectId]);
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        searchInput.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onShortcut);
+    return () => window.removeEventListener("keydown", onShortcut);
+  }, []);
   useEffect(() => {
     window.allstudio
       .runtime()
@@ -38,7 +78,6 @@ function App() {
       .recent()
       .then((items) => {
         setRecent(items);
-        setRecentId(items[0]?.id ?? "");
       })
       .catch(() =>
         setMessage(
@@ -51,6 +90,10 @@ function App() {
     if (!project) return undefined;
     const id = project.id;
     return {
+      listAssets: () => window.allstudio.listAssets(id),
+      previewAssetEdit: (request) =>
+        window.allstudio.previewAssetEdit(id, request),
+      applyAssetEdit: (request) => window.allstudio.applyAssetEdit(id, request),
       locate: (oid) => window.allstudio.locate(id, oid),
       previewTextEdit: (request) =>
         window.allstudio.previewTextEdit(id, request),
@@ -90,7 +133,6 @@ function App() {
       );
       const items = await window.allstudio.recent();
       setRecent(items);
-      setRecentId(items[0]?.id ?? "");
     } catch {
       setMessage(
         "The local operation failed. Project files and recovery data were retained.",
@@ -127,75 +169,83 @@ function App() {
         disabled={busy}
         key={`${project?.id ?? "closed"}:${session}`}
         projectControls={
-          <>
-            <nav className="project-toolbar" aria-label="Local project">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  void open(() => window.allstudio.chooseProject())
-                }
-              >
-                Open project
-              </button>
-              <label>
-                Recent projects
-                <select
-                  value={recentId}
-                  disabled={busy || !recent.length}
-                  onChange={(event) => setRecentId(event.target.value)}
+          project ? (
+            <>
+              <nav className="project-toolbar" aria-label="Local project">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void open(() => window.allstudio.closeProject())
+                  }
                 >
-                  {!recent.length ? (
-                    <option value="">No recent projects</option>
-                  ) : (
-                    recent.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </label>
-              <button
-                type="button"
-                disabled={busy || !recentId}
-                onClick={() =>
-                  void open(() => window.allstudio.openRecent(recentId))
-                }
-              >
-                Reopen
-              </button>
-              <button
-                type="button"
-                disabled={busy || !project}
-                onClick={() => void open(() => window.allstudio.closeProject())}
-              >
-                Close project
-              </button>
-              <button
-                type="button"
-                disabled={busy || !project}
-                onClick={() => void history(false)}
-              >
-                Undo saved edit
-              </button>
-              <button
-                type="button"
-                disabled={busy || !project}
-                onClick={() => void history(true)}
-              >
-                Redo saved edit
-              </button>
-            </nav>
-            <output className="project-status">{message}</output>
-          </>
+                  Close project
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !recent[0]}
+                  onClick={() =>
+                    recent[0] &&
+                    void open(() => window.allstudio.openRecent(recent[0].id))
+                  }
+                >
+                  Reopen
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-label="Open project"
+                  onClick={() =>
+                    void open(() => window.allstudio.chooseProject())
+                  }
+                >
+                  Open another project
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !project}
+                  onClick={() => void history(false)}
+                >
+                  Undo saved edit
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !project}
+                  onClick={() => void history(true)}
+                >
+                  Redo saved edit
+                </button>
+              </nav>
+              <output className="project-status">{message}</output>
+            </>
+          ) : undefined
         }
         homeContent={
           <div className="workspace-home">
-            <aside className="home-sidebar">
-              <h2>Workspace</h2>
-              <p className="current-page">Recent projects</p>
-              <p className="field-note">Your files stay on this computer.</p>
+            <aside className="home-sidebar" aria-label="Workspace navigation">
+              <div className="home-workspace-name">Local workspace</div>
+              <label className="home-search">
+                <span className="sr-only">Search projects</span>
+                <input
+                  ref={searchInput}
+                  type="search"
+                  aria-label="Search projects"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search projects…"
+                />
+                <kbd>⌘F</kbd>
+              </label>
+              <button
+                type="button"
+                className="home-nav-item"
+                aria-current="page"
+              >
+                <span aria-hidden="true">◷</span> Recents
+              </button>
+              <p className="home-sidebar-note">
+                Local files stay on this computer.
+              </p>
             </aside>
             <section
               className="home-projects"
@@ -203,17 +253,73 @@ function App() {
             >
               <div className="home-heading">
                 <h2>Recents</h2>
-                <label>
-                  Search projects
-                  <input
-                    type="search"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search local projects…"
-                  />
-                </label>
+                <div className="home-heading-actions">
+                  <button
+                    type="button"
+                    disabled={busy || !recent[0]}
+                    onClick={() =>
+                      recent[0] &&
+                      void open(() => window.allstudio.openRecent(recent[0].id))
+                    }
+                  >
+                    Reopen
+                  </button>
+                  <button
+                    type="button"
+                    className="home-open-button"
+                    aria-label="Open project"
+                    disabled={busy}
+                    onClick={() =>
+                      void open(() => window.allstudio.chooseProject())
+                    }
+                  >
+                    ＋ Open project
+                  </button>
+                  <fieldset className="view-switch">
+                    <legend className="sr-only">Project view</legend>
+                    <button
+                      type="button"
+                      aria-label="Grid view"
+                      aria-pressed={view === "grid"}
+                      onClick={() => {
+                        setView("grid");
+                        try {
+                          localStorage.setItem(
+                            "allstudio:project-view",
+                            "grid",
+                          );
+                        } catch {}
+                      }}
+                    >
+                      ▦
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="List view"
+                      aria-pressed={view === "list"}
+                      onClick={() => {
+                        setView("list");
+                        try {
+                          localStorage.setItem(
+                            "allstudio:project-view",
+                            "list",
+                          );
+                        } catch {}
+                      }}
+                    >
+                      ☷
+                    </button>
+                  </fieldset>
+                </div>
               </div>
-              <div className="project-grid">
+              {message !==
+                "Choose a local project. Applying an edit saves it to disk." &&
+              message !== "Project closed." ? (
+                <output className="home-status">{message}</output>
+              ) : null}
+              <div
+                className={`project-grid${view === "list" ? " project-list" : ""}`}
+              >
                 {recent
                   .filter((item) =>
                     `${item.name} ${item.path}`
@@ -231,18 +337,30 @@ function App() {
                       }
                     >
                       <span className="project-card-title">{item.name}</span>
-                      <span className="project-card-path">{item.path}</span>
-                      <span className="project-card-art" aria-hidden="true">
-                        ▤
+                      <span className="project-card-preview">
+                        {item.thumbnail ? (
+                          // biome-ignore lint/performance/noImgElement: This is a bounded local JPEG thumbnail in the Electron shell.
+                          <img
+                            src={item.thumbnail}
+                            alt={`Preview of ${item.name}`}
+                          />
+                        ) : (
+                          <span>Open project to create a preview</span>
+                        )}
                       </span>
-                      <span className="project-card-open">Open project →</span>
+                      <span className="project-card-meta">
+                        <span className="project-card-path">
+                          {item.path.split(/[\\/]/).filter(Boolean).at(-1) ??
+                            "Local project"}
+                        </span>
+                        <span className="project-card-open">Open →</span>
+                      </span>
                     </button>
                   ))}
               </div>
               {!recent.length ? (
                 <p className="home-empty">
-                  Open a local Next.js project to start. Your recent projects
-                  will appear here.
+                  Open a local Next.js project to start editing its real source.
                 </p>
               ) : recent.every(
                   (item) =>
@@ -255,6 +373,7 @@ function App() {
             </section>
           </div>
         }
+        onPreviewCapture={capturePreview}
         manifest={
           project
             ? {

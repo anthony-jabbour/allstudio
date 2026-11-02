@@ -10,11 +10,23 @@ A property field shows the utility explicitly set at the selected scope and the 
 
 Changing width or edit scope with an unapplied/invalid design draft offers Discard design draft or Keep responsive editing. Text drafts are retained. Pending saves lock context switching. An edit at an inactive or overridden breakpoint can save correctly while rendering remains unconfirmed. The editor reports confirmation only after source readback and an observed property change.
 
-Scoped property edits require a conservative audit of default Tailwind4 breakpoints, source stylesheet imports and recognized static build configuration. Unknown aliases, imports/loaders, custom breakpoints, PostCSS/Babel extensions and styles outside the supported src CSS subset disable scoped property writes. Base and manual Classes editing remain available through the existing safe pipeline. The audit returns eligibility only; previews receive no native filesystem access.
+Scoped property edits require a conservative audit of default Tailwind4 breakpoints, source stylesheet imports and recognized static build configuration. Unknown aliases, imports/loaders, custom breakpoints, PostCSS/Babel extensions and styles outside the supported src CSS subset disable scoped property writes. Base and manual class editing remain available through the existing safe pipeline; the raw class editor is in the collapsed Source classes disclosure. The audit returns eligibility only; previews receive no native filesystem access.
 
 Apply persists project source immediately. Undo/Redo covers saved edits for the current session; reopening retains disk edits, not prior-session history. Stale hashes, external modifications and unsupported expressions refuse safely. Clear may leave surrounding class whitespace because unrelated bytes are preserved.
 
-Phase3 remains in progress. Structural rearrangement and asset association are documented only after their implementation is verified. Human usability and assistive-technology validation remain a founder gate.
+Phase3 remains in progress pending founder validation. Bounded adjacent-sibling rearrangement and existing-project image association are implemented and verified; unfamiliar-user task sessions and assistive-technology validation remain human gates.
+
+## Home and canvas controls
+
+Home lists remembered local website projects and can search by project name or path. Cards show the project name and folder label without rendering the absolute path. Open project chooses an approved local project; Reopen opens the most recent grant. Grid/list view and light/dark appearance persist on this computer. A preview card is a small JPEG capture of the current visible site page. It is kept in AllStudio's user-data directory (maximum 96 KiB per project) and does not change project source or add a project file. Only the first 24 recent projects send preview images to Home. A project without a capture shows a neutral instruction until its preview has loaded.
+
+Select (V) keeps preview click-to-select active. While connected, the bridge suppresses mouse and keyboard click activation and link navigation so supported editor controls remain in charge of selection and routes. Hand (H) temporarily disables iframe pointer handling and pans the canvas by dragging. Escape clears a selection when no edit draft is awaiting confirmation. Fit is the initial canvas zoom; 50%, 75% and 100% are available. Zoom and canvas panning do not change the actual preview viewport width.
+
+## Project image association
+
+Assets lists image names, project paths, types and byte sizes under the granted project's `public/` directory. It supports SVG, PNG, JPEG, WebP, GIF and AVIF metadata, with at most 500 listed files. The Assets section does not load thumbnails in the trusted shell. Empty and files larger than 10 MiB remain visible but cannot be assigned.
+
+Select one unique rendered `<img>` backed by a static source element, choose an existing usable asset, review the source diff and select Use asset. Default imports from `next/image`, including aliases, are supported when `src`, `alt` and dimensions are static literals (or `fill` is set). Missing/dynamic alt, spreads, `srcSet`, custom loader/override, reused instances and ambiguous targets are refused. Assignment replaces only the existing quoted `src`; it does not invent alt text. A loaded, visible image using the local asset must appear in the preview before the editor confirms the result. Session Undo/Redo and reopening preserve source edits.
 
 
 ## Supported layer arrangement

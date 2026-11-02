@@ -67,7 +67,8 @@ describe("real local workspace", () => {
         status: "supported-defaults",
       });
       const oid = preparePreviewSource(join(root, "src/page.tsx"), source)
-        .injectedOids[1]!;
+        .injectedOids[1];
+      if (!oid) throw new Error("fixture heading was not instrumented");
       const located = await current.locate(oid);
       if (!located.ok) throw new Error(located.reason);
       const request = {
@@ -98,7 +99,7 @@ describe("real local workspace", () => {
       }
       await writeFile(
         join(root, "src/page.tsx"),
-        'import "../../outside.css";\n' + source,
+        `import "../../outside.css";\n${source}`,
       );
       expect((await current.getResponsiveCapabilities()).status).toBe(
         "unsupported",

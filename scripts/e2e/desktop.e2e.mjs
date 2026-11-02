@@ -95,6 +95,10 @@ try {
       require: "undefined",
       process: "undefined",
       api: [
+        "listAssets",
+        "previewAssetEdit",
+        "applyAssetEdit",
+        "captureProjectPreview",
         "runtime",
         "recent",
         "chooseProject",
