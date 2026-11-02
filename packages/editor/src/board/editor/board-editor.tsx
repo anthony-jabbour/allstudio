@@ -2,10 +2,12 @@ import type { BoardDocumentV1 } from "@allstudio/project";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { locate } from "../model.ts";
 import { BoardCanvas } from "./canvas.tsx";
+import { type CommandContext, findCommand, formatKeys } from "./commands.ts";
 import { I } from "./icons.tsx";
 import { AgentPanel, StyleInspector } from "./inspector.tsx";
+import { CommandPalette, ContextMenu } from "./menus.tsx";
 import { AssetsPanel, LayersPanel, PagesPanel } from "./panels.tsx";
-import { type Tool, useBoardEditor } from "./use-board-editor.ts";
+import { useBoardEditor } from "./use-board-editor.ts";
 
 export interface BoardEditorProps {
   document: BoardDocumentV1;
@@ -18,16 +20,6 @@ export interface BoardEditorProps {
   /** Extra items for the app menu (host navigation). */
   menu?: { label: string; onSelect: () => void }[];
 }
-
-const TOOL_KEYS: Record<string, Tool> = {
-  v: "select",
-  h: "hand",
-  f: "frame",
-  a: "frame",
-  r: "rect",
-  o: "ellipse",
-  t: "text",
-};
 
 function isTyping(target: EventTarget | null) {
   const el = target as HTMLElement | null;
@@ -166,6 +158,19 @@ export function BoardEditor({
   );
   const editorRef = useRef(editor);
   editorRef.current = editor;
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const paletteOpenRef = useRef(false);
+  paletteOpenRef.current = paletteOpen;
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const commandCtx = useRef<CommandContext>({
+    editor,
+    openPalette: () => setPaletteOpen(true),
+    openImagePicker: () => imageInput.current?.click(),
+  });
+  commandCtx.current = { ...commandCtx.current, editor };
 
   useEffect(() => {
     if (!editor.notice) return;
@@ -181,57 +186,13 @@ export function BoardEditor({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const ed = editorRef.current;
-      if (isTyping(event.target)) return;
-      const mod = event.metaKey || event.ctrlKey;
-      const key = event.key.toLowerCase();
-      if (mod && key === "z") {
-        event.preventDefault();
-        if (event.shiftKey) ed.redo();
-        else ed.undo();
-      } else if (mod && key === "y") {
-        event.preventDefault();
-        ed.redo();
-      } else if (mod && key === "d") {
-        event.preventDefault();
-        ed.duplicateSelection();
-      } else if (mod && key === "a") {
-        event.preventDefault();
-        ed.setSelection(
-          ed.page.nodes.filter((n) => !n.locked && !n.hidden).map((n) => n.id),
-        );
-      } else if (mod && key === "g") {
-        event.preventDefault();
-        if (event.shiftKey) ed.unframeSelected();
-        else ed.frameSelected();
-      } else if (mod && event.key === "]") {
-        event.preventDefault();
-        ed.reorder(event.altKey ? "front" : "forward");
-      } else if (mod && event.key === "[") {
-        event.preventDefault();
-        ed.reorder(event.altKey ? "back" : "backward");
-      } else if (mod && event.shiftKey && key === "h") {
-        event.preventDefault();
-        ed.toggle("hidden");
-      } else if (mod && event.shiftKey && key === "l") {
-        event.preventDefault();
-        ed.toggle("locked");
-      } else if (mod && (event.key === "=" || event.key === "+")) {
-        event.preventDefault();
-        ed.zoomBy(1.25);
-      } else if (mod && event.key === "-") {
-        event.preventDefault();
-        ed.zoomBy(0.8);
-      } else if (mod && event.key === "0") {
-        event.preventDefault();
-        ed.zoomTo(1);
-      } else if (event.shiftKey && event.code === "Digit1") {
-        ed.fitAll();
-      } else if (event.shiftKey && event.code === "Digit2") {
-        ed.fitSelection();
-      } else if (event.key === "Delete" || event.key === "Backspace") {
-        event.preventDefault();
-        ed.deleteSelection();
-      } else if (event.key.startsWith("Arrow") && ed.selection.length) {
+      if (isTyping(event.target) || paletteOpenRef.current) return;
+      if (
+        event.key.startsWith("Arrow") &&
+        ed.selection.length &&
+        !event.altKey &&
+        !(event.metaKey || event.ctrlKey)
+      ) {
         event.preventDefault();
         const step = event.shiftKey ? 10 : 1;
         ed.nudge(
@@ -246,10 +207,15 @@ export function BoardEditor({
               ? step
               : 0,
         );
-      } else if (event.key === "Escape") {
+        return;
+      }
+      if (event.key === "Escape") {
+        setContextMenu(null);
         if (ed.tool !== "select") ed.setTool("select");
         else ed.setSelection([]);
-      } else if (event.key === "Enter" && ed.selection.length === 1) {
+        return;
+      }
+      if (event.key === "Enter" && ed.selection.length === 1) {
         const node = locate(ed.page, ed.selection[0] as string)?.node;
         if (node?.type === "text") {
           event.preventDefault();
@@ -258,11 +224,13 @@ export function BoardEditor({
           event.preventDefault();
           ed.setSelection(node.children.map((c) => c.id));
         }
-      } else if (!mod && !event.altKey && TOOL_KEYS[key]) {
-        ed.setTool(TOOL_KEYS[key] as Tool);
-      } else if (!mod && key === "i" && event.shiftKey) {
-        imageInput.current?.click();
+        return;
       }
+      const command = findCommand(event);
+      if (!command) return;
+      event.preventDefault();
+      if (!command.enabled || command.enabled(commandCtx.current))
+        command.run(commandCtx.current);
     };
     // Clipboard: system events so images paste from other apps.
     const onCopy = (event: ClipboardEvent, cut = false) => {
@@ -566,7 +534,10 @@ export function BoardEditor({
       </aside>
 
       <main className="bx-main">
-        <BoardCanvas editor={editor} />
+        <BoardCanvas
+          editor={editor}
+          onContextMenu={(at) => setContextMenu(at)}
+        />
         <div className="bx-dock" role="toolbar" aria-label="Canvas tools">
           <ToolButton
             label="Select"
@@ -652,6 +623,14 @@ export function BoardEditor({
         {toast ? (
           <output className={`bx-toast ${toast.tone}`}>{toast.text}</output>
         ) : null}
+        <button
+          type="button"
+          className="bx-palette-hint"
+          onClick={() => setPaletteOpen(true)}
+          title="Command palette"
+        >
+          <I.Search size={13} /> Commands <kbd>{formatKeys("mod+k")}</kbd>
+        </button>
       </main>
 
       <aside className="bx-right" aria-label="Inspector">
@@ -676,6 +655,19 @@ export function BoardEditor({
         )}
       </aside>
 
+      {contextMenu ? (
+        <ContextMenu
+          at={contextMenu}
+          ctx={commandCtx.current}
+          onClose={() => setContextMenu(null)}
+        />
+      ) : null}
+      {paletteOpen ? (
+        <CommandPalette
+          ctx={commandCtx.current}
+          onClose={() => setPaletteOpen(false)}
+        />
+      ) : null}
       <input
         ref={imageInput}
         type="file"

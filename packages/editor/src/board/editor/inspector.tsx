@@ -1,4 +1,10 @@
-import { type BoardNode, isBoardColor } from "@allstudio/project";
+import {
+  BLEND_MODES,
+  type BoardFrameNode,
+  type BoardLayout,
+  type BoardNode,
+  isBoardColor,
+} from "@allstudio/project";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   addPage,
@@ -384,6 +390,28 @@ export function StyleInspector({ editor }: { editor: BoardEditorState }) {
             <Icon />
           </button>
         ))}
+        {nodes.length >= 3 ? (
+          <>
+            <button
+              type="button"
+              className="bx-icon"
+              aria-label="Distribute horizontally"
+              title="Distribute horizontally"
+              onClick={() => editor.distribute("horizontal")}
+            >
+              <I.DistributeH />
+            </button>
+            <button
+              type="button"
+              className="bx-icon"
+              aria-label="Distribute vertically"
+              title="Distribute vertically"
+              onClick={() => editor.distribute("vertical")}
+            >
+              <I.DistributeV />
+            </button>
+          </>
+        ) : null}
       </div>
 
       <Section title="Position">
@@ -410,9 +438,51 @@ export function StyleInspector({ editor }: { editor: BoardEditorState }) {
               step: 0.05,
               fallback: 1,
             })}
+            {single && single.type !== "ellipse" ? (
+              <button
+                type="button"
+                className="bx-btn"
+                aria-pressed={!!single.radii}
+                aria-label="Independent corners"
+                title="Independent corner radii"
+                onClick={() => {
+                  const r = single.radius ?? 0;
+                  patch({ radii: single.radii ? null : [r, r, r, r] });
+                }}
+              >
+                {single.radii ? "Uniform" : "Corners"}
+              </button>
+            ) : null}
           </div>
         ) : null}
+        {single?.radii ? (
+          <fieldset className="bx-grid2 bx-fieldset" aria-label="Corner radii">
+            {(["TL", "TR", "BR", "BL"] as const).map((corner, index) => (
+              <NumberField
+                key={corner}
+                label={corner}
+                value={single.radii?.[index] ?? 0}
+                min={0}
+                onChange={(v, transient) => {
+                  const radii = [...(single.radii ?? [0, 0, 0, 0])] as [
+                    number,
+                    number,
+                    number,
+                    number,
+                  ];
+                  radii[index] = v;
+                  patch({ radii }, transient);
+                }}
+                onCommitGesture={editor.commitGesture}
+              />
+            ))}
+          </fieldset>
+        ) : null}
       </Section>
+
+      {single?.type === "frame" ? (
+        <AutoLayoutSection editor={editor} frame={single} />
+      ) : null}
 
       {single?.type === "frame" ? (
         <Section title="Frame">
@@ -725,6 +795,32 @@ export function StyleInspector({ editor }: { editor: BoardEditorState }) {
         ) : null}
       </Section>
 
+      <Section title="Effects">
+        <div className="bx-grid2">
+          {field("Blur", "blur", { min: 0, max: 500, fallback: 0 })}
+          <label className="bx-num">
+            <span className="bx-num-label">Blend</span>
+            <select
+              aria-label="Blend mode"
+              value={(() => {
+                const v = common(nodes, (n) => n.blendMode ?? "normal");
+                return v === MIXED ? "" : (v ?? "normal");
+              })()}
+              onChange={(event) => patch({ blendMode: event.target.value })}
+            >
+              {common(nodes, (n) => n.blendMode ?? "normal") === MIXED ? (
+                <option value="">Mixed</option>
+              ) : null}
+              {BLEND_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {mode[0]?.toUpperCase() + mode.slice(1)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </Section>
+
       <div className="bx-insp-actions">
         <button
           type="button"
@@ -839,5 +935,184 @@ export function AgentPanel({ editor }: { editor: BoardEditorState }) {
         </div>
       </div>
     </div>
+  );
+}
+
+const ALIGN_LABELS = {
+  start: "Start",
+  center: "Center",
+  end: "End",
+  stretch: "Stretch",
+} as const;
+
+/** Framer-style stack controls; positions are recomputed by layout.ts. */
+function AutoLayoutSection({
+  editor,
+  frame,
+}: {
+  editor: BoardEditorState;
+  frame: BoardFrameNode;
+}) {
+  const layout = frame.layout;
+  const set = (values: Partial<BoardLayout>, transient = false) => {
+    if (!layout) return;
+    editor.patchSelection({ layout: { ...layout, ...values } }, transient);
+  };
+  // Changing direction keeps "fit" on the same logical (main/cross) axis.
+  const turn = (direction: BoardLayout["direction"]) => {
+    if (!layout || layout.direction === direction) return;
+    set({ direction, hugWidth: layout.hugHeight, hugHeight: layout.hugWidth });
+  };
+  return (
+    <Section
+      title="Auto layout"
+      action={
+        layout ? (
+          <button
+            type="button"
+            className="bx-icon"
+            aria-label="Remove auto layout"
+            title="Remove auto layout (⌥⇧A)"
+            onClick={editor.removeAutoLayout}
+          >
+            <I.Trash size={13} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="bx-icon"
+            aria-label="Add auto layout"
+            title="Add auto layout (⇧A)"
+            onClick={editor.addAutoLayout}
+          >
+            <I.Plus />
+          </button>
+        )
+      }
+    >
+      {layout ? (
+        <>
+          {/* biome-ignore lint/a11y/useSemanticElements: compact toggle group */}
+          <div className="bx-segmented" role="group" aria-label="Direction">
+            <button
+              type="button"
+              aria-pressed={layout.direction === "row"}
+              aria-label="Horizontal stack"
+              onClick={() => turn("row")}
+            >
+              <I.ArrowRight />
+            </button>
+            <button
+              type="button"
+              aria-pressed={layout.direction === "column"}
+              aria-label="Vertical stack"
+              onClick={() => turn("column")}
+            >
+              <I.ArrowDown />
+            </button>
+          </div>
+          <div className="bx-grid2">
+            <NumberField
+              label="Gap"
+              value={layout.gap}
+              min={0}
+              onChange={(gap, t) => set({ gap }, t)}
+              onCommitGesture={editor.commitGesture}
+            />
+            <NumberField
+              label="Pad"
+              value={
+                layout.padding.every((p) => p === layout.padding[0])
+                  ? layout.padding[0]
+                  : MIXED
+              }
+              min={0}
+              onChange={(p, t) => set({ padding: [p, p, p, p] }, t)}
+              onCommitGesture={editor.commitGesture}
+            />
+          </div>
+          <fieldset
+            className="bx-grid2 bx-fieldset"
+            aria-label="Padding per side"
+          >
+            {(["Top", "Right", "Bottom", "Left"] as const).map(
+              (side, index) => (
+                <NumberField
+                  key={side}
+                  label={side[0] as string}
+                  value={layout.padding[index] ?? 0}
+                  min={0}
+                  onChange={(v, t) => {
+                    const padding = [
+                      ...layout.padding,
+                    ] as BoardLayout["padding"];
+                    padding[index] = v;
+                    set({ padding }, t);
+                  }}
+                  onCommitGesture={editor.commitGesture}
+                />
+              ),
+            )}
+          </fieldset>
+          <div className="bx-grid2">
+            <label className="bx-num">
+              <span className="bx-num-label">Align</span>
+              <select
+                aria-label="Align children"
+                value={layout.align}
+                onChange={(e) =>
+                  set({ align: e.target.value as BoardLayout["align"] })
+                }
+              >
+                {(Object.keys(ALIGN_LABELS) as BoardLayout["align"][]).map(
+                  (a) => (
+                    <option key={a} value={a}>
+                      {ALIGN_LABELS[a]}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+            <label className="bx-num">
+              <span className="bx-num-label">Distribute</span>
+              <select
+                aria-label="Distribute children"
+                value={layout.justify}
+                onChange={(e) =>
+                  set({ justify: e.target.value as BoardLayout["justify"] })
+                }
+              >
+                <option value="start">Start</option>
+                <option value="center">Center</option>
+                <option value="end">End</option>
+                <option value="space-between">Space between</option>
+              </select>
+            </label>
+          </div>
+          <div className="bx-grid2">
+            <label className="bx-check">
+              <input
+                type="checkbox"
+                checked={!!layout.hugWidth}
+                onChange={(e) => set({ hugWidth: e.target.checked })}
+              />
+              Fit width
+            </label>
+            <label className="bx-check">
+              <input
+                type="checkbox"
+                checked={!!layout.hugHeight}
+                onChange={(e) => set({ hugHeight: e.target.checked })}
+              />
+              Fit height
+            </label>
+          </div>
+        </>
+      ) : (
+        <p className="bx-hint">
+          Stack children in a row or column with gap and padding.
+        </p>
+      )}
+    </Section>
   );
 }

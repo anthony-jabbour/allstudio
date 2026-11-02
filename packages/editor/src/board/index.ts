@@ -4,6 +4,8 @@ export {
 } from "./editor/board-editor.tsx";
 export * from "./geometry.ts";
 export * from "./history.ts";
+export * from "./layout.ts";
+export * from "./measure.ts";
 export * from "./model.ts";
 export {
   BoardNodeView,

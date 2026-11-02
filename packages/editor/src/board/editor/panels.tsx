@@ -182,10 +182,17 @@ export function LayersPanel({ editor }: { editor: BoardEditorState }) {
   } | null>(null);
   const dragId = useRef<string | null>(null);
   const tree = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState("");
   const { page, selection } = editor;
 
-  // Topmost layer first, like every design tool's layer list.
+  // Topmost layer first, like every design tool's layer list. While
+  // searching, matches show with their ancestors, expanded.
   const rows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const keep = (node: BoardNode): boolean =>
+      node.name.toLowerCase().includes(needle) ||
+      (node.type === "text" && node.text.toLowerCase().includes(needle)) ||
+      (node.type === "frame" && node.children.some(keep));
     const out: Row[] = [];
     const visit = (
       nodes: BoardNode[],
@@ -193,14 +200,16 @@ export function LayersPanel({ editor }: { editor: BoardEditorState }) {
       parentId: string | null,
     ) => {
       for (const node of [...nodes].reverse()) {
+        if (needle && !keep(node)) continue;
         out.push({ node, depth, parentId });
-        if (node.type === "frame" && !collapsed.has(node.id))
+        if (node.type === "frame" && (needle || !collapsed.has(node.id))) {
           visit(node.children, depth + 1, node.id);
+        }
       }
     };
     visit(page.nodes, 0, null);
     return out;
-  }, [page.nodes, collapsed]);
+  }, [page.nodes, collapsed, query]);
 
   const toggleCollapse = (id: string) =>
     setCollapsed((current) => {
@@ -279,13 +288,27 @@ export function LayersPanel({ editor }: { editor: BoardEditorState }) {
 
   return (
     <div className="bx-panel-body">
+      <label className="bx-search">
+        <I.Search />
+        <input
+          placeholder="Search layers…"
+          aria-label="Search layers"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setQuery("");
+          }}
+        />
+      </label>
       <div className="bx-section-head">
         <span>{page.name}</span>
         <span className="bx-muted">
           {rows.length ? `${countNodes(page.nodes)} layers` : ""}
         </span>
       </div>
-      {rows.length === 0 ? (
+      {rows.length === 0 && query ? (
+        <p className="bx-hint">No layers match “{query}”.</p>
+      ) : rows.length === 0 ? (
         <p className="bx-hint">
           No layers yet. Draw a frame (F), rectangle (R) or text (T).
         </p>

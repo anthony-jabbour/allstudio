@@ -22,17 +22,22 @@ import {
   zoomAt,
 } from "../geometry.ts";
 import { historyReducer, initialHistory } from "../history.ts";
+import { inferLayout, normalizeLayouts, sortForLayout } from "../layout.ts";
 import {
   type Alignment,
   absoluteBounds,
   alignNodes,
+  type CopiedStyle,
   copyNodes,
+  copyStyle,
+  distributeNodes,
   duplicateNodes,
   frameAt,
   frameSelection,
   insertNodes,
   locate,
   pasteNodes,
+  pasteStyle,
   type Reorder,
   removeNodes,
   reorderNodes,
@@ -119,6 +124,7 @@ export function useBoardEditor({
   } | null>(null);
   const canvasSize = useRef({ width: 1200, height: 800 });
   const clipboard = useRef<BoardNode[]>([]);
+  const styleClipboard = useRef<CopiedStyle | null>(null);
   const state = useRef({ doc, page, selection, viewport });
   state.current = { doc, page, selection, viewport };
 
@@ -191,7 +197,10 @@ export function useBoardEditor({
       options: { transient?: boolean; select?: string[] } = {},
     ) => {
       const current = state.current;
-      const next = updatePage(current.doc, current.page.id, fn);
+      // Stacks are re-laid out after every edit, so stored positions stay exact.
+      const next = updatePage(current.doc, current.page.id, (p) =>
+        normalizeLayouts(fn(p)),
+      );
       if (next !== current.doc) applyDoc(next, options);
       if (options.select) setSelection(options.select);
     },
@@ -415,6 +424,70 @@ export function useBoardEditor({
     },
     [apply],
   );
+  const distribute = useCallback(
+    (axis: "horizontal" | "vertical") =>
+      apply((p) => distributeNodes(p, state.current.selection, axis)),
+    [apply],
+  );
+
+  /** Turn a frame (or a set of siblings, framed first) into a stack. */
+  const addAutoLayout = useCallback(() => {
+    const p = state.current.page;
+    const ids = state.current.selection;
+    if (!ids.length) return;
+    const only = ids.length === 1 ? locate(p, ids[0] as string)?.node : null;
+    let targetPage = p;
+    let frameId: string;
+    if (only?.type === "frame") {
+      frameId = only.id;
+    } else {
+      const framed = frameSelection(p, ids);
+      if (!framed) {
+        notify(
+          "Only layers that share a parent can be stacked together.",
+          "error",
+        );
+        return;
+      }
+      targetPage = framed.page;
+      frameId = framed.id;
+    }
+    apply(
+      () =>
+        updateNodes(targetPage, [frameId], (node) => {
+          if (node.type !== "frame") return {};
+          const layout = node.layout ?? inferLayout(node);
+          return { layout, children: sortForLayout(node, layout).children };
+        }),
+      { select: [frameId] },
+    );
+  }, [apply, notify]);
+
+  const removeAutoLayout = useCallback(() => {
+    apply((p) =>
+      updateNodes(p, state.current.selection, (node) =>
+        node.type === "frame" && node.layout ? { layout: null } : {},
+      ),
+    );
+  }, [apply]);
+
+  const copyStyleOfSelection = useCallback(() => {
+    const [id] = state.current.selection;
+    const node = id ? locate(state.current.page, id)?.node : null;
+    if (!node) return;
+    styleClipboard.current = copyStyle(node);
+    notify("Style copied.");
+  }, [notify]);
+
+  const pasteStyleToSelection = useCallback(() => {
+    const style = styleClipboard.current;
+    if (!style) {
+      notify("Copy a style first (⌥⌘C).", "error");
+      return;
+    }
+    apply((p) => pasteStyle(p, state.current.selection, style));
+  }, [apply, notify]);
+
   const nudge = useCallback(
     (dx: number, dy: number) =>
       apply((p) =>
@@ -545,6 +618,13 @@ export function useBoardEditor({
     unframeSelected,
     reorder,
     align,
+    distribute,
+    addAutoLayout,
+    removeAutoLayout,
+    copyStyleOfSelection,
+    pasteStyleToSelection,
+    hasCopiedStyle: () => styleClipboard.current !== null,
+    hasClipboard: () => clipboard.current.length > 0,
     toggle,
     nudge,
     addImageFile,

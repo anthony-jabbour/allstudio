@@ -219,6 +219,28 @@ export const I = {
       <rect x="9" y="6.5" width="3" height="5" rx=".6" />
     </Svg>
   ),
+  ArrowRight: (p: P) => (
+    <Svg {...p}>
+      <path d="M2.5 8h11M9.5 4l4 4-4 4" />
+    </Svg>
+  ),
+  ArrowDown: (p: P) => (
+    <Svg {...p}>
+      <path d="M8 2.5v11M4 9.5l4 4 4-4" />
+    </Svg>
+  ),
+  DistributeH: (p: P) => (
+    <Svg {...p}>
+      <path d="M2 2v12M14 2v12" />
+      <rect x="6" y="5" width="4" height="6" rx=".6" />
+    </Svg>
+  ),
+  DistributeV: (p: P) => (
+    <Svg {...p}>
+      <path d="M2 2h12M2 14h12" />
+      <rect x="5" y="6" width="6" height="4" rx=".6" />
+    </Svg>
+  ),
   Logo: (p: P) => (
     <Svg {...p} strokeWidth={1.8}>
       <path d="M8 1.8v12.4M2.6 4.9l10.8 6.2M2.6 11.1l10.8-6.2" />

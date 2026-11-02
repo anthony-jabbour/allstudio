@@ -16,6 +16,8 @@ import {
   snapBounds,
   wheelViewport,
 } from "../geometry.ts";
+import { stackInsertIndex } from "../layout.ts";
+import { measureDistances } from "../measure.ts";
 import {
   absoluteBounds,
   frameAt,
@@ -46,15 +48,16 @@ type Gesture =
       moved: boolean;
       clickedId: string;
       additive: boolean;
+      /** Dragging a single child of a stack reorders it live (no free move). */
+      stack: boolean;
     }
   | {
       kind: "resize";
       start: Point;
       startPage: BoardPage;
-      id: string;
       handle: Handle;
-      startAbs: Bounds;
-      startNode: BoardNode;
+      startUnion: Bounds;
+      items: { id: string; abs: Bounds; node: BoardNode }[];
     }
   | { kind: "marquee"; start: Point; base: string[] }
   | { kind: "draw"; start: Point; tool: "frame" | "rect" | "ellipse" | "text" };
@@ -160,10 +163,17 @@ function TextEditor({
   );
 }
 
-export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
+export function BoardCanvas({
+  editor,
+  onContextMenu,
+}: {
+  editor: BoardEditorState;
+  onContextMenu?: (at: { x: number; y: number }) => void;
+}) {
   const root = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const [space, setSpace] = useState(false);
+  const [alt, setAlt] = useState(false);
   const [guides, setGuides] = useState<SnapLine[]>([]);
   const [marquee, setMarquee] = useState<Bounds | null>(null);
   const [ghost, setGhost] = useState<Bounds | null>(null);
@@ -218,6 +228,7 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
       );
     };
     const down = (event: KeyboardEvent) => {
+      if (event.key === "Alt") setAlt(true);
       if (event.code === "Space" && !isTyping(event.target)) {
         event.preventDefault();
         setSpace(true);
@@ -225,12 +236,19 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
     };
     const up = (event: KeyboardEvent) => {
       if (event.code === "Space") setSpace(false);
+      if (event.key === "Alt") setAlt(false);
     };
+    const reset = () => {
+      setAlt(false);
+      setSpace(false);
+    };
+    window.addEventListener("blur", reset);
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", reset);
     };
   }, []);
 
@@ -273,12 +291,18 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
       moved: false,
       clickedId,
       additive,
+      stack:
+        movable.length === 1 &&
+        !!locate(ed.page, movable[0] as string)?.parent?.layout,
     };
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const ed = editorRef.current;
     if ((event.target as HTMLElement).closest(".bx-text-editing")) return;
+    // Right button: leave targeting intact for the context menu (pointer
+    // capture would re-target the contextmenu event to the canvas).
+    if (event.button === 2) return;
     root.current?.focus({ preventScroll: true });
     if (ed.editingTextId) ed.setEditingTextId(null);
     const handle = (event.target as HTMLElement).dataset.handle as
@@ -295,19 +319,26 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
     }
     if (event.button !== 0) return;
     const world = toWorld(event);
-    if (handle && ed.selection.length === 1) {
-      const id = ed.selection[0] as string;
-      const startAbs = absoluteBounds(ed.page, id);
-      const startNode = locate(ed.page, id)?.node;
-      if (startAbs && startNode) {
+    if (handle && ed.selection.length) {
+      // One gesture for single and multi-selection: every layer scales with
+      // the selection box (Framer-style group resize).
+      const items = topmostIds(ed.page, ed.selection).flatMap((id) => {
+        const abs = absoluteBounds(ed.page, id);
+        const node = locate(ed.page, id)?.node;
+        return abs && node && !node.locked ? [{ id, abs, node }] : [];
+      });
+      const startUnion = selectionBounds(
+        ed.page,
+        items.map((i) => i.id),
+      );
+      if (startUnion && items.length) {
         gesture.current = {
           kind: "resize",
           start: world,
           startPage: ed.page,
-          id,
           handle,
-          startAbs,
-          startNode,
+          startUnion,
+          items,
         };
       }
       return;
@@ -361,6 +392,13 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
       if (!g.moved && Math.hypot(dx, dy) * ed.viewport.zoom < DRAG_THRESHOLD)
         return;
       g.moved = true;
+      if (g.stack) {
+        const id = g.ids[0] as string;
+        ed.apply(() => dropInto(g.startPage, id, world, { x: dx, y: dy }), {
+          transient: true,
+        });
+        return;
+      }
       let lines: SnapLine[] = [];
       if (!(event.metaKey || event.ctrlKey)) {
         const snap = snapBounds(
@@ -394,22 +432,41 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
       return;
     }
     if (g.kind === "resize") {
+      const u = g.startUnion;
       const next = resizeBounds(
-        g.startAbs,
+        u,
         g.handle,
         world.x - g.start.x,
         world.y - g.start.y,
         event.shiftKey,
       );
+      const sx = next.width / Math.max(u.width, 1);
+      const sy = next.height / Math.max(u.height, 1);
+      const patches = new Map(
+        g.items.map(({ id, abs, node }) => {
+          const nx = next.x + (abs.x - u.x) * sx;
+          const ny = next.y + (abs.y - u.y) * sy;
+          return [
+            id,
+            {
+              x: Math.round(node.x + (nx - abs.x)),
+              y: Math.round(node.y + (ny - abs.y)),
+              width: Math.max(1, Math.round(abs.width * sx)),
+              height: Math.max(1, Math.round(abs.height * sy)),
+            },
+          ];
+        }),
+      );
       ed.apply(
         () =>
-          updateNodes(g.startPage, [g.id], {
-            x: g.startNode.x + (next.x - g.startAbs.x),
-            y: g.startNode.y + (next.y - g.startAbs.y),
-            width: next.width,
-            height: next.height,
-          }),
-        { transient: true },
+          updateNodes(
+            g.startPage,
+            patches.keys(),
+            (node) => patches.get(node.id) ?? {},
+          ),
+        {
+          transient: true,
+        },
       );
       return;
     }
@@ -503,14 +560,17 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
       // Drop into the deepest frame under the pointer (top-level frames stay put).
       const world = toWorld(event);
       let next = ed.page;
-      for (const id of g.ids) {
-        const found = locate(next, id);
-        if (!found || (found.node.type === "frame" && !found.parent)) continue;
-        const exclude = new Set([id]);
-        const target = frameAt(next, world, exclude);
-        const targetId = target?.id ?? null;
-        if (targetId !== (found.parent?.id ?? null))
-          next = reparent(next, id, targetId);
+      if (!g.stack) {
+        for (const id of g.ids) {
+          const found = locate(next, id);
+          if (!found || (found.node.type === "frame" && !found.parent))
+            continue;
+          const target = frameAt(next, world, new Set([id]));
+          const targetId = target?.id ?? null;
+          if (target?.layout) next = dropInto(next, id, world, { x: 0, y: 0 });
+          else if (targetId !== (found.parent?.id ?? null))
+            next = reparent(next, id, targetId);
+        }
       }
       if (next !== ed.page) ed.apply(() => next, { transient: true });
       ed.commitGesture();
@@ -579,8 +639,21 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
     editor.hoverId && !selection.includes(editor.hoverId)
       ? absoluteBounds(page, editor.hoverId)
       : null;
-  const single =
-    selection.length === 1 ? locate(page, selection[0] as string)?.node : null;
+  const selectedNodes = selection.map((id) => locate(page, id)?.node);
+  const resizable =
+    selectedNodes.length > 0 && selectedNodes.every((n) => n && !n.locked);
+  // Alt: measure from the selection to the hovered layer, or to the parent frame.
+  let measureTo: Bounds | null = null;
+  if (alt && union && !editor.editingTextId) {
+    if (editor.hoverId && !selection.includes(editor.hoverId)) {
+      measureTo = absoluteBounds(page, editor.hoverId);
+    } else if (selection.length === 1) {
+      const parent = locate(page, selection[0] as string)?.parent;
+      measureTo = parent ? absoluteBounds(page, parent.id) : null;
+    }
+  }
+  const measurements =
+    union && measureTo ? measureDistances(union, measureTo) : [];
   const cursor = panning
     ? "grabbing"
     : space || tool === "hand"
@@ -613,7 +686,18 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
       }}
       onPointerLeave={() => editorRef.current.setHoverId(null)}
       onDoubleClick={onDoubleClick}
-      onContextMenu={(event) => event.preventDefault()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        const ed = editorRef.current;
+        // Right-clicking an unselected layer selects it first (like every design tool).
+        const hit =
+          (event.target as HTMLElement).dataset.labelId ??
+          hitNode(ed.page, event.target);
+        if (hit && !ed.selection.includes(hit)) ed.setSelection([hit]);
+        if (!hit && !(event.target as HTMLElement).closest(".bx-selection"))
+          ed.setSelection([]);
+        onContextMenu?.({ x: event.clientX, y: event.clientY });
+      }}
       onDragOver={(event) => {
         if (event.dataTransfer.types.includes("Files")) event.preventDefault();
       }}
@@ -710,7 +794,7 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
               height: union.height * z,
             }}
           >
-            {single && !single.locked
+            {resizable
               ? HANDLES.map((h) => (
                   <span
                     key={h}
@@ -747,6 +831,49 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
             />
           ),
         )}
+        {measureTo ? (
+          <div
+            className="bx-measure-target"
+            style={{
+              left: sx(measureTo.x),
+              top: sy(measureTo.y),
+              width: measureTo.width * z,
+              height: measureTo.height * z,
+            }}
+          />
+        ) : null}
+        {measurements.map((m) => (
+          <div
+            key={`${m.axis}-${m.from.x}-${m.from.y}`}
+            data-testid="measurement"
+          >
+            <div
+              className={`bx-measure ${m.axis}`}
+              style={
+                m.axis === "x"
+                  ? {
+                      left: sx(m.from.x),
+                      top: sy(m.from.y),
+                      width: (m.to.x - m.from.x) * z,
+                    }
+                  : {
+                      left: sx(m.from.x),
+                      top: sy(m.from.y),
+                      height: (m.to.y - m.from.y) * z,
+                    }
+              }
+            />
+            <span
+              className="bx-measure-label"
+              style={{
+                left: sx((m.from.x + m.to.x) / 2),
+                top: sy((m.from.y + m.to.y) / 2),
+              }}
+            >
+              {Math.round(m.value)}
+            </span>
+          </div>
+        ))}
         {marquee ? (
           <div
             className="bx-marquee"
@@ -781,4 +908,40 @@ export function BoardCanvas({ editor }: { editor: BoardEditorState }) {
       ) : null}
     </div>
   );
+}
+
+/**
+ * Place `id` under the pointer: inside a stack it takes the index implied by
+ * the pointer (siblings' midpoints); elsewhere it reparents to the frame
+ * under the pointer and moves by `delta`. Reference: Onlook's move manager
+ * (Apache-2.0, store/editor/move @ 423e2e9) splits flow reordering from
+ * absolute dragging the same way, but asks the preview iframe for the index;
+ * here it is computed from the model.
+ */
+function dropInto(
+  page: BoardPage,
+  id: string,
+  world: Point,
+  delta: Point,
+): BoardPage {
+  const found = locate(page, id);
+  if (!found) return page;
+  const target = frameAt(page, world, new Set([id]));
+  if (target?.layout) {
+    const origin = absoluteBounds(page, target.id);
+    const local = {
+      x: world.x - (origin?.x ?? 0),
+      y: world.y - (origin?.y ?? 0),
+    };
+    let index = stackInsertIndex(target, id, local);
+    // stackInsertIndex counts siblings without the dragged node; reparent
+    // takes an index into the current child list, so shift past it.
+    if (found.parent?.id === target.id && found.index <= index) index += 1;
+    return reparent(page, id, target.id, index);
+  }
+  const moved = reparent(page, id, target?.id ?? null);
+  return updateNodes(moved, [id], (node) => ({
+    x: Math.round(node.x + delta.x),
+    y: Math.round(node.y + delta.y),
+  }));
 }

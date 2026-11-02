@@ -589,3 +589,100 @@ export function movePage(
   pages.splice(Math.max(0, Math.min(pages.length, toIndex)), 0, page);
   return { ...doc, pages };
 }
+
+/** Spread 3+ siblings so the gaps between them are equal (Framer "Distribute"). */
+export function distributeNodes(
+  page: BoardPage,
+  ids: string[],
+  axis: "horizontal" | "vertical",
+): BoardPage {
+  const top = topmostIds(page, ids);
+  if (top.length < 3) return page;
+  const row = axis === "horizontal";
+  const items = top
+    .map((id) => ({ id, b: absoluteBounds(page, id) }))
+    .filter((v): v is { id: string; b: Bounds } => v.b !== null)
+    .sort((a, b) => (row ? a.b.x - b.b.x : a.b.y - b.b.y));
+  const first = items[0]?.b;
+  const last = items.at(-1)?.b;
+  if (!first || !last) return page;
+  const span = row
+    ? last.x + last.width - first.x
+    : last.y + last.height - first.y;
+  const sizes = items.reduce(
+    (sum, i) => sum + (row ? i.b.width : i.b.height),
+    0,
+  );
+  const gap = (span - sizes) / (items.length - 1);
+  let cursor = row ? first.x : first.y;
+  const targets = new Map<string, number>();
+  for (const item of items) {
+    targets.set(item.id, cursor - (row ? item.b.x : item.b.y));
+    cursor += (row ? item.b.width : item.b.height) + gap;
+  }
+  return updateNodes(page, targets.keys(), (node) => {
+    const delta = Math.round(targets.get(node.id) ?? 0);
+    return row ? { x: node.x + delta } : { y: node.y + delta };
+  });
+}
+
+const SHARED_STYLE_KEYS = [
+  "fill",
+  "gradient",
+  "stroke",
+  "radius",
+  "radii",
+  "shadow",
+  "opacity",
+  "blur",
+  "blendMode",
+] as const;
+const TEXT_STYLE_KEYS = [
+  "color",
+  "fontFamily",
+  "fontSize",
+  "fontWeight",
+  "lineHeight",
+  "letterSpacing",
+  "textAlign",
+] as const;
+
+export type CopiedStyle = {
+  fromText: boolean;
+  values: Record<string, unknown>;
+};
+
+/** Copy visual properties (not geometry, name or content) from a layer. */
+export function copyStyle(node: BoardNode): CopiedStyle {
+  const values: Record<string, unknown> = {};
+  for (const key of SHARED_STYLE_KEYS)
+    values[key] = (node as never)[key] ?? null;
+  if (node.type === "text") {
+    for (const key of TEXT_STYLE_KEYS) values[key] = node[key];
+  }
+  return { fromText: node.type === "text", values: structuredClone(values) };
+}
+
+/** Paste a copied style; text properties only land on text layers. */
+export function pasteStyle(
+  page: BoardPage,
+  ids: string[],
+  style: CopiedStyle,
+): BoardPage {
+  return updateNodes(page, ids, (node) => {
+    const patch: Record<string, unknown> = {};
+    for (const key of SHARED_STYLE_KEYS) {
+      const value = style.values[key];
+      if (key === "radius" || key === "opacity" || key === "blur") {
+        if (typeof value === "number") patch[key] = value;
+        else patch[key] = undefined;
+      } else if (key === "blendMode") {
+        patch[key] = value ?? undefined;
+      } else patch[key] = value;
+    }
+    if (node.type === "text" && style.fromText) {
+      for (const key of TEXT_STYLE_KEYS) patch[key] = style.values[key];
+    }
+    return structuredClone(patch);
+  });
+}
