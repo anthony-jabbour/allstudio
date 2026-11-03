@@ -44,6 +44,9 @@ export class FileStoreError extends Error {
 
 const INDEX_KEY = "allstudio.files.v1";
 const SETTINGS_KEY = "allstudio.settings.v1";
+const INDEX_RECOVERY_ID = "!allstudio_index_unavailable!";
+const INDEX_DAMAGED_MESSAGE =
+  "The board list could not be read. Existing board documents were left untouched.";
 const DOC_PREFIX = "allstudio.board.";
 export const SCRATCHPAD_ID = "scratchpad";
 const MAX_IMPORT_BYTES = 24 * 1024 * 1024;
@@ -63,6 +66,7 @@ function isFile(value: unknown): value is StudioFile {
 export class FileStore {
   private listeners = new Set<() => void>();
   private cache: StudioFile[] | null = null;
+  private indexDamaged = false;
 
   constructor(
     private readonly storage: StorageLike,
@@ -77,6 +81,7 @@ export class FileStore {
   /** Re-read storage (e.g. after another tab changed it) and notify. */
   refresh(): void {
     this.cache = null;
+    this.indexDamaged = false;
     this.emit();
   }
 
@@ -96,30 +101,67 @@ export class FileStore {
 
   private readIndex(): StudioFile[] {
     if (this.cache) return this.cache;
-    let files: StudioFile[] = [];
+    let raw: string | null;
     try {
-      const raw = this.storage.getItem(INDEX_KEY);
-      const parsed: unknown = raw ? JSON.parse(raw) : [];
-      files = Array.isArray(parsed) ? parsed.filter(isFile) : [];
+      raw = this.storage.getItem(INDEX_KEY);
     } catch {
-      files = [];
+      this.indexDamaged = true;
+      this.cache = [];
+      return this.cache;
     }
-    this.cache = files;
-    return files;
+    if (raw === null) {
+      this.cache = [];
+      return this.cache;
+    }
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed) || !parsed.every(isFile)) {
+        throw new Error("Invalid board list.");
+      }
+      this.cache = parsed;
+    } catch {
+      this.indexDamaged = true;
+      this.cache = [];
+    }
+    return this.cache;
   }
 
   private writeIndex(files: StudioFile[]) {
+    if (this.indexDamaged) throw new FileStoreError(INDEX_DAMAGED_MESSAGE);
     this.write(INDEX_KEY, JSON.stringify(files));
     this.cache = files;
     this.emit();
   }
 
+  private writeNewDocument(
+    document: BoardDocumentV1,
+    file: StudioFile,
+    files: StudioFile[],
+  ) {
+    if (this.indexDamaged) throw new FileStoreError(INDEX_DAMAGED_MESSAGE);
+    const key = DOC_PREFIX + document.id;
+    const next = [...files, file];
+    this.write(key, JSON.stringify(document));
+    try {
+      this.write(INDEX_KEY, JSON.stringify(next));
+    } catch (error) {
+      try {
+        this.storage.removeItem(key);
+      } catch {
+        throw new FileStoreError(
+          "The file list could not be saved and the new board could not be rolled back. Restart AllStudio before retrying.",
+        );
+      }
+      throw error;
+    }
+    this.cache = next;
+  }
+
   /** All files, most recently edited first. Ensures the scratchpad exists. */
   list(): StudioFile[] {
-    this.ensureScratchpad();
-    return [...this.readIndex()].sort((a, b) =>
-      b.updatedAt.localeCompare(a.updatedAt),
-    );
+    const recovery = this.ensureScratchpad();
+    const files = [...this.readIndex(), ...(recovery ? [recovery] : [])];
+    return files.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   get(id: string): StudioFile | undefined {
@@ -128,10 +170,16 @@ export class FileStore {
 
   /** Validated document, or a FileStoreError describing why it cannot open. */
   read(id: string): BoardDocumentV1 {
+    if (id === INDEX_RECOVERY_ID) {
+      throw new FileStoreError(
+        `${INDEX_DAMAGED_MESSAGE} Restore the list before opening board files.`,
+      );
+    }
     const raw = this.storage.getItem(DOC_PREFIX + id);
     if (raw === null) throw new FileStoreError("This file no longer exists.");
+    let document: BoardDocumentV1;
     try {
-      return parseBoardDocument(JSON.parse(raw));
+      document = parseBoardDocument(JSON.parse(raw));
     } catch (error) {
       throw new FileStoreError(
         error instanceof BoardDocumentError
@@ -139,27 +187,87 @@ export class FileStore {
           : "This file is damaged and was not opened.",
       );
     }
+    if (document.id !== id) {
+      throw new FileStoreError(
+        "This file is damaged and was not opened because its ID does not match its storage key.",
+      );
+    }
+    return document;
   }
 
-  private ensureScratchpad() {
+  private ensureScratchpad(): StudioFile | undefined {
     const files = this.readIndex();
-    if (files.some((file) => file.id === SCRATCHPAD_ID)) return;
     const stamp = new Date(0).toISOString();
-    const doc = createBoardDocument("Scratchpad", undefined, stamp);
-    doc.id = SCRATCHPAD_ID;
-    this.write(DOC_PREFIX + SCRATCHPAD_ID, JSON.stringify(doc));
-    this.cache = [
-      ...files,
-      {
-        id: SCRATCHPAD_ID,
-        name: "Scratchpad",
+    if (this.indexDamaged) {
+      return {
+        id: INDEX_RECOVERY_ID,
+        name: "Board list unavailable (files preserved)",
         createdAt: stamp,
         updatedAt: stamp,
         archived: false,
         permanent: true,
-      },
-    ];
-    this.write(INDEX_KEY, JSON.stringify(this.cache));
+      };
+    }
+    if (files.some((file) => file.id === SCRATCHPAD_ID)) return;
+    const damaged: StudioFile = {
+      id: SCRATCHPAD_ID,
+      name: "Scratchpad (damaged)",
+      createdAt: stamp,
+      updatedAt: stamp,
+      archived: false,
+      permanent: true,
+    };
+    const key = DOC_PREFIX + SCRATCHPAD_ID;
+    const raw = this.storage.getItem(key);
+    if (raw !== null) {
+      let document: BoardDocumentV1;
+      try {
+        document = parseBoardDocument(JSON.parse(raw));
+      } catch {
+        return damaged;
+      }
+      if (document.id !== SCRATCHPAD_ID) return damaged;
+      const file: StudioFile = {
+        ...damaged,
+        name: document.name,
+        createdAt: document.createdAt,
+        updatedAt: document.updatedAt,
+      };
+      const next = [...files, file];
+      try {
+        this.write(INDEX_KEY, JSON.stringify(next));
+        this.cache = next;
+      } catch {
+        return { ...file, name: `${file.name} (not indexed)` };
+      }
+      return;
+    }
+    const doc = createBoardDocument("Scratchpad", undefined, stamp);
+    doc.id = SCRATCHPAD_ID;
+    const file: StudioFile = {
+      id: SCRATCHPAD_ID,
+      name: "Scratchpad (not saved)",
+      createdAt: stamp,
+      updatedAt: stamp,
+      archived: false,
+      permanent: true,
+    };
+    try {
+      this.writeNewDocument(
+        doc,
+        {
+          id: SCRATCHPAD_ID,
+          name: "Scratchpad",
+          createdAt: stamp,
+          updatedAt: stamp,
+          archived: false,
+          permanent: true,
+        },
+        files,
+      );
+    } catch {
+      return file;
+    }
   }
 
   create(document: BoardDocumentV1): StudioFile {
@@ -176,8 +284,8 @@ export class FileStore {
       updatedAt: stamp,
       archived: false,
     };
-    this.write(DOC_PREFIX + doc.id, JSON.stringify(doc));
-    this.writeIndex([...files, file]);
+    this.writeNewDocument(doc, file, files);
+    this.emit();
     return file;
   }
 
@@ -295,10 +403,9 @@ export function memoryStorage(): StorageLike {
 
 export function browserStorage(): StorageLike {
   try {
-    const probe = "allstudio.probe";
-    window.localStorage.setItem(probe, "1");
-    window.localStorage.removeItem(probe);
-    return window.localStorage;
+    const storage = window.localStorage;
+    storage.getItem("allstudio.probe");
+    return storage;
   } catch {
     return memoryStorage();
   }

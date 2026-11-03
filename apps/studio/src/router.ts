@@ -3,12 +3,18 @@ import { useEffect, useState } from "react";
 export type Route =
   | { name: "home"; section: "recents" | "files" | "archive" | "settings" }
   | { name: "studio"; section: "home" | "templates" | "projects" }
-  | { name: "file"; id: string };
+  | { name: "file"; id: string }
+  | { name: "chat"; id?: string };
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (parts[0] === "file" && parts[1]) {
     return { name: "file", id: decodeURIComponent(parts[1]) };
+  }
+  if (parts[0] === "chat") {
+    return parts[1]
+      ? { name: "chat", id: decodeURIComponent(parts[1]) }
+      : { name: "chat" };
   }
   if (parts[0] === "studio") {
     const section = parts[1];
@@ -32,6 +38,8 @@ export function href(route: Route): string {
   switch (route.name) {
     case "file":
       return `#/file/${encodeURIComponent(route.id)}`;
+    case "chat":
+      return route.id ? `#/chat/${encodeURIComponent(route.id)}` : "#/chat";
     case "studio":
       return route.section === "home"
         ? "#/studio"

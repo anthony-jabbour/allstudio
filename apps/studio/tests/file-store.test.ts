@@ -1,7 +1,8 @@
 import { BOARD_TEMPLATES, createFromTemplate } from "@allstudio/editor/board";
 import { parseBoardDocument } from "@allstudio/project";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  browserStorage,
   FileStore,
   FileStoreError,
   formatEdited,
@@ -82,7 +83,227 @@ describe("FileStore", () => {
       },
       removeItem: () => {},
     });
-    expect(() => s.list()).toThrow(/storage is full/);
+    expect(s.list().find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Scratchpad (not saved)",
+    );
+  });
+
+  it("keeps readable persistent storage when writes are quota-blocked", () => {
+    const values = new Map([["existing-board", "persisted"]]);
+    const persistentStorage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+      removeItem: (key: string) => values.delete(key),
+    };
+    vi.stubGlobal("window", { localStorage: persistentStorage });
+
+    try {
+      const storage = browserStorage();
+      expect(storage.getItem("existing-board")).toBe("persisted");
+      expect(() => storage.setItem("new-board", "data")).toThrow(
+        "QuotaExceededError",
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("removes a new board document when the index write fails", () => {
+    const backing = memoryStorage();
+    const writes: string[] = [];
+    const removed: string[] = [];
+    const storage = {
+      getItem: (key: string) => backing.getItem(key),
+      setItem: (key: string, value: string) => {
+        writes.push(key);
+        if (key === "allstudio.files.v1") throw new Error("QuotaExceededError");
+        backing.setItem(key, value);
+      },
+      removeItem: (key: string) => {
+        removed.push(key);
+        backing.removeItem(key);
+      },
+    };
+    const s = new FileStore(storage);
+
+    expect(() => s.create(createFromTemplate("blank"))).toThrow(
+      /storage is full/,
+    );
+    expect(writes).toHaveLength(2);
+    const documentKey = writes[0];
+    expect(removed).toEqual([documentKey]);
+    expect(backing.getItem(documentKey ?? "")).toBeNull();
+  });
+
+  it("rolls back the scratchpad document when its index write fails", () => {
+    const backing = memoryStorage();
+    const writes: string[] = [];
+    const removed: string[] = [];
+    const storage = {
+      getItem: (key: string) => backing.getItem(key),
+      setItem: (key: string, value: string) => {
+        writes.push(key);
+        if (key === "allstudio.files.v1") throw new Error("QuotaExceededError");
+        backing.setItem(key, value);
+      },
+      removeItem: (key: string) => {
+        removed.push(key);
+        backing.removeItem(key);
+      },
+    };
+
+    expect(
+      new FileStore(storage).list().find((file) => file.id === SCRATCHPAD_ID)
+        ?.name,
+    ).toBe("Scratchpad (not saved)");
+    expect(writes).toHaveLength(2);
+    expect(removed).toEqual([writes[0]]);
+    expect(backing.getItem(writes[0] ?? "")).toBeNull();
+  });
+
+  it("reindexes an existing scratchpad without overwriting its document", () => {
+    const storage = memoryStorage();
+    const document = createFromTemplate("blank");
+    document.id = SCRATCHPAD_ID;
+    document.name = "Recovered scratchpad";
+    const key = `allstudio.board.${SCRATCHPAD_ID}`;
+    const original = JSON.stringify(document);
+    storage.setItem(key, original);
+
+    const files = new FileStore(storage).list();
+
+    expect(files.find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Recovered scratchpad",
+    );
+    expect(storage.getItem(key)).toBe(original);
+  });
+
+  it("lists an existing scratchpad as not indexed when recovery is blocked", () => {
+    const backing = memoryStorage();
+    const document = createFromTemplate("blank");
+    document.id = SCRATCHPAD_ID;
+    const key = `allstudio.board.${SCRATCHPAD_ID}`;
+    const original = JSON.stringify(document);
+    backing.setItem(key, original);
+    const storage = {
+      getItem: (name: string) => backing.getItem(name),
+      setItem: (name: string, value: string) => {
+        if (name === "allstudio.files.v1")
+          throw new Error("QuotaExceededError");
+        backing.setItem(name, value);
+      },
+      removeItem: (name: string) => backing.removeItem(name),
+    };
+
+    const files = new FileStore(storage).list();
+
+    expect(files.find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Untitled (not indexed)",
+    );
+    expect(backing.getItem(key)).toBe(original);
+  });
+
+  it("shows a damaged scratchpad and preserves its contents", () => {
+    const storage = memoryStorage();
+    const key = `allstudio.board.${SCRATCHPAD_ID}`;
+    const original = "not a board document";
+    storage.setItem(key, original);
+    const files = new FileStore(storage);
+
+    expect(files.list().find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Scratchpad (damaged)",
+    );
+    expect(() => files.read(SCRATCHPAD_ID)).toThrow(/damaged/i);
+    expect(storage.getItem(key)).toBe(original);
+  });
+
+  it("shows a mismatched scratchpad as damaged and preserves its contents", () => {
+    const storage = memoryStorage();
+    const document = createFromTemplate("blank");
+    const key = `allstudio.board.${SCRATCHPAD_ID}`;
+    const original = JSON.stringify(document);
+    storage.setItem(key, original);
+    const files = new FileStore(storage);
+
+    expect(files.list().find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Scratchpad (damaged)",
+    );
+    expect(() => files.read(SCRATCHPAD_ID)).toThrow(/damaged/i);
+    expect(storage.getItem(key)).toBe(original);
+  });
+
+  it("preserves a corrupt file index and every stored board during scratchpad recovery", () => {
+    const storage = memoryStorage();
+    const scratchpad = createFromTemplate("blank");
+    scratchpad.id = SCRATCHPAD_ID;
+    const other = createFromTemplate("landing");
+    const indexKey = "allstudio.files.v1";
+    const index = "{corrupt index";
+    const scratchpadKey = `allstudio.board.${SCRATCHPAD_ID}`;
+    const otherKey = `allstudio.board.${other.id}`;
+    const scratchpadContents = JSON.stringify(scratchpad);
+    const otherContents = JSON.stringify(other);
+    storage.setItem(indexKey, index);
+    storage.setItem(scratchpadKey, scratchpadContents);
+    storage.setItem(otherKey, otherContents);
+    const files = new FileStore(storage);
+
+    const recovery = files.list();
+
+    expect(recovery).toHaveLength(1);
+    expect(recovery[0]?.name).toBe("Board list unavailable (files preserved)");
+    const recoveryDocument = createFromTemplate("blank");
+    recoveryDocument.id = recovery[0]?.id ?? "";
+    expect(() => parseBoardDocument(recoveryDocument)).toThrow(
+      /1-64 characters/,
+    );
+    const recoveryRouteId = recovery[0]?.id ?? "";
+    expect(parseRoute(`#/file/${encodeURIComponent(recoveryRouteId)}`)).toEqual(
+      {
+        name: "file",
+        id: recoveryRouteId,
+      },
+    );
+    expect(() => files.read(recovery[0]?.id ?? "")).toThrow(
+      /board list could not be read/i,
+    );
+    const newDocument = createFromTemplate("blank");
+    expect(() => files.create(newDocument)).toThrow(
+      /board list could not be read/i,
+    );
+    expect(storage.getItem(indexKey)).toBe(index);
+    expect(storage.getItem(scratchpadKey)).toBe(scratchpadContents);
+    expect(storage.getItem(otherKey)).toBe(otherContents);
+    expect(storage.getItem(`allstudio.board.${newDocument.id}`)).toBeNull();
+  });
+
+  it("does not silently filter invalid entries from a board index", () => {
+    const storage = memoryStorage();
+    const indexKey = "allstudio.files.v1";
+    const index = JSON.stringify([
+      { id: "one-valid-looking-entry" },
+      { id: "bad" },
+    ]);
+    storage.setItem(indexKey, index);
+    const files = new FileStore(storage).list();
+
+    expect(files.map((file) => file.name)).toEqual([
+      "Board list unavailable (files preserved)",
+    ]);
+    expect(storage.getItem(indexKey)).toBe(index);
+  });
+
+  it("does not reserve a valid board ID for the index recovery row", () => {
+    const s = store();
+    const document = createFromTemplate("blank");
+    document.id = "__allstudio_index_unavailable__";
+
+    const imported = s.importJson(JSON.stringify(document));
+
+    expect(imported.id).toBe(document.id);
+    expect(s.read(imported.id).id).toBe(document.id);
   });
 });
 
