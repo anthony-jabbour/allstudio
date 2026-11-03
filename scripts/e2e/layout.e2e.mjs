@@ -4,6 +4,7 @@ import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
+import { clickPreview } from "./preview-pointer.mjs";
 
 const evidence = await mkdtemp(join(tmpdir(), "allstudio-layout-e2e-"));
 console.log(`Evidence: ${evidence}`);
@@ -41,7 +42,7 @@ try {
   await page
     .getByLabel("Edit breakpoint", { exact: true })
     .selectOption("base");
-  await preview.locator("#hero").click({ position: { x: 5, y: 5 } });
+  await clickPreview(page, preview.locator("#hero"), { x: 5, y: 5 });
   await expect(page.getByTestId("source-location")).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Layout", exact: true }),
@@ -311,7 +312,7 @@ try {
     "multi-child flex container updates flexDirection, justifyContent and alignItems, preserves flex-wrap gap-3, and moves #harbor-secondary below #harbor-cta",
   );
 
-  await preview.locator("#harbor-cta").click();
+  await clickPreview(page, preview.locator("#harbor-cta"));
   await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
     await preview.locator("#harbor-cta").getAttribute("class"),
   );
@@ -487,7 +488,7 @@ try {
   assert.equal(await readFile(file, "utf8"), external);
   pass("stale layout writes refuse safely and preserve external source bytes");
 
-  await preview.locator("#harbor-secondary").click();
+  await clickPreview(page, preview.locator("#harbor-secondary"));
   await expect(
     page.getByText("className is an expression", { exact: false }),
   ).toBeVisible();
@@ -503,7 +504,7 @@ try {
     "dynamic class expressions disable layout controls while static text remains editable",
   );
 
-  await preview.locator("#harbor-cta").click();
+  await clickPreview(page, preview.locator("#harbor-cta"));
   await expect(page.getByLabel("Width preset", { exact: true })).toBeEnabled();
   await page.getByLabel("Width px", { exact: true }).fill("300");
   const beforeCollapse = await readFile(file, "utf8");

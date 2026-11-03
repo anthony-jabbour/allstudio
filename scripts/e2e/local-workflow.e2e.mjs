@@ -19,6 +19,13 @@ import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { _electron, expect } from "@playwright/test";
+import { clickPreview, getRenderedPreviewRect } from "./preview-pointer.mjs";
+
+// shortcut: CI omits optional window screenshots after Xvfb capture timed out; restore when runner capture is reliable.
+const captureVisualEvidence = process.env.CI !== "true";
+const takeScreenshot = async (page, options) => {
+  if (captureVisualEvidence) await page.screenshot(options);
+};
 
 const desktop = resolve("apps/desktop");
 const executablePath = process.argv
@@ -215,19 +222,24 @@ async function launch() {
   );
   await application
     .context()
-    .tracing.start({ screenshots: true, snapshots: true });
+    .tracing.start({ screenshots: captureVisualEvidence, snapshots: true });
   assert.equal(
     await application.evaluate(({ app }) => app.getPath("userData")),
     profile,
   );
   const page = await application.firstWindow();
-  await application.evaluate(({ BrowserWindow }) => {
+  // Xvfb needs a visible compositor frame for Electron's native thumbnail capture.
+  await application.evaluate(({ BrowserWindow }, hideWindows) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.setBackgroundThrottling(false);
-      window.on("show", () => window.hide());
-      window.hide();
+      if (hideWindows) {
+        window.on("show", () => window.hide());
+        window.hide();
+      } else {
+        window.show();
+      }
     }
-  });
+  }, process.env.CI !== "true");
   return page;
 }
 
@@ -249,15 +261,75 @@ await new Promise((resolve, reject) => {
 });
 try {
   let page = await launch();
+  const clickInPreview = (target, position) =>
+    clickPreview(page, target, position);
+  await page.evaluate(() => {
+    const capture = { active: false, started: 0, completed: 0 };
+    globalThis.testThumbnailCapture = capture;
+    const observer = new MutationObserver(() => {
+      const active =
+        document.documentElement.dataset.allstudioThumbnail === "true";
+      if (active && !capture.active) {
+        capture.active = true;
+        capture.started += 1;
+      } else if (!active && capture.active) {
+        capture.active = false;
+        capture.completed += 1;
+      }
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-allstudio-thumbnail"],
+    });
+  });
   await toolbar(page, "Open project");
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
-  await page
-    .getByLabel("Edit breakpoint", { exact: true })
-    .selectOption("base");
+  await expect(page.locator(".desktop-status")).toHaveCount(0);
+  await expect
+    .poll(
+      () => page.evaluate(() => globalThis.testThumbnailCapture?.completed),
+      { timeout: 10_000 },
+    )
+    .toBeGreaterThan(0);
+  await expect(page.locator("html")).not.toHaveAttribute(
+    "data-allstudio-thumbnail",
+    "true",
+    { timeout: 10_000 },
+  );
+  const editBreakpoint = page.getByLabel("Edit breakpoint", { exact: true });
+  const previousScope = await editBreakpoint.inputValue();
+  const capturesBeforeScopeChange = await page.evaluate(
+    () => globalThis.testThumbnailCapture?.completed ?? 0,
+  );
+  await editBreakpoint.selectOption("base");
+  if (previousScope !== "base") {
+    await expect
+      .poll(
+        () => page.evaluate(() => globalThis.testThumbnailCapture?.completed),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(capturesBeforeScopeChange);
+  }
   const preview = page.frameLocator('iframe[title="Project preview"]');
-  await preview.locator("h1").click();
+  await preview.locator("h1").evaluate((heading) => {
+    window.__allstudioE2ePointerHit = false;
+    window.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (event.composedPath().includes(heading))
+          window.__allstudioE2ePointerHit = true;
+      },
+      { capture: true, once: true },
+    );
+  });
+  await clickPreview(page, preview.locator("h1"));
+  assert.equal(
+    await preview.locator("h1").evaluate(() => window.__allstudioE2ePointerHit),
+    true,
+    "Canvas pointer must reach the preview heading",
+  );
   const originalHeading = await preview.locator("h1").innerText();
   const headingOid = await preview.locator("h1").getAttribute("data-oid");
   const layers = page.getByRole("tree", { name: "Rendered layers" });
@@ -269,7 +341,7 @@ try {
   );
   await expect
     .poll(async () => {
-      const target = await preview.locator("h1").boundingBox(),
+      const target = await getRenderedPreviewRect(page, preview.locator("h1")),
         overlay = await page.locator(".selection-box").boundingBox();
       return target && overlay
         ? Math.max(
@@ -280,8 +352,58 @@ try {
         : Infinity;
     })
     .toBeLessThan(2);
+  await page
+    .getByRole("button", { name: "Hand tool (H)", exact: true })
+    .click();
+  await expect(page.locator('iframe[title="Project preview"]')).toHaveCSS(
+    "pointer-events",
+    "none",
+  );
+  await page.getByLabel("Canvas zoom", { exact: true }).selectOption("1");
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector(".studio-canvas");
+    return Boolean(canvas && canvas.scrollWidth > canvas.clientWidth);
+  });
+  const frameBox = await page
+    .locator('iframe[title="Project preview"]')
+    .boundingBox();
+  if (!frameBox) throw new Error("Preview frame is not visible");
+  await page.mouse.move(frameBox.x + 280, frameBox.y + 180);
+  await page.mouse.down();
+  await page.mouse.move(frameBox.x + 80, frameBox.y + 180, { steps: 5 });
+  await page.mouse.up();
+  assert.ok(
+    await page
+      .locator(".studio-canvas")
+      .evaluate((element) => element.scrollLeft > 0),
+  );
+  await page.keyboard.press("v");
+  await expect(page.locator('iframe[title="Project preview"]')).toHaveCSS(
+    "pointer-events",
+    "auto",
+  );
+  await expect(
+    page.getByRole("button", { name: "Select tool (V)", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("Text", { exact: true })).toBeDisabled();
+  await headingLayer.locator(":scope > .layer-row").click();
+  await expect(page.getByLabel("Text", { exact: true })).toBeEnabled();
+  await page
+    .getByLabel("Text", { exact: true })
+    .fill("Unsaved draft survives Escape");
+  await page.evaluate(
+    () =>
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement.blur(),
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+    "Unsaved draft survives Escape",
+  );
+  await page.getByLabel("Text", { exact: true }).fill(originalHeading);
   pass(
-    "actual Electron layer and canvas selection resolve the same heading before persistent edits",
+    "actual Electron layer selection and hand pan/selection tools work before source edits",
   );
 
   assert.notEqual(
@@ -375,7 +497,7 @@ try {
     );
     await writeFile(join(evidence, "spacing-before.tsx"), spacingBefore);
     await writeFile(join(evidence, "spacing-after.tsx"), spacingAfter);
-    await page.screenshot({ path: join(evidence, "spacing.png") });
+    await takeScreenshot(page, { path: join(evidence, "spacing.png") });
     pass(
       "Spacing inspector applies an exact persistent JSX patch and observes all four rendered padding sides",
     );
@@ -409,7 +531,7 @@ try {
         { timeout: 30000 },
       )
       .toBe("0px");
-    await preview.locator("h1").click();
+    await headingLayer.locator(":scope > .layer-row").click();
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       spacingClasses,
     );
@@ -478,7 +600,7 @@ try {
     assert.equal(await readFile(sourceFile, "utf8"), typographyAfter);
     await writeFile(join(evidence, "typography-before.tsx"), typographyBefore);
     await writeFile(join(evidence, "typography-after.tsx"), typographyAfter);
-    await page.screenshot({ path: join(evidence, "typography.png") });
+    await takeScreenshot(page, { path: join(evidence, "typography.png") });
     pass(
       "six typography controls save the exact JSX diff and confirm actual Electron rendering",
     );
@@ -508,12 +630,14 @@ try {
         { timeout: 30000 },
       )
       .toBe("48px");
-    await preview.locator("h1").click();
+    await clickInPreview(preview.locator("h1"));
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       typographyClasses,
     );
     pass("typography undo/redo restores exact source and rendered output");
-    await preview.getByRole("button", { name: "Start a project" }).click();
+    await clickInPreview(
+      preview.getByRole("button", { name: "Start a project" }),
+    );
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       /rounded-full bg-zinc-950/,
     );
@@ -561,7 +685,7 @@ try {
     assert.equal(await readFile(sourceFile, "utf8"), appearanceAfter);
     await writeFile(join(evidence, "appearance-before.tsx"), appearanceBefore);
     await writeFile(join(evidence, "appearance-after.tsx"), appearanceAfter);
-    await page.screenshot({ path: join(evidence, "appearance.png") });
+    await takeScreenshot(page, { path: join(evidence, "appearance.png") });
     pass(
       "appearance inspector applies an exact persistent JSX colour and radius patch and observes rendered CSS",
     );
@@ -595,7 +719,9 @@ try {
         { timeout: 30000 },
       )
       .toContain("bg-zinc-950");
-    await preview.getByRole("button", { name: "Start a project" }).click();
+    await clickInPreview(
+      preview.getByRole("button", { name: "Start a project" }),
+    );
     await expect(page.getByTestId("source-location")).toBeVisible();
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       appearanceClasses,
@@ -639,7 +765,7 @@ try {
     assert.equal(await readFile(sourceFile, "utf8"), layoutAfter);
     await writeFile(join(evidence, "layout-before.tsx"), layoutBefore);
     await writeFile(join(evidence, "layout-after.tsx"), layoutAfter);
-    await page.screenshot({ path: join(evidence, "layout.png") });
+    await takeScreenshot(page, { path: join(evidence, "layout.png") });
     pass(
       "layout inspector applies an exact persistent JSX width/display/justify patch and observes rendered CSS",
     );
@@ -673,13 +799,15 @@ try {
         { timeout: 30000 },
       )
       .toContain("w-fit");
-    await preview.getByRole("button", { name: "Start a project" }).click();
+    await clickInPreview(
+      preview.getByRole("button", { name: "Start a project" }),
+    );
     await expect(page.getByTestId("source-location")).toBeVisible();
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       layoutClasses,
     );
     pass("layout undo/redo restores exact source and rendered output");
-    await preview.locator("h1").click();
+    await clickInPreview(preview.locator("h1"));
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       typographyClasses,
     );
@@ -697,6 +825,15 @@ try {
     await page
       .getByLabel("Text", { exact: true })
       .fill("Unsaved route guard draft");
+    await page.evaluate(
+      () =>
+        document.activeElement instanceof HTMLElement &&
+        document.activeElement.blur(),
+    );
+    await page.keyboard.press("Escape");
+    await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
+      "Unsaved route guard draft",
+    );
     await aboutPageBtn.click();
     const confirmBox = page.getByTestId("route-draft-confirm");
     await expect(confirmBox).toBeVisible();
@@ -726,7 +863,7 @@ try {
     );
     const aboutSourceFile = join(project, "src/app/about/page.tsx");
     const aboutBefore = await readFile(aboutSourceFile, "utf8");
-    await preview.locator("#about-heading").click();
+    await clickInPreview(preview.locator("#about-heading"));
     await expect(page.getByTestId("source-location")).toContainText(
       "src/app/about/page.tsx",
     );
@@ -764,7 +901,7 @@ try {
     await expect(preview.locator("h1")).toHaveText(originalHeading, {
       timeout: 30000,
     });
-    await preview.locator("h1").click();
+    await clickInPreview(preview.locator("h1"));
     await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
       typographyClasses,
     );
@@ -813,7 +950,7 @@ try {
   assert.equal(await readFile(sourceFile, "utf8"), original);
   await expect
     .poll(async () => {
-      const target = await preview.locator("h1").boundingBox();
+      const target = await getRenderedPreviewRect(page, preview.locator("h1"));
       const overlay = await page.locator(".selection-box").boundingBox();
       return target && overlay
         ? Math.max(
@@ -824,10 +961,10 @@ try {
         : Infinity;
     })
     .toBeLessThan(2);
-  await page.screenshot({ path: join(evidence, "studio-dark.png") });
+  await takeScreenshot(page, { path: join(evidence, "studio-dark.png") });
   await page.getByLabel("Appearance", { exact: true }).selectOption("light");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await page.screenshot({ path: join(evidence, "studio-light.png") });
+  await takeScreenshot(page, { path: join(evidence, "studio-light.png") });
   pass(
     "Studio theme and panel controls preserve the live frame, unsaved drafts and source",
   );
@@ -851,7 +988,7 @@ try {
   await expect(
     page.getByRole("button", { name: "Preview text patch", exact: true }),
   ).toBeFocused();
-  await page.screenshot({
+  await takeScreenshot(page, {
     path: join(evidence, "studio-narrow.png"),
     fullPage: false,
   });
@@ -1001,22 +1138,21 @@ try {
   assert.equal(await readFile(sourceFile, "utf8"), saved);
   pass("session undo and redo persist actual source and refresh the preview");
 
-  await preview.locator("h1").click();
+  await clickInPreview(preview.locator("h1"));
   await page
     .getByLabel("Text", { exact: true })
     .fill("Must not overwrite external edit");
+  const applyText = page.getByRole("button", {
+    name: "Apply text",
+    exact: true,
+  });
+  await expect(applyText).toBeEnabled();
   const external = `${saved}\n// External editor change\n`;
   await writeFile(sourceFile, external);
-  await page
-    .getByText(/Project files changed|source file changed/)
-    .waitFor({ timeout: 10_000 });
-  await page.getByRole("button", { name: "Apply text", exact: true }).click();
-  await page
-    .getByText(/file changed since this element was selected/)
-    .waitFor();
+  await expect(applyText).toBeDisabled({ timeout: 10_000 });
   assert.equal(await readFile(sourceFile, "utf8"), external);
   pass(
-    "file watching detects external change; a stale save is non-destructive",
+    "file watching disables stale source edits and preserves the external change",
   );
 
   const outsideDir = join(evidence, "outside-dir");
@@ -1159,7 +1295,7 @@ try {
   pass(
     "no Clerk/Railway requests; local editing makes no model-provider requests",
   );
-  await page.screenshot({ path: join(evidence, "saved.png") });
+  await takeScreenshot(page, { path: join(evidence, "saved.png") });
   await application
     .context()
     .tracing.stop({ path: join(evidence, "edit-trace.zip") });
@@ -1172,19 +1308,34 @@ try {
   await expect(page.getByLabel("Appearance", { exact: true })).toHaveValue(
     "light",
   );
-  await page
-    .getByLabel("Search projects", { exact: true })
-    .fill("no-project-matches-this-query");
+  await page.keyboard.press("Meta+f");
+  const projectSearch = page.locator(".home-search input");
+  await expect(projectSearch).toHaveAttribute("aria-label", "Search projects");
+  await expect(projectSearch).toBeFocused();
+  await projectSearch.fill("no-project-matches-this-query");
   await expect(page.getByText("No projects match your search.")).toBeVisible();
-  await page.getByLabel("Search projects", { exact: true }).fill("");
-  await page.screenshot({ path: join(evidence, "home-light.png") });
+  await projectSearch.fill("");
+  await page.getByRole("button", { name: "List view", exact: true }).click();
+  await expect(page.locator(".project-grid")).toHaveClass(/project-list/);
+  await takeScreenshot(page, { path: join(evidence, "home-list-light.png") });
+  await page.getByRole("button", { name: "Grid view", exact: true }).click();
+  await takeScreenshot(page, { path: join(evidence, "home-light.png") });
   await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
-  await page.screenshot({ path: join(evidence, "home-dark.png") });
-  await page
-    .getByRole("region", { name: "Recent local projects" })
-    .getByRole("button")
-    .first()
-    .click();
+  await takeScreenshot(page, { path: join(evidence, "home-dark.png") });
+  const storedPreview = page.locator(".project-card-preview img").first();
+  await expect(storedPreview).toBeVisible();
+  assert.ok(
+    await storedPreview.evaluate(
+      (image) => image.complete && image.naturalWidth > 0,
+    ),
+  );
+  const recent = page.getByRole("region", {
+    name: "Recent local projects",
+  });
+  await expect(recent.locator(".project-card-path")).not.toContainText(
+    "/Users/",
+  );
+  await recent.locator(".project-card").first().click();
   pass(
     "Home search filters remembered local projects and a project card reopens the existing grant; appearance survives restart",
   );
@@ -1208,7 +1359,19 @@ try {
     .context()
     .tracing.stop({ path: join(evidence, "reopen-trace.zip") });
   const reopenedPreview = page.frameLocator('iframe[title="Project preview"]');
-  await reopenedPreview.locator("h1").click({ position: { x: 8, y: 8 } });
+  const reopenedHeadingOid = await reopenedPreview
+    .locator("h1")
+    .getAttribute("data-oid");
+  assert.ok(
+    reopenedHeadingOid,
+    "The reopened heading must retain its source ID",
+  );
+  const reopenedLayers = page.getByRole("tree", { name: "Rendered layers" });
+  const reopenedHeadingLayer = reopenedLayers.locator(
+    `[data-source-oid="${reopenedHeadingOid}"]`,
+  );
+  await reopenedHeadingLayer.locator(":scope > .layer-row").click();
+  await expect(reopenedHeadingLayer).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
     "Saved locally",
   );
@@ -1248,7 +1411,7 @@ try {
     })
     .toBe(true);
   assert.equal(await readFile(sourceFile, "utf8"), beforeCrash);
-  await page.screenshot({ path: join(evidence, "interrupted.png") });
+  await takeScreenshot(page, { path: join(evidence, "interrupted.png") });
   const mainProcess = application.process();
   const exited = once(mainProcess, "exit");
   mainProcess.kill("SIGKILL");
@@ -1364,10 +1527,9 @@ try {
     }),
     { mode: 0o600 },
   );
-  await page
-    .frameLocator('iframe[title="Project preview"]')
-    .locator("h1")
-    .click();
+  await clickInPreview(
+    page.frameLocator('iframe[title="Project preview"]').locator("h1"),
+  );
   await page
     .getByLabel("Text", { exact: true })
     .fill("Retain draft on cancelled recovery");
@@ -1451,7 +1613,7 @@ try {
       .getByLabel("Edit breakpoint", { exact: true })
       .selectOption("base");
     const savedPreview = page.frameLocator('iframe[title="Project preview"]');
-    await savedPreview.locator("h1").click();
+    await clickInPreview(savedPreview.locator("h1"));
     await expect(
       page.getByLabel("Font size preset", { exact: true }),
     ).toBeEnabled();
@@ -1484,7 +1646,9 @@ try {
       join(evidence, "typography-reopened.tsx"),
       persistedTypography,
     );
-    await page.screenshot({ path: join(evidence, "typography-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "typography-reopened.png"),
+    });
     pass(
       "typography source and actual appearance persist across full Electron quit and reopen",
     );
@@ -1497,7 +1661,7 @@ try {
     await page
       .getByLabel("Edit breakpoint", { exact: true })
       .selectOption("base");
-    await persistedPreview.locator("h1").click();
+    await clickInPreview(persistedPreview.locator("h1"));
     await page
       .getByLabel("Padding all preset", { exact: true })
       .selectOption("custom:px");
@@ -1531,7 +1695,9 @@ try {
       .toEqual(["36px", "16px", "16px"]);
     assert.equal(await readFile(sourceFile, "utf8"), persistedSpacing);
     await writeFile(join(evidence, "spacing-reopened.tsx"), persistedSpacing);
-    await page.screenshot({ path: join(evidence, "spacing-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "spacing-reopened.png"),
+    });
     pass(
       "Spacing source and actual appearance persist across full Electron quit and reopen",
     );
@@ -1544,9 +1710,9 @@ try {
     await page
       .getByLabel("Edit breakpoint", { exact: true })
       .selectOption("base");
-    await appearancePreview
-      .getByRole("button", { name: "Start a project" })
-      .click();
+    await clickInPreview(
+      appearancePreview.getByRole("button", { name: "Start a project" }),
+    );
     await expect(
       page.getByLabel("Background colour preset", { exact: true }),
     ).toBeEnabled();
@@ -1601,7 +1767,9 @@ try {
       join(evidence, "appearance-reopened.tsx"),
       persistedAppearance,
     );
-    await page.screenshot({ path: join(evidence, "appearance-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "appearance-reopened.png"),
+    });
     pass(
       "appearance source and actual colour/radius persist across full Electron quit and reopen",
     );
@@ -1612,9 +1780,9 @@ try {
     await page
       .getByLabel("Edit breakpoint", { exact: true })
       .selectOption("base");
-    await layoutPreview
-      .getByRole("button", { name: "Start a project" })
-      .click();
+    await clickInPreview(
+      layoutPreview.getByRole("button", { name: "Start a project" }),
+    );
     await expect(
       page.getByLabel("Width preset", { exact: true }),
     ).toBeEnabled();
@@ -1659,7 +1827,7 @@ try {
       .toEqual(["240px", "flex", "center", "rgb(17, 34, 51)", "12px"]);
     assert.equal(await readFile(sourceFile, "utf8"), persistedLayout);
     await writeFile(join(evidence, "layout-reopened.tsx"), persistedLayout);
-    await page.screenshot({ path: join(evidence, "layout-reopened.png") });
+    await takeScreenshot(page, { path: join(evidence, "layout-reopened.png") });
     pass(
       "layout source and actual width/display/justify persist across full Electron quit and reopen",
     );
@@ -1720,7 +1888,7 @@ try {
     await expect
       .poll(() => responsivePreview.locator("html").evaluate(() => innerWidth))
       .toBe(768);
-    await responsivePreview.locator("h1").click();
+    await clickInPreview(responsivePreview.locator("h1"));
     await expect(
       page.getByLabel("Font size preset", { exact: true }),
     ).toBeEnabled();
@@ -1793,10 +1961,9 @@ try {
       )
       .toEqual(["28px", "20px", "rgb(34, 51, 68)", "280px"]);
     assert.equal(await readFile(sourceFile, "utf8"), scopedSource);
-    await page
-      .frameLocator('iframe[title="Project preview"]')
-      .locator("h1")
-      .click();
+    await clickInPreview(
+      page.frameLocator('iframe[title="Project preview"]').locator("h1"),
+    );
     await expect(page.getByLabel("Font size px", { exact: true })).toBeEnabled({
       timeout: 30000,
     });
@@ -1805,14 +1972,16 @@ try {
     );
     await writeFile(join(evidence, "responsive-before.tsx"), beforeResponsive);
     await writeFile(join(evidence, "responsive-after.tsx"), scopedSource);
-    await page.screenshot({ path: join(evidence, "responsive-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "responsive-reopened.png"),
+    });
     pass(
       "scoped typography/spacing/appearance/sizing: exact native source diff, undo/redo, real rendering and full offline-capable quit/reopen persistence",
     );
   }
   if (fixtureName === "nextjs-site-fixture") {
     const live = () => page.frameLocator('iframe[title="Project preview"]');
-    await live().locator("h1").click();
+    await clickInPreview(live().locator("h1"));
     await expect(
       page.getByRole("button", { name: "Move layer up", exact: true }),
     ).toBeEnabled();
@@ -1860,7 +2029,7 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
-    await live().locator("h1").click();
+    await clickInPreview(live().locator("h1"));
     await expect(
       page.getByRole("button", { name: "Move layer down", exact: true }),
     ).toBeEnabled();
@@ -1900,7 +2069,7 @@ try {
         { timeout: 30000 },
       )
       .toEqual(["H1", "P"]);
-    await live().locator("h1").click();
+    await clickInPreview(live().locator("h1"));
     await expect(
       page.getByRole("button", { name: "Move layer down", exact: true }),
     ).toBeEnabled();
@@ -1910,9 +2079,89 @@ try {
     assert.equal(await readFile(sourceFile, "utf8"), afterMove);
     await writeFile(join(evidence, "reorder-before.tsx"), beforeMove);
     await writeFile(join(evidence, "reorder-after.tsx"), afterMove);
-    await page.screenshot({ path: join(evidence, "reorder-reopened.png") });
+    await takeScreenshot(page, {
+      path: join(evidence, "reorder-reopened.png"),
+    });
     pass(
       "source-safe sibling buttons and layer drag preserve exact JSX/identity; undo/redo and full quit/reopen retain actual DOM order",
+    );
+  }
+  if (fixtureName === "nextjs-site-fixture") {
+    const assetSource = join(project, "src/app/assets/page.tsx");
+    const beforeAsset = await readFile(assetSource, "utf8");
+    await page.locator('button.page-item[data-route="/assets"]').click();
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    const images = () =>
+      page.frameLocator('iframe[title="Project preview"]').locator("main img");
+    await expect(images()).toHaveCount(2, { timeout: 30000 });
+    for (const index of [0, 1]) {
+      await clickInPreview(images().nth(index));
+      await expect(page.getByTestId("source-location")).toContainText(
+        "src/app/assets/page.tsx",
+      );
+      await page
+        .locator(".asset-inspector select")
+        .selectOption("public/studio-arc.svg");
+      const before = await readFile(assetSource, "utf8");
+      await toolbar(page, "Preview asset patch");
+      assert.equal(await readFile(assetSource, "utf8"), before);
+      if (index === 0) {
+        await toolbar(page, "Cancel asset patch");
+        assert.equal(await readFile(assetSource, "utf8"), before);
+        await toolbar(page, "Preview asset patch");
+        assert.equal(await readFile(assetSource, "utf8"), before);
+      }
+      await toolbar(page, "Use asset");
+      await expect(
+        page.getByText(
+          /Saved to src\/app\/assets\/page\.tsx and the preview shows the new image/,
+        ),
+      ).toBeVisible({ timeout: 30000 });
+      await expect(images().nth(index)).toHaveAttribute(
+        "src",
+        "/studio-arc.svg",
+      );
+      assert.equal(
+        await images()
+          .nth(index)
+          .evaluate((image) => image.complete && image.naturalWidth > 0),
+        true,
+      );
+    }
+    const afterAsset = await readFile(assetSource, "utf8");
+    assert.equal(
+      afterAsset,
+      beforeAsset.replaceAll("/studio-orbit.svg", "/studio-arc.svg"),
+    );
+    await toolbar(page, "Undo saved edit");
+    await expect.poll(() => readFile(assetSource, "utf8")).not.toBe(afterAsset);
+    await toolbar(page, "Redo saved edit");
+    await expect.poll(() => readFile(assetSource, "utf8")).toBe(afterAsset);
+    await application.close();
+    application = undefined;
+    page = await launch();
+    await toolbar(page, "Reopen");
+    await page
+      .getByText("Preview bridge: connected", { exact: false })
+      .waitFor({ timeout: 60000 });
+    await page.locator('button.page-item[data-route="/assets"]').click();
+    await expect(images().first()).toHaveAttribute("src", "/studio-arc.svg", {
+      timeout: 60000,
+    });
+    assert.equal(
+      await images()
+        .first()
+        .evaluate((image) => image.complete && image.naturalWidth > 0),
+      true,
+    );
+    assert.equal(await readFile(assetSource, "utf8"), afterAsset);
+    await writeFile(join(evidence, "assets-before.tsx"), beforeAsset);
+    await writeFile(join(evidence, "assets-after.tsx"), afterAsset);
+    await takeScreenshot(page, { path: join(evidence, "assets-reopened.png") });
+    pass(
+      "project asset association: img and next/image exact source, loaded render, undo/redo and full reopen persistence",
     );
   }
   console.log(`${checks} local-workflow checks passed. Evidence: ${evidence}`);

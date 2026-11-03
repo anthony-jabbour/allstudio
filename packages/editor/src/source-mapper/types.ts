@@ -33,7 +33,8 @@ export type SourceMapperError =
   | "unsupported-multiline-text"
   | "unsupported-className-value"
   | "unconfined-patch"
-  | "unsupported-reorder";
+  | "unsupported-reorder"
+  | "unsupported-image-source";
 
 export interface InstrumentOptions {
   /**

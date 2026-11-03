@@ -3,9 +3,12 @@ import { type FSWatcher, watch } from "node:fs";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  type AssetEditRequest,
+  assetUrl,
   type ClassEditRequest,
   discoverAppRouterRoutes,
   isEditBreakpoint,
+  isUsableAsset,
   type LocateElementResult,
   type ProjectRoutesSnapshot,
   type ReorderEditRequest,
@@ -23,7 +26,9 @@ import {
 import {
   createLineDiff,
   describeElement,
+  describeImageSource,
   editElementClassName,
+  editElementImageSource,
   editElementText,
   formatLineDiff,
   inspectSiblingReorder,
@@ -354,6 +359,7 @@ export class LocalWorkspace implements SourceEditWorkspace {
               location: originalLocation(described.location, preview),
               text: described.text,
               className: described.className,
+              image: describeImageSource(preview.content, oid),
               reorder: (await this.discoverRoutes()).routes.some(
                 (route) => route.sourcePath === path,
               )
@@ -382,6 +388,15 @@ export class LocalWorkspace implements SourceEditWorkspace {
   previewClassEdit(request: ClassEditRequest) {
     return this.edit(request, "className", false);
   }
+  listAssets() {
+    return this.files.listAssets();
+  }
+  previewAssetEdit(request: AssetEditRequest) {
+    return this.edit(request, "asset", false);
+  }
+  applyAssetEdit(request: AssetEditRequest) {
+    return this.enqueue(() => this.edit(request, "asset", true));
+  }
   applyTextEdit(request: TextEditRequest) {
     return this.enqueue(() => this.edit(request, "text", true));
   }
@@ -396,8 +411,12 @@ export class LocalWorkspace implements SourceEditWorkspace {
   }
 
   private async edit(
-    request: TextEditRequest | ClassEditRequest | ReorderEditRequest,
-    field: "text" | "className" | "reorder",
+    request:
+      | TextEditRequest
+      | ClassEditRequest
+      | ReorderEditRequest
+      | AssetEditRequest,
+    field: "text" | "className" | "reorder" | "asset",
     write: boolean,
   ): Promise<TextEditResult> {
     if (!isSourcePath(request.path)) return sourceEditFailure("path-rejected");
@@ -436,7 +455,35 @@ export class LocalWorkspace implements SourceEditWorkspace {
         ReturnType<typeof reorderSibling>,
         { ok: true }
       > | null = null;
-      if (field === "reorder") {
+      if (field === "asset") {
+        const assetPath = (request as AssetEditRequest).assetPath;
+        const url = assetUrl(assetPath);
+        if (
+          !url ||
+          !(await this.files.listAssets()).some(
+            (asset) => asset.path === assetPath && isUsableAsset(asset),
+          )
+        )
+          return sourceEditFailure("path-rejected");
+        const current = describeImageSource(preview.content, request.oid);
+        if (!current.ok) return sourceEditFailure(current.reason);
+        if (current.src === url) return noop;
+        const patched = editElementImageSource(
+          preview.content,
+          request.oid,
+          url,
+        );
+        if (!patched.ok) return sourceEditFailure(patched.reason);
+        const check = describeImageSource(patched.generated, request.oid);
+        if (
+          !check.ok ||
+          check.src !== url ||
+          JSON.stringify(listOids(preview.content)?.sort()) !==
+            JSON.stringify(listOids(patched.generated)?.sort())
+        )
+          return sourceEditFailure("invalid-patch");
+        patchedContent = patched.generated;
+      } else if (field === "reorder") {
         if (
           !(await this.discoverRoutes()).routes.some(
             (route) => route.sourcePath === request.path,

@@ -17,7 +17,7 @@ export interface PreviewBridgeConfig {
 
 const EDITOR_SOURCE = "allstudio-editor";
 const PREVIEW_SOURCE = "allstudio-preview";
-const VERSION = 8;
+const VERSION = 10;
 const OID_ATTRIBUTE = "data-oid";
 const MAX_TEXT_LENGTH = 2000;
 const MAX_INSTANCES = 10_000;
@@ -74,6 +74,7 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
   if (typeof window === "undefined" || window.parent === window) return;
   const parent = window.parent;
   let nonce: string | null = null;
+  let handshakeGeneration = 0;
   let tracked: string | null = null;
   let trackedElement: Element | null = null;
   let reportScheduled = false;
@@ -154,6 +155,20 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
       // A detached/unavailable measurement is not a default property value.
     }
     return {
+      image:
+        element instanceof HTMLImageElement
+          ? {
+              currentSrc:
+                element.currentSrc.length <= 2048 ? element.currentSrc : "",
+              complete: element.complete,
+              visible: element.checkVisibility({
+                checkOpacity: true,
+                checkVisibilityCSS: true,
+              }),
+              naturalWidth: Math.min(100000, element.naturalWidth),
+              naturalHeight: Math.min(100000, element.naturalHeight),
+            }
+          : null,
       neighbors: {
         previous: neighbor(element.previousElementSibling),
         next: neighbor(element.nextElementSibling),
@@ -320,10 +335,23 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
     )
       return;
     if (message.type === "hello") {
+      if (
+        Object.keys(message).some(
+          (key) =>
+            !["source", "version", "type", "nonce", "generation"].includes(key),
+        ) ||
+        !Number.isSafeInteger(message.generation) ||
+        (message.generation as number) < 1 ||
+        (message.generation as number) < handshakeGeneration ||
+        ((message.generation as number) === handshakeGeneration &&
+          message.nonce !== nonce)
+      )
+        return;
+      handshakeGeneration = message.generation as number;
       nonce = message.nonce;
       tracked = null;
       trackedElement = null;
-      post({ type: "ready", nonce });
+      post({ type: "ready", nonce, generation: handshakeGeneration });
       reportLayers(true);
       return;
     }
@@ -374,6 +402,15 @@ export function installPreviewBridge(config: PreviewBridgeConfig): void {
     "click",
     (event) => {
       if (!nonce) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },
+    true,
+  );
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (!nonce || event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
       const target = event.target instanceof Element ? event.target : null;

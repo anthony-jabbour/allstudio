@@ -1,0 +1,22 @@
+import ProjectImage from "next/image";
+
+export default function AssetsPage() {
+  return (
+    <main className="mx-auto grid max-w-3xl gap-8 p-12" data-oid="kmhhp19">
+      <h1 className="text-3xl font-semibold" data-oid="3q._plz">Project images</h1>
+      {/* biome-ignore lint/performance/noImgElement: This fixture verifies static img source editing. */}
+      <img
+        src="/studio-arc.svg"
+        alt="Orange orbit"
+        width="160"
+        height="160" data-oid="vhaj324"
+      />
+      <ProjectImage
+        src="/studio-arc.svg"
+        alt="Orange orbit"
+        width={160}
+        height={160} data-oid="tfxwm2g"
+      />
+    </main>
+  );
+}

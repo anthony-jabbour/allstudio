@@ -3,6 +3,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
+import { clickPreview, getRenderedPreviewRect } from "./preview-pointer.mjs";
 
 const evidence = await mkdtemp(join(tmpdir(), "allstudio-responsive-e2e-"));
 console.log(`Evidence: ${evidence}`);
@@ -45,13 +46,16 @@ try {
     .getByRole("button", { name: "Tablet viewport", exact: true })
     .click();
   await page.getByLabel("Canvas zoom", { exact: true }).selectOption("0.5");
-  await preview.locator("h1").click();
+  await clickPreview(page, preview.locator("h1"));
   await expect(page.getByTestId("source-location")).toBeVisible();
   const checkGeometry = async () => {
     await expect
       .poll(async () => {
         const box = await page.locator(".selection-box").boundingBox();
-        const element = await preview.locator("h1").boundingBox();
+        const element = await getRenderedPreviewRect(
+          page,
+          preview.locator("h1"),
+        );
         return box && element
           ? Math.max(
               ...["x", "y", "width", "height"].map((key) =>
@@ -213,7 +217,7 @@ try {
   await page
     .getByRole("button", { name: "Tablet viewport", exact: true })
     .click();
-  await preview.locator("h1").click();
+  await clickPreview(page, preview.locator("h1"));
   await page
     .getByLabel("Font weight preset", { exact: true })
     .selectOption("custom:number");
@@ -223,7 +227,7 @@ try {
   );
   const css = await readFile(cssFile, "utf8");
   try {
-    await writeFile(cssFile, css + "\n@theme { --breakpoint-md: 900px; }\n");
+    await writeFile(cssFile, `${css}\n@theme { --breakpoint-md: 900px; }\n`);
     await page
       .getByRole("button", { name: "Apply typography", exact: true })
       .click();

@@ -1,3 +1,4 @@
+import type { ImageSourceInfo } from "../source-mapper/image.ts";
 import type {
   ReorderDirection,
   ReorderInspection,
@@ -8,6 +9,7 @@ import type {
   SourceLocation,
   SourceMapperError,
 } from "../source-mapper/types.ts";
+import type { ProjectAsset } from "./assets.ts";
 import type { ResponsiveCapabilities } from "./breakpoints.ts";
 
 /**
@@ -20,6 +22,9 @@ import type { EditBreakpoint } from "./class-tokens.ts";
 import type { DiscoveredRoute, UnsupportedRoute } from "./routes.ts";
 
 export interface SourceEditWorkspace {
+  listAssets?(): Promise<ProjectAsset[]>;
+  previewAssetEdit?(request: AssetEditRequest): Promise<TextEditResult>;
+  applyAssetEdit?(request: AssetEditRequest): Promise<TextEditResult>;
   previewReorder?(request: ReorderEditRequest): Promise<TextEditResult>;
   applyReorder?(request: ReorderEditRequest): Promise<TextEditResult>;
   getResponsiveCapabilities?(): Promise<ResponsiveCapabilities>;
@@ -52,6 +57,7 @@ export interface SelectRouteSuccess {
 export type SelectRouteResult = SelectRouteSuccess | SourceEditFailure;
 
 export interface SourceElementInfo {
+  image?: ImageSourceInfo;
   reorder?: ReorderInspection;
   /** Workspace-relative POSIX path, e.g. `src/app/page.tsx`. */
   path: string;
@@ -67,6 +73,12 @@ export interface TextEditRequest {
   oid: string;
   expectedSha256: string;
   text: string;
+}
+export interface AssetEditRequest {
+  path: string;
+  oid: string;
+  expectedSha256: string;
+  assetPath: string;
 }
 export interface ReorderEditRequest {
   path: string;
@@ -133,6 +145,8 @@ export type TextEditResult =
   | SourceEditFailure;
 
 const FAILURE_MESSAGES: Record<SourceEditFailureReason, string> = {
+  "unsupported-image-source":
+    "Choose a static img or verified next/image with quoted src and alt. Expressions, missing alt, spreads, srcSet and custom loaders/overrides are unsupported.",
   "parse-failed": "The source file could not be parsed. Nothing was written.",
   "oid-not-found":
     "This element has no matching data-oid in the workspace source.",
@@ -183,6 +197,17 @@ export function sourceEditFailure(
   return { ok: false, reason, message: describeSourceEditFailure(reason) };
 }
 
+export {
+  assetFromMetadata,
+  assetPathFromUrl,
+  assetUrl,
+  isUsableAsset,
+  MAX_ASSET_BYTES,
+  MAX_ASSET_FILES,
+  MAX_ASSET_PATH_LENGTH,
+  MAX_ASSET_URL_LENGTH,
+  type ProjectAsset,
+} from "./assets.ts";
 export type {
   ResponsiveCapabilities,
   ResponsiveMetadataReader,
@@ -199,6 +224,7 @@ export type { EditBreakpoint } from "./class-tokens.ts";
 export { isEditBreakpoint } from "./class-tokens.ts";
 export {
   hasExactKeys,
+  parseAssetEditBody,
   parseClassEditBody,
   parseLocateBody,
   parseReorderBody,

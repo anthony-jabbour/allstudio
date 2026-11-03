@@ -113,6 +113,108 @@ static int style_name(const char *name) {
   for (unsigned i = 0; extension && styles[i]; ++i) if (!strcasecmp(extension, styles[i])) return 1;
   return 0;
 }
+static int asset_name(const char *name) {
+  const char *extension = strrchr(name, '.');
+  const char *extensions[] = { ".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", NULL };
+  for (unsigned i = 0; extension && extensions[i]; ++i) if (!strcasecmp(extension, extensions[i])) return 1;
+  return 0;
+}
+static int hex_string(const char *value, size_t length) {
+  for (size_t i = 0; i < length; ++i) {
+    const char c = value[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return 0;
+  }
+  return 1;
+}
+static int thumbnail_name(const char *name, int allow_temp) {
+  size_t length = strlen(name);
+  if (length == 68 && hex_string(name, 64) && !strcmp(name + 64, ".jpg")) return 1;
+  if (!allow_temp) return 0;
+  if (length == 31 && !strncmp(name, ".allstudio-", 11) &&
+      hex_string(name + 11, 16) && !strcmp(name + 27, ".tmp")) return 1;
+  if (length < 91 || !hex_string(name, 64) || strncmp(name + 64, ".jpg.", 5)) return 0;
+  const char *part = name + 69;
+  const char *digits = part;
+  while (*part >= '0' && *part <= '9') ++part;
+  if (part == digits || *part++ != '.') return 0;
+  return hex_string(part, 16) && !strcmp(part + 16, ".tmp");
+}
+static int thumbnail_path(const char *path, int allow_temp) {
+  return !strncmp(path, "thumbnails/", 11) && thumbnail_name(path + 11, allow_temp);
+}
+static int open_thumbnail_directory(int create) {
+  int directory = openat(3, "thumbnails", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  if (directory < 0 && create && errno == ENOENT) {
+    if (mkdirat(3, "thumbnails", 0700) && errno != EEXIST) fail("write-failed");
+    directory = openat(3, "thumbnails", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  }
+  return directory;
+}
+static unsigned parse_retained_ids(const char *input, size_t length,
+                                   char ids[100][65]) {
+  if (length > 100 * 65) fail("invalid-request");
+  size_t offset = 0;
+  unsigned count = 0;
+  while (offset < length) {
+    if (count >= 100 || length - offset < 64 || !hex_string(input + offset, 64))
+      fail("invalid-request");
+    memcpy(ids[count], input + offset, 64);
+    ids[count][64] = '\0';
+    ++count;
+    offset += 64;
+    if (offset < length && (input[offset++] != '\n' || offset == length))
+      fail("invalid-request");
+  }
+  return count;
+}
+static int retained_thumbnail(const char *name, char ids[100][65],
+                              unsigned count) {
+  if (strlen(name) != 68 || !hex_string(name, 64) || strcmp(name + 64, ".jpg"))
+    return 0;
+  for (unsigned i = 0; i < count; ++i)
+    if (!memcmp(name, ids[i], 64)) return 1;
+  return 0;
+}
+static void prune_thumbnail_directory(int directory, char ids[100][65],
+                                      unsigned id_count) {
+  DIR *stream = fdopendir(dup(directory));
+  if (!stream) fail("read-failed");
+  unsigned count = 0;
+  struct dirent *entry;
+  while ((entry = readdir(stream))) {
+    if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) continue;
+    if (++count > 100000) fail("scan-limit");
+    if (!thumbnail_name(entry->d_name, 1)) continue;
+    struct stat info;
+    if (fstatat(directory, entry->d_name, &info, AT_SYMLINK_NOFOLLOW))
+      fail("read-failed");
+    if (S_ISDIR(info.st_mode)) fail("path-rejected");
+    if (!S_ISREG(info.st_mode) && !S_ISLNK(info.st_mode)) continue;
+    if (S_ISREG(info.st_mode) && info.st_nlink != 1) fail("path-rejected");
+    if (S_ISREG(info.st_mode) && info.st_size >= 4 && info.st_size <= 96 * 1024 &&
+        retained_thumbnail(entry->d_name, ids, id_count)) continue;
+    if (unlinkat(directory, entry->d_name, 0)) fail("write-failed");
+  }
+  closedir(stream);
+  if (fsync(directory)) fail("write-failed");
+}
+static void remove_thumbnail(const char *path) {
+  if (!thumbnail_path(path, 1)) fail("path-rejected");
+  int directory = open_thumbnail_directory(0);
+  if (directory < 0 && errno == ENOENT) { puts("OK"); return; }
+  if (directory < 0) fail("path-rejected");
+  const char *name = path + 11;
+  struct stat info;
+  if (fstatat(directory, name, &info, AT_SYMLINK_NOFOLLOW)) {
+    if (errno == ENOENT) { close(directory); puts("OK"); return; }
+    fail("path-rejected");
+  }
+  if (S_ISDIR(info.st_mode) || (S_ISREG(info.st_mode) && info.st_nlink != 1) ||
+      (!S_ISREG(info.st_mode) && !S_ISLNK(info.st_mode))) fail("path-rejected");
+  if (unlinkat(directory, name, 0) || fsync(directory)) fail("write-failed");
+  close(directory);
+  puts("OK");
+}
 static void list_source(int directory, const char *prefix, unsigned depth, int styles) {
   if (depth > 32) fail("scan-limit");
   DIR *stream = fdopendir(dup(directory));
@@ -128,16 +230,25 @@ static void list_source(int directory, const char *prefix, unsigned depth, int s
       if (styles) fail("scan-limit");
       continue;
     }
+    int unsafe_asset_path = 0;
+    if (styles == 3) for (const unsigned char *p = (const unsigned char *)relative; *p; ++p)
+      if (*p < 32 || *p == 127 || strchr("\\:%?#", *p)) unsafe_asset_path = 1;
     struct stat info;
     if (fstatat(directory, entry->d_name, &info, AT_SYMLINK_NOFOLLOW)) {
       if (styles) fail("read-failed");
       continue;
     }
     if (styles && S_ISLNK(info.st_mode)) fail("path-rejected");
+    if (unsafe_asset_path) continue;
     if (S_ISDIR(info.st_mode)) {
       int child = openat(directory, entry->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
       if (child >= 0) { list_source(child, relative, depth + 1, styles); close(child); }
       else if (styles) fail("path-rejected");
+    } else if (styles == 3 && asset_name(entry->d_name)) {
+      if (!S_ISREG(info.st_mode) || info.st_nlink != 1 || info.st_size < 0 || (unsigned long long)info.st_size > 9007199254740991ULL) fail("path-rejected");
+      if (++listed > 500) fail("scan-limit");
+      printf("%d %llu\n", length, (unsigned long long)info.st_size);
+      if (fwrite(relative, 1, (size_t)length, stdout) != (size_t)length) fail("read-failed");
     } else if ((styles == 1 && style_name(entry->d_name)) || (styles == 2 && audit_source_name(entry->d_name))) {
       if (!S_ISREG(info.st_mode) || info.st_nlink != 1 || info.st_size < 0 || info.st_size > LIMIT) fail("path-rejected");
       if (++listed > 1000) fail("scan-limit");
@@ -161,34 +272,70 @@ static int readable_root(const char *path) {
   return configuration(path);
 }
 int main(int argc, char **argv) {
-  if (argc != 4 || (strcmp(argv[1], "read") && strcmp(argv[1], "write") && strcmp(argv[1], "list") && strcmp(argv[1], "list-styles") && strcmp(argv[1], "list-audit-sources") && strcmp(argv[1], "read-audit-source") && strcmp(argv[1], "read-css") && strcmp(argv[1], "backup") && strcmp(argv[1], "create"))) fail("invalid-request");
+  if (argc != 4 || (strcmp(argv[1], "read") && strcmp(argv[1], "write") && strcmp(argv[1], "list") && strcmp(argv[1], "list-assets") && strcmp(argv[1], "list-styles") && strcmp(argv[1], "list-audit-sources") && strcmp(argv[1], "read-audit-source") && strcmp(argv[1], "read-css") && strcmp(argv[1], "backup") && strcmp(argv[1], "create") && strcmp(argv[1], "prune-thumbnails") && strcmp(argv[1], "read-thumbnail") && strcmp(argv[1], "write-thumbnail") && strcmp(argv[1], "create-thumbnail") && strcmp(argv[1], "remove-thumbnail"))) fail("invalid-request");
   const char *root = argv[2], *relative = argv[3];
   size_t length = strlen(relative);
   int listing = !strcmp(argv[1], "list") && !strcmp(relative, "src");
+  int asset_listing = !strcmp(argv[1], "list-assets") && !strcmp(relative, "public");
   int style_listing = !strcmp(argv[1], "list-styles") && !strcmp(relative, "src");
   int audit_listing = !strcmp(argv[1], "list-audit-sources") && !strcmp(relative, "src");
+  int thumbnail_prune = !strcmp(argv[1], "prune-thumbnails") && !strcmp(relative, "thumbnails");
+  int thumbnail_read = !strcmp(argv[1], "read-thumbnail") && thumbnail_path(relative, 0);
+  int thumbnail_write = !strcmp(argv[1], "write-thumbnail") && thumbnail_path(relative, 0);
+  int thumbnail_create = !strcmp(argv[1], "create-thumbnail") && thumbnail_path(relative, 0);
+  int thumbnail_remove = !strcmp(argv[1], "remove-thumbnail") && thumbnail_path(relative, 1);
   int audit_read = !strcmp(argv[1], "read-audit-source") && length <= 1024 && length >= 7 && !strncmp(relative, "src/", 4) && !strchr(relative, '\\') && !strchr(relative, ':') && audit_source_name(relative);
   int css_read = !strcmp(argv[1], "read-css") && length <= 1024 && length >= 8 && !strncmp(relative, "src/", 4) &&
       !strchr(relative, '\\') && !strchr(relative, ':') && !strcasecmp(relative + length - 4, ".css");
-  int creating = !strcmp(argv[1], "create") && configuration(relative);
+  int creating = (!strcmp(argv[1], "create") && configuration(relative)) || thumbnail_create;
   int backing = !strcmp(argv[1], "backup") && configuration(relative);
   int config_io = configuration(relative) && (!strcmp(argv[1], "read") || !strcmp(argv[1], "write"));
   int metadata_read = !strcmp(argv[1], "read") && readable_root(relative);
   int source_path = (!strcmp(argv[1], "read") || !strcmp(argv[1], "write")) && length <= 1024 && length >= 9 && !strncmp(relative, "src/", 4) &&
       !strchr(relative, '\\') && !strchr(relative, ':') &&
       (!strcmp(relative + length - 4, ".tsx") || !strcmp(relative + length - 4, ".jsx"));
-  if (!listing && !style_listing && !audit_listing && !audit_read && !css_read && !creating && !backing && !config_io && !metadata_read && !source_path) fail("path-rejected");
+  if (!listing && !asset_listing && !style_listing && !audit_listing && !thumbnail_prune && !thumbnail_read && !thumbnail_write && !thumbnail_create && !thumbnail_remove && !audit_read && !css_read && !creating && !backing && !config_io && !metadata_read && !source_path) fail("path-rejected");
   if ((!strcmp(argv[1], "create") && !creating) || (!strcmp(argv[1], "backup") && !backing)) fail("path-rejected");
   char *canonical = realpath(root, NULL);
   if (!canonical || strcmp(canonical, root)) fail("path-rejected");
   free(canonical);
   struct stat granted, visible;
   if (fstat(3, &granted) || !S_ISDIR(granted.st_mode) || stat(root, &visible) || !same_inode(&granted, &visible)) fail("path-rejected");
-  if (listing || style_listing || audit_listing) {
-    int source = openat(3, style_listing ? "." : "src", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  if (thumbnail_prune) {
+    int directory = open_thumbnail_directory(0);
+    if (directory < 0 && errno != ENOENT) fail("path-rejected");
+    puts("READY");
+    fflush(stdout);
+    size_t expected_size, ids_size;
+    char *expected = receive(&expected_size);
+    char *ids_input = receive(&ids_size);
+    if (expected_size != 0) fail("invalid-request");
+    char retained_ids[100][65];
+    unsigned retained_count = parse_retained_ids(ids_input, ids_size, retained_ids);
+    puts("PREPARED");
+    fflush(stdout);
+    if (getchar() != 'C') fail("write-failed");
+    if (directory >= 0) {
+      prune_thumbnail_directory(directory, retained_ids, retained_count);
+      close(directory);
+    }
+    free(expected);
+    free(ids_input);
+    puts("OK");
+    return 0;
+  }
+  if (thumbnail_remove) { remove_thumbnail(relative); return 0; }
+  if (thumbnail_write || thumbnail_create) {
+    int directory = open_thumbnail_directory(1);
+    if (directory < 0) fail("path-rejected");
+    close(directory);
+  }
+  if (listing || asset_listing || style_listing || audit_listing) {
+    int source = openat(3, style_listing ? "." : asset_listing ? "public" : "src", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (source < 0 && asset_listing && errno == ENOENT) { puts("OK"); return 0; }
     if (source < 0) fail("path-rejected");
     puts("OK");
-    list_source(source, style_listing ? "" : "src", 0, audit_listing ? 2 : style_listing);
+    list_source(source, style_listing ? "" : asset_listing ? "public" : "src", 0, asset_listing ? 3 : audit_listing ? 2 : style_listing);
     return 0;
   }
   parent_fd = dup(3);
@@ -213,13 +360,14 @@ int main(int argc, char **argv) {
   if (creating) {
     struct stat existing;
     if (!fstatat(parent_fd, component, &existing, AT_SYMLINK_NOFOLLOW) || errno != ENOENT) fail("path-rejected");
-    metadata.st_mode = 0644;
+    metadata.st_mode = thumbnail_create ? 0600 : 0644;
   } else {
     fd = openat(parent_fd, component, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
     if (fd < 0) fail(errno == ENOENT ? "file-not-found" : "path-rejected");
     original = read_source(fd, &size, &metadata);
+    if ((thumbnail_read || thumbnail_write) && size > 96 * 1024) fail("path-rejected");
   }
-  if (!strcmp(argv[1], "read") || css_read || audit_read) {
+  if (!strcmp(argv[1], "read") || css_read || audit_read || thumbnail_read) {
     printf("OK %u %zu\n", (unsigned)(metadata.st_mode & 07777), size);
     if (fwrite(original, 1, size, stdout) != size) fail("read-failed");
     return 0;

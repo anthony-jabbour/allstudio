@@ -4,6 +4,7 @@ import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
+import { clickPreview } from "./preview-pointer.mjs";
 
 const evidence = await mkdtemp(join(tmpdir(), "allstudio-spacing-e2e-"));
 console.log(`Evidence: ${evidence}`);
@@ -37,7 +38,7 @@ try {
   await page
     .getByLabel("Edit breakpoint", { exact: true })
     .selectOption("base");
-  await preview.locator("#hero").click({ position: { x: 5, y: 5 } });
+  await clickPreview(page, preview.locator("#hero"), { x: 5, y: 5 });
   await expect(page.getByTestId("source-location")).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Spacing", exact: true }),
@@ -245,7 +246,7 @@ try {
   pass(
     "block padding preserves inline shorthand companion and does not overwrite responsive behavior",
   );
-  await preview.locator("#harbor-heading").click();
+  await clickPreview(page, preview.locator("#harbor-heading"));
   await expect(page.getByLabel("Classes", { exact: true })).toHaveValue(
     await preview.locator("#harbor-heading").getAttribute("class"),
   );
@@ -340,7 +341,7 @@ try {
   );
   assert.equal(await readFile(file, "utf8"), external);
   pass("stale spacing writes refuse safely and preserve external source bytes");
-  await preview.locator("#harbor-secondary").click();
+  await clickPreview(page, preview.locator("#harbor-secondary"));
   await expect(
     page.getByText("className is an expression", { exact: false }),
   ).toBeVisible();
@@ -354,7 +355,7 @@ try {
   pass(
     "dynamic class expressions keep spacing disabled and static text editable",
   );
-  await preview.locator("#hero").click({ position: { x: 5, y: 5 } });
+  await clickPreview(page, preview.locator("#hero"), { x: 5, y: 5 });
   await expect(
     page.getByLabel("Padding inline preset", { exact: true }),
   ).toBeEnabled();

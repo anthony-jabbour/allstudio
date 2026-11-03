@@ -1,11 +1,15 @@
 import type { ProjectManifestV1 } from "@allstudio/project";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PreviewElementSnapshot } from "../preview-bridge/protocol.ts";
 import type { ResponsiveCapabilities } from "../site/breakpoints.ts";
 import type { EditBreakpoint } from "../site/class-tokens.ts";
 import {
+  type AssetEditRequest,
   type DiscoveredRoute,
   describeSourceEditFailure,
+  isUsableAsset,
+  type ProjectAsset,
   type ReorderEditRequest,
   type ReorderReceipt,
   type SourceEditWorkspace,
@@ -19,6 +23,7 @@ import {
   observesAppearance,
 } from "./appearance-confirmation.ts";
 import { AppearanceInspector } from "./appearance-inspector.tsx";
+import { observesAsset } from "./asset-confirmation.ts";
 import { LayerTree } from "./layer-tree.tsx";
 import {
   type LayoutTarget,
@@ -58,6 +63,7 @@ export interface EditorShellProps {
   activeRoute?: string;
   projectControls?: import("react").ReactNode;
   homeContent?: import("react").ReactNode;
+  onPreviewCapture?: () => void;
   disabled?: boolean;
 }
 
@@ -117,9 +123,24 @@ function unsupportedReasonBadge(reason: UnsupportedRouteReason): string {
 
 type Status = { kind: "info" | "success" | "error"; text: string } | null;
 
+const ASSET_LIST_ERROR =
+  "Project assets could not be listed. No source was changed.";
+
+export async function listProjectAssets(workspace: SourceEditWorkspace) {
+  if (!workspace.listAssets) return { ok: true as const, assets: [] };
+  try {
+    const assets = await workspace.listAssets();
+    if (!Array.isArray(assets)) throw new Error("Asset list unavailable");
+    return { ok: true as const, assets };
+  } catch {
+    return { ok: false as const, assets: [], error: ASSET_LIST_ERROR };
+  }
+}
+
 type EditKind = "text" | "className";
 
 interface PendingRefresh {
+  assetOrigin?: string;
   reorder?: ReorderReceipt;
   appearance?: AppearanceTarget[];
   layout?: LayoutTarget[];
@@ -132,7 +153,7 @@ interface PendingRefresh {
     | "design properties";
   typography?: TypographyTarget[];
   oid: string;
-  kind: EditKind | "reorder";
+  kind: EditKind | "reorder" | "asset";
   /** Value the preview must show before the edit counts as visible. */
   value: string;
   reloaded: boolean;
@@ -148,6 +169,11 @@ function previewShows(
   element: PreviewElementSnapshot,
   pending: PendingRefresh,
 ): boolean {
+  if (pending.kind === "asset")
+    return Boolean(
+      pending.assetOrigin &&
+        observesAsset(element, pending.assetOrigin, pending.value),
+    );
   if (pending.kind === "reorder")
     return Boolean(
       pending.reorder && observesReorder(element, pending.reorder),
@@ -170,7 +196,8 @@ const NOOP_SUBJECT: Record<EditKind, string> = {
   className: "the classes already match",
 };
 
-const KIND_LABEL: Record<EditKind | "reorder", string> = {
+const KIND_LABEL: Record<EditKind | "reorder" | "asset", string> = {
+  asset: "image",
   reorder: "sibling order",
   text: "text",
   className: "classes",
@@ -186,6 +213,7 @@ export function EditorShell({
   projectControls,
   homeContent,
   disabled,
+  onPreviewCapture,
 }: EditorShellProps) {
   const [appearance, setAppearance] = useState(() => {
     try {
@@ -263,6 +291,7 @@ export function EditorShell({
             unsupportedRoutes={unsupportedRoutes}
             activeRoute={activeRoute}
             navigatorOpen={navigatorOpen}
+            onPreviewCapture={onPreviewCapture}
           />
         </div>
       ) : (
@@ -290,6 +319,7 @@ function SourceElementEditor({
   unsupportedRoutes,
   activeRoute,
   navigatorOpen,
+  onPreviewCapture,
 }: {
   previewUrl: string;
   workspace: SourceEditWorkspace;
@@ -297,12 +327,13 @@ function SourceElementEditor({
   unsupportedRoutes?: readonly UnsupportedRoute[];
   activeRoute?: string;
   navigatorOpen: boolean;
+  onPreviewCapture?: () => void;
 }) {
   const [currentPreviewUrl, setCurrentPreviewUrl] = useState(previewUrl);
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [scope, setScope] = useState<EditBreakpoint>("xl");
   const [manualScope, setManualScope] = useState(false);
-  const [zoom, setZoom] = useState("1");
+  const [zoom, setZoom] = useState("fit");
   const [scale, setScale] = useState(1);
   const [viewportHeight, setViewportHeight] = useState(800);
   const canvas = useRef<HTMLElement | null>(null);
@@ -343,6 +374,14 @@ function SourceElementEditor({
   const selectionBox = useRef<HTMLDivElement | null>(null);
   const requestedLayer = useRef<string | null>(null);
   const [frameKey, setFrameKey] = useState(0);
+  const [canvasTool, setCanvasTool] = useState<"select" | "hand">("select");
+  const panStart = useRef<{
+    x: number;
+    y: number;
+    left: number;
+    top: number;
+    pointer: number;
+  } | null>(null);
   const [selected, setSelected] = useState<PreviewElementSnapshot | null>(null);
   const [source, setSource] = useState<SourceElementInfo | null>(null);
   const [draft, setDraft] = useState("");
@@ -356,6 +395,10 @@ function SourceElementEditor({
   const [layoutValid, setLayoutValid] = useState(true);
   const [pending, setPending] = useState<PendingRefresh | null>(null);
   const [moveDraft, setMoveDraft] = useState<ReorderEditRequest | null>(null);
+  const [assets, setAssets] = useState<ProjectAsset[]>([]);
+  const [assetError, setAssetError] = useState<string | null>(null);
+  const [assetChoice, setAssetChoice] = useState("");
+  const [assetDraft, setAssetDraft] = useState<AssetEditRequest | null>(null);
   const request = useRef(0);
   // Bumped on every selection so late edit responses for an older
   // selection are ignored.
@@ -383,6 +426,17 @@ function SourceElementEditor({
       active = false;
     };
   }, [workspace, scope]);
+  useEffect(() => {
+    let active = true;
+    void listProjectAssets(workspace).then((result) => {
+      if (!active) return;
+      setAssets(result.assets);
+      setAssetError(result.ok ? null : result.error);
+    });
+    return () => {
+      active = false;
+    };
+  }, [workspace]);
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
@@ -466,6 +520,8 @@ function SourceElementEditor({
       setPendingRouteSwitch(null);
       setPendingContext(null);
       setMoveDraft(null);
+      setAssetDraft(null);
+      setAssetChoice("");
       setStatus(null);
       setSelected(element);
       if (!element) {
@@ -534,6 +590,7 @@ function SourceElementEditor({
           window.clearTimeout(deadline);
           setBusy(false);
           if (refreshed) {
+            onPreviewCapture?.();
             setStatus({
               kind: "success",
               text:
@@ -548,13 +605,125 @@ function SourceElementEditor({
       }
     },
   });
+  useEffect(() => {
+    if (!bridge.connected || !onPreviewCapture) return;
+    const timeout = window.setTimeout(onPreviewCapture, 400);
+    return () => window.clearTimeout(timeout);
+  }, [bridge.connected, onPreviewCapture]);
+
+  const clearSelection = useCallback(() => {
+    selection.current += 1;
+    request.current += 1;
+    editRun.current += 1;
+    setSelected(null);
+    setSource(null);
+    setDraft("");
+    setClassDraft("");
+    setAssetDraft(null);
+    setAssetChoice("");
+    setPending(null);
+    setDiff("");
+    setStatus(null);
+    setBusy(false);
+    bridge.track(null);
+  }, [bridge.track]);
+  useEffect(() => {
+    const handleToolKey = (event: KeyboardEvent) => {
+      if (
+        event.isComposing ||
+        /^(INPUT|TEXTAREA|SELECT)$/.test(
+          (event.target as HTMLElement | null)?.tagName ?? "",
+        )
+      )
+        return;
+      if (event.key.toLowerCase() === "v") setCanvasTool("select");
+      if (event.key.toLowerCase() === "h") setCanvasTool("hand");
+      if (event.key !== "Escape") return;
+      if (pendingRouteSwitch || pendingContext) {
+        event.preventDefault();
+        setPendingRouteSwitch(null);
+        setPendingContext(null);
+        return;
+      }
+      if (assetDraft) {
+        event.preventDefault();
+        setAssetDraft(null);
+        setDiff("");
+        setStatus(null);
+        return;
+      }
+      if (
+        !moveDraft &&
+        !pending &&
+        !hasUnsavedInspectorDraft({
+          source,
+          draft,
+          classDraft,
+          typographyValid,
+          spacingValid,
+          appearanceValid,
+          layoutValid,
+          hasPendingRefresh: false,
+        })
+      ) {
+        event.preventDefault();
+        clearSelection();
+      }
+    };
+    document.addEventListener("keydown", handleToolKey);
+    return () => document.removeEventListener("keydown", handleToolKey);
+  }, [
+    moveDraft,
+    assetDraft,
+    pending,
+    pendingRouteSwitch,
+    pendingContext,
+    clearSelection,
+    source,
+    draft,
+    classDraft,
+    typographyValid,
+    spacingValid,
+    appearanceValid,
+    layoutValid,
+  ]);
+  const startPan = (event: ReactPointerEvent<HTMLElement>) => {
+    if (canvasTool !== "hand" || event.button !== 0) return;
+    if (
+      (event.target as HTMLElement).closest("button, input, select, label, a")
+    )
+      return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panStart.current = {
+      x: event.clientX,
+      y: event.clientY,
+      left: event.currentTarget.scrollLeft,
+      top: event.currentTarget.scrollTop,
+      pointer: event.pointerId,
+    };
+  };
+  const movePan = (event: ReactPointerEvent<HTMLElement>) => {
+    const start = panStart.current;
+    if (!start || start.pointer !== event.pointerId) return;
+    event.currentTarget.scrollLeft = start.left + start.x - event.clientX;
+    event.currentTarget.scrollTop = start.top + start.y - event.clientY;
+  };
+  const endPan = (event: ReactPointerEvent<HTMLElement>) => {
+    if (panStart.current?.pointer !== event.pointerId) return;
+    panStart.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+  };
 
   useEffect(() => {
     if (!pending) {
       return;
     }
     const poll =
-      pending.propertyLabel || pending.kind === "reorder"
+      pending.propertyLabel ||
+      pending.kind === "reorder" ||
+      pending.kind === "asset"
         ? window.setInterval(() => bridge.track(pending.oid), 250)
         : null;
     const timer = window.setTimeout(() => {
@@ -592,15 +761,17 @@ function SourceElementEditor({
     selected?.instances === 1 &&
     bridge.connected &&
     !busy &&
-    !moveDraft;
+    !moveDraft &&
+    !assetDraft;
   const classEditable =
     Boolean(source?.className.ok) &&
     selected?.instances === 1 &&
     bridge.connected &&
     !busy &&
-    !moveDraft;
+    !moveDraft &&
+    !assetDraft;
   const hasUnsavedDraft =
-    Boolean(moveDraft) ||
+    Boolean(moveDraft || assetDraft) ||
     hasUnsavedInspectorDraft({
       source,
       draft,
@@ -629,7 +800,7 @@ function SourceElementEditor({
       !spacingValid ||
       !appearanceValid ||
       !layoutValid;
-    if (moveDraft && !discard) {
+    if ((moveDraft || assetDraft) && !discard) {
       setPendingContext(next);
       return;
     }
@@ -639,6 +810,7 @@ function SourceElementEditor({
     }
     if (discard) {
       setMoveDraft(null);
+      setAssetDraft(null);
       setClassDraft(source?.className.ok ? (source.className.value ?? "") : "");
       setTypographyValid(true);
       setSpacingValid(true);
@@ -652,6 +824,7 @@ function SourceElementEditor({
     setScope(next.scope);
     setManualScope(next.manual);
     setContextVersion((value) => value + 1);
+    if (onPreviewCapture) window.setTimeout(onPreviewCapture, 450);
     if (selected) bridge.track(selected.oid);
   };
   const designEditable =
@@ -690,6 +863,8 @@ function SourceElementEditor({
     setPendingRouteSwitch(null);
     setBusy(false);
     setMoveDraft(null);
+    setAssetDraft(null);
+    setAssetChoice("");
     setTypographyValid(true);
     setSpacingValid(true);
     setAppearanceValid(true);
@@ -741,10 +916,12 @@ function SourceElementEditor({
     switchingRoute ||
     !bridge.connected ||
     hasUnsavedDraft ||
+    Boolean(assetDraft) ||
     !workspace.previewReorder ||
     !workspace.applyReorder;
   const cancelMove = () => {
     setMoveDraft(null);
+    setPendingRouteSwitch(null);
     setPendingContext(null);
     setDiff("");
     setStatus(null);
@@ -755,6 +932,7 @@ function SourceElementEditor({
       if (event.key !== "Escape" || event.isComposing) return;
       event.preventDefault();
       setMoveDraft(null);
+      setPendingRouteSwitch(null);
       setPendingContext(null);
       setDiff("");
       setStatus(null);
@@ -869,6 +1047,123 @@ function SourceElementEditor({
       run,
     });
     bridge.track(receipt.oid);
+  };
+
+  const refreshAssets = async () => {
+    const result = await listProjectAssets(workspace);
+    if (!result.ok) {
+      setAssets([]);
+      setAssetChoice("");
+      setAssetError(result.error);
+      setStatus({ kind: "error", text: result.error });
+      return;
+    }
+    setAssets(result.assets);
+    setAssetError(null);
+    if (!result.assets.some((asset) => asset.path === assetChoice))
+      setAssetChoice("");
+  };
+  const previewAsset = async () => {
+    if (
+      !source?.image?.ok ||
+      !selected ||
+      selected.instances !== 1 ||
+      selected.tagName !== "img" ||
+      !assetChoice ||
+      !workspace.previewAssetEdit ||
+      busy ||
+      moveDraft ||
+      !bridge.connected
+    )
+      return;
+    const requestValue: AssetEditRequest = {
+      path: source.path,
+      oid: selected.oid,
+      expectedSha256: source.sha256,
+      assetPath: assetChoice,
+    };
+    const selectionAtStart = selection.current,
+      run = ++editRun.current;
+    setBusy(true);
+    const result = await workspace.previewAssetEdit(requestValue);
+    if (selectionAtStart !== selection.current || run !== editRun.current)
+      return;
+    setBusy(false);
+    if (!result.ok) {
+      setStatus({ kind: "error", text: result.message });
+      return;
+    }
+    if (result.noop) {
+      setStatus({ kind: "info", text: "The image already uses this asset." });
+      return;
+    }
+    setAssetDraft(requestValue);
+    setDiff(result.diff);
+    setStatus({
+      kind: "info",
+      text: "Review the source diff, then Use asset.",
+    });
+  };
+  const applyAsset = async () => {
+    const requestValue = assetDraft;
+    if (
+      !requestValue ||
+      !source ||
+      !selected ||
+      !workspace.applyAssetEdit ||
+      busy ||
+      requestValue.oid !== selected.oid ||
+      requestValue.expectedSha256 !== source.sha256
+    )
+      return;
+    const chosen = assets.find(
+      (asset) => asset.path === requestValue.assetPath,
+    );
+    if (!chosen || !isUsableAsset(chosen)) return;
+    const selectionAtStart = selection.current,
+      run = ++editRun.current;
+    applying.current = run;
+    setBusy(true);
+    const result = await workspace.applyAssetEdit(requestValue);
+    if (applying.current === run) applying.current = null;
+    if (selectionAtStart !== selection.current || run !== editRun.current)
+      return;
+    if (!result.ok) {
+      setBusy(false);
+      setStatus({ kind: "error", text: result.message });
+      return;
+    }
+    setAssetDraft(null);
+    setDiff(result.diff);
+    if (!result.written) {
+      setBusy(false);
+      setStatus({ kind: "info", text: "No source change was written." });
+      return;
+    }
+    if (!result.oid) {
+      setBusy(false);
+      setSource(null);
+      setStatus({
+        kind: "error",
+        text: "The image source was saved, but selection identity is unavailable. Reselect it; Undo remains available.",
+      });
+      return;
+    }
+    setSource({ ...source, sha256: result.sha256 });
+    setSelected({ ...selected, oid: result.oid });
+    setStatus({
+      kind: "info",
+      text: "Image source saved. Waiting for the preview…",
+    });
+    setPending({
+      kind: "asset",
+      assetOrigin: previewOrigin,
+      oid: result.oid,
+      value: chosen.url,
+      reloaded: false,
+      run,
+    });
+    bridge.track(result.oid);
   };
 
   const edit = async (kind: EditKind, apply: boolean, design = false) => {
@@ -1036,6 +1331,33 @@ function SourceElementEditor({
 
   return (
     <>
+      <nav className="studio-tools" aria-label="Canvas tools">
+        <button
+          type="button"
+          aria-label="Select tool (V)"
+          aria-pressed={canvasTool === "select"}
+          onClick={() => setCanvasTool("select")}
+        >
+          Select
+        </button>
+        <button
+          type="button"
+          aria-label="Hand tool (H)"
+          aria-pressed={canvasTool === "hand"}
+          onClick={() => setCanvasTool("hand")}
+        >
+          Hand
+        </button>
+        {selected ? (
+          <button
+            type="button"
+            aria-label="Clear selection"
+            onClick={clearSelection}
+          >
+            Clear
+          </button>
+        ) : null}
+      </nav>
       <aside
         className="studio-navigator"
         aria-label="Project navigator"
@@ -1132,25 +1454,15 @@ function SourceElementEditor({
         </div>
       </aside>
       <div className="editor-workspace">
-        <section ref={canvas} className="studio-canvas" aria-label="Canvas">
-          <ViewportControls
-            width={viewportWidth}
-            scope={scope}
-            manual={manualScope}
-            zoom={zoom}
-            disabled={busy || switchingRoute || pending !== null}
-            onWidth={(width) =>
-              switchContext({
-                width,
-                scope: breakpointForWidth(width),
-                manual: false,
-              })
-            }
-            onScope={(scope) =>
-              switchContext({ width: viewportWidth, scope, manual: true })
-            }
-            onZoom={setZoom}
-          />
+        <section
+          ref={canvas}
+          className={`studio-canvas${canvasTool === "hand" ? " studio-canvas-hand" : ""}`}
+          aria-label="Canvas"
+          onPointerDown={startPan}
+          onPointerMove={movePan}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
+        >
           {pendingContext ? (
             <div
               role="alert"
@@ -1197,9 +1509,12 @@ function SourceElementEditor({
                 key={frameKey}
                 ref={frame}
                 className="preview-frame"
-                style={{ height: viewportHeight }}
                 title="Project preview"
                 src={currentPreviewUrl}
+                style={{
+                  height: viewportHeight,
+                  pointerEvents: canvasTool === "hand" ? "none" : "auto",
+                }}
                 sandbox="allow-scripts allow-same-origin allow-forms"
                 onLoad={bridge.handleFrameLoad}
               />
@@ -1218,13 +1533,38 @@ function SourceElementEditor({
               ) : null}
             </div>
           </div>
+          <ViewportControls
+            width={viewportWidth}
+            scope={scope}
+            manual={manualScope}
+            zoom={zoom}
+            disabled={busy || switchingRoute || pending !== null}
+            onWidth={(width) =>
+              switchContext({
+                width,
+                scope: breakpointForWidth(width),
+                manual: false,
+              })
+            }
+            onScope={(scope) =>
+              switchContext({ width: viewportWidth, scope, manual: true })
+            }
+            onZoom={(nextZoom) => {
+              setZoom(nextZoom);
+              if (onPreviewCapture) window.setTimeout(onPreviewCapture, 450);
+            }}
+          />
         </section>
         <aside className="inspector" aria-label="Selection">
           <h2>Design</h2>
-          <p className="field-note">
-            Source edit scope: {scope === "base" ? "Base" : scope}. Preview
-            width and source scope are separate. Unset values do not imply
-            inheritance.
+          {bridge.lastRejection ? (
+            <output hidden data-testid="preview-rejection">
+              {bridge.lastRejection}
+            </output>
+          ) : null}
+          <p className="inspector-meta">
+            Preview bridge: {bridge.connected ? "connected" : "connecting…"} ·
+            Source scope {scope === "base" ? "Base" : scope} · {viewportWidth}px
           </p>
           {scope !== "base" && responsive.status !== "supported-defaults" ? (
             <output>
@@ -1232,18 +1572,20 @@ function SourceElementEditor({
               could not be validated. Base edits remain available.
             </output>
           ) : null}
-          <p className="bridge-status">
-            Preview bridge: {bridge.connected ? "connected" : "connecting…"}
-            {bridge.lastRejection
-              ? ` · rejected a preview message (${bridge.lastRejection})`
-              : ""}
-          </p>
+          {bridge.lastRejection && bridge.lastRejection !== "stale-nonce" ? (
+            <p className="bridge-status">
+              Preview message rejected: {bridge.lastRejection}
+            </p>
+          ) : null}
           {selected ? (
             <dl>
               <dt>Element</dt>
               <dd>
-                <code>&lt;{selected.tagName}&gt;</code> data-oid{" "}
-                <code>{selected.oid}</code>
+                <code>&lt;{selected.tagName}&gt;</code>
+                <details className="source-identity">
+                  <summary>Source identity</summary>
+                  <code>{selected.oid}</code>
+                </details>
               </dd>
               {source ? (
                 <>
@@ -1263,15 +1605,114 @@ function SourceElementEditor({
           ) : (
             <p>Click an element in the preview to select it.</p>
           )}
+          <details
+            className="asset-inspector"
+            aria-label="Project assets"
+            open={selected?.tagName === "img"}
+          >
+            <summary>
+              Assets <span>{assets.length}</span>
+            </summary>
+            <p className="field-note">
+              Project images in public/. Choose an existing file for a supported
+              image.
+            </p>
+            <button
+              type="button"
+              disabled={!workspace.listAssets || busy}
+              onClick={() => void refreshAssets()}
+            >
+              Refresh assets
+            </button>
+            {assetError ? (
+              <p className="field-note" role="alert">
+                {assetError}
+              </p>
+            ) : assets.length ? (
+              <label className="text-field">
+                Project image
+                <select
+                  value={assetChoice}
+                  disabled={busy || !workspace.previewAssetEdit}
+                  onChange={(event) => {
+                    setAssetChoice(event.target.value);
+                    setAssetDraft(null);
+                    setDiff("");
+                  }}
+                >
+                  <option value="">Select an asset</option>
+                  {assets.map((asset) => (
+                    <option
+                      key={asset.path}
+                      value={asset.path}
+                      disabled={!isUsableAsset(asset)}
+                    >
+                      {asset.path} · {asset.type} ·{" "}
+                      {asset.size.toLocaleString()} B
+                      {isUsableAsset(asset) ? "" : " · unavailable"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p className="field-note">No supported project images found.</p>
+            )}
+            {source?.image && !source.image.ok ? (
+              <p className="field-note">
+                {describeSourceEditFailure(source.image.reason)}
+              </p>
+            ) : null}
+            {source?.image?.ok ? (
+              <p className="field-note">
+                Current source: <code>{source.image.src}</code> · alt:{" "}
+                {source.image.alt || "decorative"}
+              </p>
+            ) : null}
+            <div className="actions">
+              <button
+                type="button"
+                disabled={
+                  !assetChoice ||
+                  !source?.image?.ok ||
+                  selected?.tagName !== "img" ||
+                  selected.instances !== 1 ||
+                  busy ||
+                  Boolean(moveDraft) ||
+                  !bridge.connected ||
+                  !workspace.previewAssetEdit
+                }
+                onClick={() => void previewAsset()}
+              >
+                Preview asset patch
+              </button>
+              <button
+                type="button"
+                disabled={!assetDraft || busy || !workspace.applyAssetEdit}
+                onClick={() => void applyAsset()}
+              >
+                Use asset
+              </button>
+              {assetDraft ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setAssetDraft(null);
+                    setPendingRouteSwitch(null);
+                    setDiff("");
+                    setStatus(null);
+                  }}
+                >
+                  Cancel asset patch
+                </button>
+              ) : null}
+            </div>
+          </details>
           <section
             className="structure-inspector"
             aria-label="Layer arrangement"
           >
             <h2>Arrange layer</h2>
-            <p className="field-note">
-              Adjacent static siblings in the current page only. Select a
-              supported layer to drag it onto its adjacent row.
-            </p>
             <div className="actions">
               <button
                 type="button"
@@ -1408,37 +1849,40 @@ function SourceElementEditor({
               Apply text
             </button>
           </div>
-          <label className="text-field">
-            Classes
-            <input
-              type="text"
-              value={classDraft}
-              disabled={!classEditable}
-              spellCheck={false}
-              onChange={(event) => setClassDraft(event.target.value)}
-            />
-          </label>
-          {source && !source.className.ok ? (
-            <p className="field-note">
-              {describeSourceEditFailure(source.className.reason)}
-            </p>
-          ) : null}
-          <div className="actions">
-            <button
-              type="button"
-              disabled={!classEditable}
-              onClick={() => void edit("className", false)}
-            >
-              Preview class patch
-            </button>
-            <button
-              type="button"
-              disabled={!classEditable}
-              onClick={() => void edit("className", true)}
-            >
-              Apply classes
-            </button>
-          </div>
+          <details className="source-class-controls">
+            <summary>Source classes</summary>
+            <label className="text-field">
+              Classes
+              <input
+                type="text"
+                value={classDraft}
+                disabled={!classEditable}
+                spellCheck={false}
+                onChange={(event) => setClassDraft(event.target.value)}
+              />
+            </label>
+            {source && !source.className.ok ? (
+              <p className="field-note">
+                {describeSourceEditFailure(source.className.reason)}
+              </p>
+            ) : null}
+            <div className="actions">
+              <button
+                type="button"
+                disabled={!classEditable}
+                onClick={() => void edit("className", false)}
+              >
+                Preview class patch
+              </button>
+              <button
+                type="button"
+                disabled={!classEditable}
+                onClick={() => void edit("className", true)}
+              >
+                Apply classes
+              </button>
+            </div>
+          </details>
           {status ? (
             <p
               className={`status status-${status.kind}`}

@@ -13,10 +13,12 @@ export type {
   PreviewTypography,
 } from "../preview-bridge/protocol.ts";
 export type {
+  AssetEditRequest,
   ClassEditRequest,
   DiscoveredRoute,
   EditBreakpoint,
   LocateElementResult,
+  ProjectAsset,
   ProjectRoutesSnapshot,
   ReorderEditRequest,
   ReorderReceipt,
@@ -38,6 +40,7 @@ export type {
 export {
   describeSourceEditFailure,
   discoverAppRouterRoutes,
+  isUsableAsset,
   parseSelectRouteBody,
   resolvePreviewRouteUrl,
   sourceEditFailure,
@@ -49,3 +52,11 @@ export {
   EditorShell,
   hasUnsavedInspectorDraft,
 } from "./editor-shell.tsx";
+export type {
+  WorkspaceHomeNavigationItem,
+  WorkspaceHomeProject,
+  WorkspaceHomeProps,
+  WorkspaceHomeSection,
+  WorkspaceHomeView,
+} from "./workspace-home.tsx";
+export { WorkspaceHome } from "./workspace-home.tsx";

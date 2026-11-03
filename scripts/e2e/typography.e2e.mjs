@@ -4,6 +4,7 @@ import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
+import { clickPreview } from "./preview-pointer.mjs";
 
 const evidence = await mkdtemp(join(tmpdir(), "allstudio-typography-e2e-"));
 console.log(`Evidence: ${evidence}`);
@@ -30,7 +31,7 @@ try {
   await page
     .getByLabel("Edit breakpoint", { exact: true })
     .selectOption("base");
-  await preview.locator("h1").click();
+  await clickPreview(page, preview.locator("h1"));
   await expect(page.getByTestId("source-location")).toBeVisible();
   const typography = page.getByRole("region", {
     name: "Typography",
@@ -238,7 +239,7 @@ try {
     await page
       .getByLabel("Edit breakpoint", { exact: true })
       .selectOption("base");
-    await preview.locator("h1").click();
+    await clickPreview(page, preview.locator("h1"));
     await expect
       .poll(() =>
         preview
@@ -285,7 +286,7 @@ try {
   await page
     .getByLabel("Edit breakpoint", { exact: true })
     .selectOption("base");
-  await preview.locator("h1").click();
+  await clickPreview(page, preview.locator("h1"));
   await expect
     .poll(() =>
       preview
@@ -311,7 +312,7 @@ try {
   await page
     .getByLabel("Edit breakpoint", { exact: true })
     .selectOption("base");
-  await preview.locator("#harbor-secondary").click();
+  await clickPreview(page, preview.locator("#harbor-secondary"));
   await expect(
     page.getByText("className is an expression", { exact: false }),
   ).toBeVisible();
@@ -322,7 +323,7 @@ try {
   pass(
     "dynamic class expressions disable typography while static text remains editable",
   );
-  await preview.locator("#harbor-heading").click();
+  await clickPreview(page, preview.locator("#harbor-heading"));
   await expect(
     page.getByLabel("Font size preset", { exact: true }),
   ).toBeEnabled();

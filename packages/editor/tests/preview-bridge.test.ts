@@ -18,8 +18,10 @@ const expected = {
   previewOrigin: "http://localhost:3101",
   previewWindow,
   nonce: "n".repeat(48),
+  generation: 4,
 };
 const element = {
+  image: null,
   neighbors: { previous: null, next: null },
   layout: {
     display: "grid",
@@ -71,6 +73,57 @@ const element = {
   rect: { x: 10, y: 20, width: 300, height: 60 },
   instances: 1,
 };
+describe("bounded rendered image observation", () => {
+  it("accepts a loaded img and refuses oversized or malformed image data", () => {
+    const valid = {
+      ...element,
+      tagName: "img",
+      image: {
+        currentSrc: "http://localhost:3101/logo.png",
+        complete: true,
+        visible: true,
+        naturalWidth: 64,
+        naturalHeight: 64,
+      },
+    };
+    expect(
+      parsePreviewMessage(
+        event({ type: "select", clickedTag: "img", element: valid }),
+        expected,
+      ).ok,
+    ).toBe(true);
+    for (const image of [
+      undefined,
+      { ...valid.image, currentSrc: "x".repeat(2049) },
+      { ...valid.image, naturalWidth: -1 },
+      { ...valid.image, naturalHeight: 100001 },
+      { ...valid.image, naturalWidth: 1.5 },
+      { ...valid.image, visible: "yes" },
+      { ...valid.image, complete: "yes" },
+      { ...valid.image, secret: "/outside" },
+    ])
+      expect(
+        parsePreviewMessage(
+          event({
+            type: "select",
+            clickedTag: "img",
+            element: { ...valid, image },
+          }),
+          expected,
+        ).ok,
+      ).toBe(false);
+    expect(
+      parsePreviewMessage(
+        event({
+          type: "select",
+          clickedTag: "h1",
+          element: { ...element, image: valid.image },
+        }),
+        expected,
+      ).ok,
+    ).toBe(false);
+  });
+});
 
 describe("bounded direct source-backed neighbor observations", () => {
   const neighbor = { nodeId: "n2", oid: "neighbor", instances: 1 };
@@ -141,6 +194,23 @@ function event(data: Record<string, unknown>, overrides = {}) {
 }
 
 describe("preview bridge protocol", () => {
+  it("accepts readiness only from the current handshake generation", () => {
+    expect(
+      parsePreviewMessage(event({ type: "ready", generation: 4 }), expected),
+    ).toEqual({
+      ok: true,
+      message: { type: "ready", nonce: expected.nonce, generation: 4 },
+    });
+    for (const ready of [
+      { type: "ready" },
+      { type: "ready", generation: 3 },
+      { type: "ready", generation: 4, path: "/outside" },
+    ])
+      expect(parsePreviewMessage(event(ready), expected)).toMatchObject({
+        ok: false,
+        reason: "stale-nonce",
+      });
+  });
   it("accepts a well-formed selection from the preview window", () => {
     expect(
       parsePreviewMessage(
@@ -584,7 +654,7 @@ describe("bounded selected appearance measurement", () => {
       expect(result.message.element?.appearance).toEqual(appearance);
   });
   it("is part of the protocol version that the runtime copy reports", () => {
-    expect(PREVIEW_BRIDGE_VERSION).toBe(8);
+    expect(PREVIEW_BRIDGE_VERSION).toBe(10);
     expect(
       parsePreviewMessage(
         event({ type: "boot", version: PREVIEW_BRIDGE_VERSION - 1 }),

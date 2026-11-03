@@ -1,6 +1,11 @@
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { type FileHandle, open, realpath } from "node:fs/promises";
+import {
+  assetFromMetadata,
+  MAX_ASSET_FILES,
+  type ProjectAsset,
+} from "@allstudio/editor/site";
 
 export class FileFailure extends Error {
   constructor(public reason: string) {
@@ -52,7 +57,7 @@ export class NativeFiles {
   }
 
   private async readChecked(
-    operation: "read" | "read-css" | "read-audit-source",
+    operation: "read" | "read-css" | "read-audit-source" | "read-thumbnail",
     path: string,
   ): Promise<{ bytes: Buffer; mode: number }> {
     const result = await this.run(operation, path);
@@ -86,16 +91,107 @@ export class NativeFiles {
     return this.listChecked("list");
   }
 
+  async readThumbnail(id: string): Promise<Buffer> {
+    if (!/^[a-f0-9]{64}$/.test(id)) throw new FileFailure("path-rejected");
+    const { bytes } = await this.readChecked(
+      "read-thumbnail",
+      `thumbnails/${id}.jpg`,
+    );
+    if (
+      bytes.length < 4 ||
+      bytes.length > 96 * 1024 ||
+      bytes[0] !== 0xff ||
+      bytes[1] !== 0xd8
+    )
+      throw new FileFailure("path-rejected");
+    return bytes;
+  }
+
+  async writeThumbnail(id: string, before: Buffer | null, after: Buffer) {
+    if (
+      !/^[a-f0-9]{64}$/.test(id) ||
+      after.length < 4 ||
+      after.length > 96 * 1024 ||
+      after[0] !== 0xff ||
+      after[1] !== 0xd8 ||
+      (before && before.length > 96 * 1024)
+    )
+      throw new FileFailure("path-rejected");
+    await this.run(
+      before ? "write-thumbnail" : "create-thumbnail",
+      `thumbnails/${id}.jpg`,
+      before ?? Buffer.alloc(0),
+      after,
+    );
+  }
+
+  async removeThumbnail(name: string) {
+    if (
+      !/^(?:[a-f0-9]{64}\.jpg|[a-f0-9]{64}\.jpg\.\d+\.[a-f0-9]{16}\.tmp|\.allstudio-[a-f0-9]{16}\.tmp)$/.test(
+        name,
+      )
+    )
+      throw new FileFailure("path-rejected");
+    await this.run("remove-thumbnail", `thumbnails/${name}`);
+  }
+
+  async pruneThumbnails(retainedIds: ReadonlySet<string>) {
+    const ids = [...retainedIds];
+    if (ids.length > 100 || !ids.every((id) => /^[a-f0-9]{64}$/.test(id)))
+      throw new FileFailure("path-rejected");
+    await this.run(
+      "prune-thumbnails",
+      "thumbnails",
+      Buffer.alloc(0),
+      Buffer.from(ids.join("\n")),
+    );
+  }
+
   async listStyles(): Promise<string[]> {
     return this.listChecked("list-styles");
+  }
+  async listAssets(): Promise<ProjectAsset[]> {
+    const output = await this.run("list-assets", "public");
+    if (output.subarray(0, 3).toString() !== "OK\n")
+      throw new FileFailure("read-failed");
+    const assets: ProjectAsset[] = [];
+    let offset = 3;
+    while (offset < output.length) {
+      const end = output.indexOf(10, offset);
+      const header = /^([1-9][0-9]{0,3}) (0|[1-9][0-9]{0,15})$/.exec(
+        output.subarray(offset, end).toString(),
+      );
+      if (end < offset || !header) throw new FileFailure("read-failed");
+      const length = Number(header[1]),
+        size = Number(header[2]);
+      if (
+        length > 1024 ||
+        end + 1 + length > output.length ||
+        assets.length >= MAX_ASSET_FILES
+      )
+        throw new FileFailure("scan-limit");
+      const path = new TextDecoder("utf-8", { fatal: true }).decode(
+        output.subarray(end + 1, end + 1 + length),
+      );
+      const asset = assetFromMetadata(path, size);
+      if (!asset || assets.some((item) => item.path === path))
+        throw new FileFailure("path-rejected");
+      assets.push(asset);
+      offset = end + 1 + length;
+    }
+    return assets.sort((a, b) =>
+      a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+    );
   }
 
   private async listChecked(
     operation: "list" | "list-styles" | "list-audit-sources",
   ): Promise<string[]> {
     const output = await this.run(operation, "src");
-    if (output.subarray(0, 3).toString() !== "OK\n")
-      throw new FileFailure("read-failed");
+    if (output.subarray(0, 3).toString() !== "OK\n") {
+      const reason = /^ERR ([a-z-]+)\n/.exec(output.toString())?.[1];
+      throw new FileFailure(reason ?? "read-failed");
+    }
     const result: string[] = [];
     let offset = 3;
     while (offset < output.length) {
@@ -202,10 +298,14 @@ export class NativeFiles {
         } else if (
           operation === "read" ||
           operation === "list" ||
+          operation === "list-assets" ||
           operation === "read-css" ||
           operation === "read-audit-source" ||
           operation === "list-audit-sources" ||
           operation === "list-styles" ||
+          operation === "prune-thumbnails" ||
+          operation === "remove-thumbnail" ||
+          operation === "read-thumbnail" ||
           output.toString() === "READY\nPREPARED\nOK\n"
         )
           resolve(output);

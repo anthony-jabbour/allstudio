@@ -4,7 +4,7 @@
  * every inbound message is checked for the expected origin, the expected
  * window, the session nonce, and a strict shape before the editor acts on it.
  */
-export const PREVIEW_BRIDGE_VERSION = 8;
+export const PREVIEW_BRIDGE_VERSION = 10;
 export const EDITOR_MESSAGE_SOURCE = "allstudio-editor";
 export const PREVIEW_MESSAGE_SOURCE = "allstudio-preview";
 
@@ -40,6 +40,7 @@ export interface PreviewRect {
 }
 
 export interface PreviewElementSnapshot {
+  image: PreviewImage | null;
   neighbors: { previous: PreviewNeighbor | null; next: PreviewNeighbor | null };
   layout: PreviewLayout;
   appearance: PreviewAppearance;
@@ -55,6 +56,48 @@ export interface PreviewElementSnapshot {
   rect: PreviewRect;
   /** Number of rendered elements sharing this oid (e.g. `.map()` items). */
   instances: number;
+}
+export interface PreviewImage {
+  currentSrc: string;
+  complete: boolean;
+  visible: boolean;
+  naturalWidth: number;
+  naturalHeight: number;
+}
+function parseImage(
+  value: unknown,
+  tagName: string,
+): PreviewImage | null | undefined {
+  if (value === null) return null;
+  if (
+    tagName !== "img" ||
+    !isRecord(value) ||
+    !hasOnlyKeys(value, [
+      "currentSrc",
+      "complete",
+      "visible",
+      "naturalWidth",
+      "naturalHeight",
+    ])
+  )
+    return undefined;
+  const { currentSrc, complete, visible, naturalWidth, naturalHeight } = value;
+  if (
+    typeof currentSrc !== "string" ||
+    currentSrc.length > 2048 ||
+    typeof complete !== "boolean" ||
+    typeof visible !== "boolean" ||
+    typeof naturalWidth !== "number" ||
+    !Number.isInteger(naturalWidth) ||
+    naturalWidth < 0 ||
+    naturalWidth > 100000 ||
+    typeof naturalHeight !== "number" ||
+    !Number.isInteger(naturalHeight) ||
+    naturalHeight < 0 ||
+    naturalHeight > 100000
+  )
+    return undefined;
+  return { currentSrc, complete, visible, naturalWidth, naturalHeight };
 }
 
 export interface PreviewNeighbor {
@@ -237,7 +280,7 @@ function parseTypography(value: unknown): PreviewTypography | null {
 
 export type PreviewMessage =
   | { type: "boot" }
-  | { type: "ready"; nonce: string }
+  | { type: "ready"; nonce: string; generation: number }
   | ({ type: "layers"; nonce: string } & PreviewLayersSnapshot)
   | {
       type: "layer-error";
@@ -258,7 +301,7 @@ export type PreviewMessage =
     };
 
 export type EditorMessage =
-  | { type: "hello"; nonce: string }
+  | { type: "hello"; nonce: string; generation: number }
   | { type: "track"; nonce: string; oid: string | null }
   | { type: "select-layer"; nonce: string; generation: number; nodeId: string };
 
@@ -273,6 +316,7 @@ export interface PreviewExpectation {
   previewWindow: unknown;
   /** Nonce of the current handshake, or null before `hello` was sent. */
   nonce: string | null;
+  generation: number;
 }
 
 export type PreviewMessageRejection =
@@ -332,6 +376,10 @@ function parseSnapshot(
   const appearance = parseAppearance(value.appearance);
   const layout = parseLayout(value.layout);
   const { nodeId, oid, tagName, text, className, instances } = value;
+  const image = parseImage(
+    value.image,
+    typeof tagName === "string" ? tagName : "",
+  );
   if (
     typeof nodeId !== "string" ||
     !NODE_ID_PATTERN.test(nodeId) ||
@@ -350,13 +398,15 @@ function parseSnapshot(
     !typography ||
     !spacing ||
     !appearance ||
-    !layout
+    !layout ||
+    image === undefined
   ) {
     return undefined;
   }
   const neighbors = parseNeighbors(value.neighbors, oid, nodeId, instances);
   if (!neighbors) return undefined;
   return {
+    image,
     neighbors,
     nodeId,
     oid,
@@ -476,7 +526,22 @@ export function parsePreviewMessage(
   const nonce = expected.nonce;
 
   if (data.type === "ready") {
-    return { ok: true, message: { type: "ready", nonce } };
+    if (
+      !hasOnlyKeys(data, [
+        "source",
+        "version",
+        "type",
+        "nonce",
+        "generation",
+      ]) ||
+      !Number.isSafeInteger(data.generation) ||
+      data.generation !== expected.generation
+    )
+      return { ok: false, reason: "stale-nonce" };
+    return {
+      ok: true,
+      message: { type: "ready", nonce, generation: data.generation as number },
+    };
   }
   if (data.type === "layers") {
     const layers = parseLayers(data);

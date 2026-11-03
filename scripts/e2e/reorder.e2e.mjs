@@ -3,6 +3,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
+import { clickPreview } from "./preview-pointer.mjs";
 
 const evidence = await mkdtemp(join(tmpdir(), "allstudio-reorder-e2e-"));
 console.log(`Evidence: ${evidence}`);
@@ -35,7 +36,7 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
-  await preview.locator("h1").click();
+  await clickPreview(page, preview.locator("h1"));
   await expect(page.getByTestId("source-location")).toBeVisible();
   const oid = await preview.locator("h1").getAttribute("data-oid");
   const peerOid = await preview
@@ -135,7 +136,7 @@ try {
   await page
     .getByRole("button", { name: "Move layer up", exact: true })
     .click();
-  const external = before + "\n// External reorder conflict\n";
+  const external = `${before}\n// External reorder conflict\n`;
   await writeFile(file, external);
   await page
     .getByRole("button", { name: "Apply layer move", exact: true })
@@ -160,7 +161,7 @@ try {
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
-    await preview.locator("h1").click();
+    await clickPreview(page, preview.locator("h1"));
     await expect(page.getByTestId("source-location")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Move layer up", exact: true }),
@@ -180,7 +181,7 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60000 });
-  await preview.locator("nav a").first().click();
+  await clickPreview(page, preview.locator("nav a").first());
   await expect(
     page.getByRole("button", { name: "Move layer up", exact: true }),
   ).toBeDisabled();

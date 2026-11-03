@@ -1,7 +1,9 @@
 import {
+  type AssetEditRequest,
   type ClassEditRequest,
   type DiscoveredRoute,
   type LocateElementResult,
+  type ProjectAsset,
   type ReorderEditRequest,
   type ResponsiveCapabilities,
   type SelectRouteResult,
@@ -41,6 +43,11 @@ export function createHttpWorkspace(
   }
 
   return {
+    listAssets: () => call<ProjectAsset[]>("list-assets", {}),
+    previewAssetEdit: (request: AssetEditRequest) =>
+      call<TextEditResult>("preview-asset", request),
+    applyAssetEdit: (request: AssetEditRequest) =>
+      call<TextEditResult>("apply-asset", request),
     previewReorder: (request: ReorderEditRequest) =>
       call<TextEditResult>("preview-reorder", request),
     applyReorder: (request: ReorderEditRequest) =>

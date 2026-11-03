@@ -9,13 +9,14 @@ import {
 import { type BrowserWindow, dialog } from "electron";
 import type {
   OpenProject,
+  PreviewBounds,
   ProjectResult,
   RecentProject,
 } from "../shared/desktop-api.ts";
 import { applyIntegration, planIntegration } from "./config-integration.ts";
 import { durableJson } from "./durable-json.ts";
 import { hash, LocalWorkspace, textOf } from "./local-workspace.ts";
-import { FileFailure } from "./native-files.ts";
+import { FileFailure, NativeFiles } from "./native-files.ts";
 
 interface SavedProject extends RecentProject {
   dev: string;
@@ -65,6 +66,8 @@ export class Projects {
   } | null = null;
   private preview: Preview | null = null;
   private tail: Promise<unknown> = Promise.resolve();
+  private thumbnailTail: Promise<boolean> = Promise.resolve(false);
+  private thumbnailCacheDisabled = false;
   private disposed = false;
   constructor(
     private data: string,
@@ -108,11 +111,142 @@ export class Projects {
     }
   }
   async recent(): Promise<RecentProject[]> {
-    return (await this.saved()).map(({ id, name, path }) => ({
-      id,
-      name,
-      path,
-    }));
+    const projects = await this.saved();
+    await this.pruneThumbnails(projects);
+    const files = await NativeFiles.open(
+      this.data,
+      join(this.runtime, "files"),
+    ).catch(() => undefined);
+    try {
+      return Promise.all(
+        projects.map(async ({ id, name, path }, index) => ({
+          id,
+          name,
+          path,
+          ...(index < 24 && files
+            ? { thumbnail: await this.readThumbnail(files, id) }
+            : {}),
+        })),
+      );
+    } finally {
+      await files?.close().catch(() => {});
+    }
+  }
+  private async pruneThumbnails(projects: readonly SavedProject[]) {
+    this.thumbnailCacheDisabled = true;
+    let files: NativeFiles | undefined;
+    let cleaned = false;
+    try {
+      await this.thumbnailTail.catch(() => false);
+      files = await NativeFiles.open(this.data, join(this.runtime, "files"));
+      // shortcut: the 100-project and 96 KiB image limits bound retained cache size; keep them aligned.
+      await files.pruneThumbnails(
+        new Set(projects.map((project) => project.id)),
+      );
+      cleaned = true;
+    } catch {
+      this.notify(
+        "Project preview thumbnails are paused because the local cache could not be cleaned.",
+      );
+    } finally {
+      await files?.close().catch(() => {});
+      this.thumbnailCacheDisabled = !cleaned;
+    }
+  }
+  private async readThumbnail(
+    files: NativeFiles,
+    id: string,
+  ): Promise<string | undefined> {
+    if (!/^[a-f0-9]{64}$/.test(id)) return undefined;
+    try {
+      const bytes = await files.readThumbnail(id);
+      return `data:image/jpeg;base64,${bytes.toString("base64")}`;
+    } catch {
+      return undefined;
+    }
+  }
+  async captureThumbnail(id: string, bounds: PreviewBounds): Promise<boolean> {
+    const capture = this.thumbnailTail.then(
+      () => this.captureThumbnailNow(id, bounds),
+      () => this.captureThumbnailNow(id, bounds),
+    );
+    this.thumbnailTail = capture;
+    return capture;
+  }
+  private async captureThumbnailNow(
+    id: string,
+    bounds: PreviewBounds,
+  ): Promise<boolean> {
+    if (
+      this.thumbnailCacheDisabled ||
+      !this.current ||
+      this.current.info.id !== id ||
+      !/^[a-f0-9]{64}$/.test(id)
+    )
+      return false;
+    const [windowWidth, windowHeight] = this.window().getContentSize();
+    const { x, y, width, height } = bounds;
+    if (
+      ![x, y, width, height].every(Number.isFinite) ||
+      x < 0 ||
+      y < 0 ||
+      width < 160 ||
+      height < 120 ||
+      x + width > windowWidth ||
+      y + height > windowHeight ||
+      width > 2048 ||
+      height > 1536
+    )
+      return false;
+    try {
+      const contents = this.window().webContents;
+      await contents.executeJavaScript(
+        'document.documentElement.dataset.allstudioThumbnail = "true"; new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+      );
+      const image = await contents.capturePage({
+        x: Math.round(x),
+        y: Math.round(y),
+        width: Math.round(width),
+        height: Math.round(height),
+      });
+      const size = image.getSize();
+      const cropWidth = Math.min(size.width, Math.round(size.height * 1.6));
+      const cropHeight = Math.min(size.height, Math.round(size.width / 1.6));
+      const thumbnail = image.crop({
+        x: Math.max(0, Math.round((size.width - cropWidth) / 2)),
+        y: 0,
+        width: cropWidth,
+        height: cropHeight,
+      });
+      const bytes = thumbnail
+        .resize({ width: 420, quality: "good" })
+        .toJPEG(68);
+      if (bytes.length > 96 * 1024) return false;
+      const files = await NativeFiles.open(
+        this.data,
+        join(this.runtime, "files"),
+      );
+      try {
+        let before: Buffer | null = null;
+        try {
+          before = await files.readThumbnail(id);
+        } catch {
+          await files.removeThumbnail(`${id}.jpg`).catch(() => {});
+        }
+        await files.writeThumbnail(id, before, bytes);
+        return true;
+      } finally {
+        await files.close().catch(() => {});
+      }
+    } catch {
+      return false;
+    } finally {
+      await this.window()
+        .webContents.executeJavaScript(
+          "delete document.documentElement.dataset.allstudioThumbnail",
+        )
+        .catch(() => {});
+    }
   }
   private operation(
     task: () => Promise<ProjectResult>,
@@ -281,12 +415,13 @@ export class Projects {
         if (this.current?.workspace === workspace) this.notify(message);
       });
       if (this.disposed) throw new Error("Desktop is closing.");
+      const nextProjects = [
+        entry,
+        ...saved.filter((item) => item.id !== id),
+      ].slice(0, 100);
       await durableJson(join(this.data, "projects.json"), {
         schema: 1,
-        projects: [entry, ...saved.filter((item) => item.id !== id)].slice(
-          0,
-          100,
-        ),
+        projects: nextProjects,
       });
       const basePreviewUrl = `http://127.0.0.1:${candidate.port}/`;
       const routeSnapshot = await workspace.discoverRoutes();
@@ -309,6 +444,7 @@ export class Projects {
       await this.closeCurrent();
       this.preview = candidate;
       this.current = { info, workspace, basePreviewUrl };
+      await this.pruneThumbnails(nextProjects);
       return { ok: true, project: info };
     } catch (error) {
       await this.stopPreview(candidate);

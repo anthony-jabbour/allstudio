@@ -4,6 +4,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
+import { clickPreview } from "./preview-pointer.mjs";
 
 const evidence = await mkdtemp(join(tmpdir(), "allstudio-layers-e2e-"));
 console.log(`Evidence: ${evidence}`);
@@ -62,6 +63,52 @@ try {
   await page.goto("http://localhost:5173/");
   await expect(tree).toBeVisible({ timeout: 5000 });
   await choose("aurora-atelier");
+  const urlBeforePreviewActions = await preview
+    .locator("body")
+    .evaluate((body) => {
+      const link = document.createElement("a");
+      link.id = "preview-navigation-probe";
+      link.href = "#navigated";
+      link.textContent = "Untrusted navigation";
+      const button = document.createElement("button");
+      button.id = "preview-activation-probe";
+      button.textContent = "Untrusted activation";
+      button.addEventListener("click", () => {
+        body.dataset.previewActivated = "true";
+      });
+      body.prepend(button, link);
+      return location.href;
+    });
+  const probeButton = preview.locator("#preview-activation-probe");
+  await clickPreview(page, probeButton);
+  assert.equal(
+    await preview.locator("body").getAttribute("data-preview-activated"),
+    null,
+  );
+  await probeButton.focus();
+  await probeButton.press("Enter");
+  assert.equal(
+    await preview.locator("body").getAttribute("data-preview-activated"),
+    null,
+  );
+  const probeLink = preview.locator("#preview-navigation-probe");
+  await clickPreview(page, probeLink);
+  assert.equal(
+    await preview.locator("body").evaluate(() => location.href),
+    urlBeforePreviewActions,
+  );
+  await probeLink.focus();
+  await probeLink.press("Enter");
+  assert.equal(
+    await preview.locator("body").evaluate(() => location.href),
+    urlBeforePreviewActions,
+  );
+  await probeButton.evaluate((button) => button.remove());
+  await probeLink.evaluate((link) => link.remove());
+  pass(
+    "connected preview blocks mouse and keyboard click activation and navigation",
+  );
+
   const scrollReads = await preview.locator("body").evaluate(async (body) => {
     const bulk = document.createElement("div");
     for (let i = 0; i < 1000; i++) bulk.append(document.createElement("span"));
@@ -105,7 +152,7 @@ try {
     "src/app/page.tsx",
   );
   await align(heading);
-  await heading.click();
+  await clickPreview(page, heading);
   await expect(row(headingOid)).toHaveAttribute("aria-selected", "true");
   pass("canvas and tree select the same source-backed heading and rectangle");
   for (const target of [
@@ -207,7 +254,7 @@ try {
       iframe.contentWindow.postMessage(
         {
           source: "allstudio-editor",
-          version: 8,
+          version: 10,
           type: "select-layer",
           nonce,
           generation,
@@ -262,7 +309,7 @@ try {
       const iframe = document.querySelector("iframe");
       const request = {
         source: "allstudio-editor",
-        version: 8,
+        version: 10,
         type: "select-layer",
         nonce: base.nonce,
         generation: base.generation,
@@ -308,7 +355,7 @@ try {
     parent.postMessage(
       {
         source: "allstudio-preview",
-        version: 8,
+        version: 10,
         type: "layers",
         nonce: base.nonce,
         generation: base.generation + 1,
@@ -325,7 +372,7 @@ try {
     );
   }, goodTree);
   await expect(
-    page.getByText("rejected a preview message (malformed)", { exact: false }),
+    page.getByText("Preview message rejected: malformed", { exact: true }),
   ).toBeVisible();
   await expect(row(headingOid)).toHaveAttribute("aria-selected", "true");
   pass(
@@ -412,7 +459,7 @@ try {
     page.getByText("Layer tree is partial: inspection limits reached."),
   ).toBeVisible();
   await expect(tree.getByRole("treeitem")).toHaveCount(1000);
-  await preview.locator("h1").click();
+  await clickPreview(page, preview.locator("h1"));
   await expect(
     page.getByText("Selected element is outside the displayed layer tree."),
   ).toBeVisible();
@@ -425,7 +472,7 @@ try {
     clone.setAttribute("data-test-layer-duplicate", "");
     heading.after(clone);
   });
-  await preview.locator("h1").first().click();
+  await clickPreview(page, preview.locator("h1").first());
   await expect(page.getByRole("alert")).toContainText("renders 2 times");
   await expect(
     page.getByRole("button", { name: "Apply text", exact: true }),
@@ -493,7 +540,7 @@ try {
   pass(
     "DOM depth and visit budgets truncate explicitly and recover when the oversized subtree is removed",
   );
-  await preview.locator("h1").click();
+  await clickPreview(page, preview.locator("h1"));
   await expect(page.getByLabel("Text", { exact: true })).toBeEnabled();
   await preview.locator("h1").evaluate((heading) => heading.remove());
   await expect(

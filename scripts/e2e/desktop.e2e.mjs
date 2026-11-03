@@ -49,13 +49,11 @@ try {
     .tracing.start({ screenshots: true, snapshots: true });
   tracingStarted = true;
   const page = await application.firstWindow();
-  await page
-    .getByRole("status")
-    .filter({
-      hasText: `Electron 45.0.0 · ${executablePath ? "Packaged" : "Development"}`,
-    })
-    .waitFor();
   await page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  await expect(page.locator(".desktop-status")).toHaveCount(0);
+  await expect(
+    page.getByText("Source-backed design editing", { exact: true }),
+  ).toBeVisible();
   await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
   assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
   await page.reload();
@@ -95,6 +93,10 @@ try {
       require: "undefined",
       process: "undefined",
       api: [
+        "listAssets",
+        "previewAssetEdit",
+        "applyAssetEdit",
+        "captureProjectPreview",
         "runtime",
         "recent",
         "chooseProject",

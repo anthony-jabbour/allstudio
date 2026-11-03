@@ -125,7 +125,7 @@ describe("bounded default breakpoint audit", () => {
       auditDefaultBreakpoints({ ...input(), packageJson: "not-json" }).status,
     ).toBe("unsupported");
     const value = input();
-    value.styles.push(value.styles[0]!);
+    value.styles.push(...value.styles);
     expect(auditDefaultBreakpoints(value).status).toBe("unsupported");
   });
   it("never returns raw CSS or config to the renderer", () => {
