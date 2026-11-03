@@ -35,6 +35,18 @@ describe("desktop trust boundary", () => {
     expect(
       isTrustedRequest({ sender: editor, senderFrame: mainFrame }, editor, []),
     ).toBe(false);
+    mainFrame.url = "app://editor/index.html#/file/board-id";
+    expect(
+      isTrustedRequest({ sender: editor, senderFrame: mainFrame }, editor, []),
+    ).toBe(true);
+    mainFrame.url = "app://editor/index.html?query#/file/board-id";
+    expect(
+      isTrustedRequest({ sender: editor, senderFrame: mainFrame }, editor, []),
+    ).toBe(false);
+    mainFrame.url = "app://editor/other.html#/file/board-id";
+    expect(
+      isTrustedRequest({ sender: editor, senderFrame: mainFrame }, editor, []),
+    ).toBe(false);
     mainFrame.url = "app://editor/index.html";
   });
   it("confines app assets to the renderer directory", () => {

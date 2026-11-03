@@ -14,11 +14,12 @@ export function isTrustedRequest(
   editor: Editor,
   args: unknown[],
 ): boolean {
+  const frameUrl = event.senderFrame?.url ?? "";
   return (
     args.length === 0 &&
     event.sender === editor &&
     event.senderFrame === editor.mainFrame &&
-    event.senderFrame.url === EDITOR_URL
+    frameUrl.split("#", 1)[0] === EDITOR_URL
   );
 }
 
