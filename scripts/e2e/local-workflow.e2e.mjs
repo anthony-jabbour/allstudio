@@ -228,13 +228,18 @@ async function launch() {
     profile,
   );
   const page = await application.firstWindow();
-  await application.evaluate(({ BrowserWindow }) => {
+  // Xvfb needs a visible compositor frame for Electron's native thumbnail capture.
+  await application.evaluate(({ BrowserWindow }, hideWindows) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.setBackgroundThrottling(false);
-      window.on("show", () => window.hide());
-      window.hide();
+      if (hideWindows) {
+        window.on("show", () => window.hide());
+        window.hide();
+      } else {
+        window.show();
+      }
     }
-  });
+  }, process.env.CI !== "true");
   return page;
 }
 
