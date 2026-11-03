@@ -211,12 +211,6 @@ app
       )
         return current.workspace.getResponsiveCapabilities();
       if (
-        value.action === "capture-project-preview" &&
-        hasExactKeys(value, ["action", "projectId", "bounds"]) &&
-        isPreviewBounds(value.bounds)
-      )
-        return projects.captureThumbnail(current.info.id, value.bounds);
-      if (
         value.action === "list-assets" &&
         hasExactKeys(value, ["action", "projectId"])
       )

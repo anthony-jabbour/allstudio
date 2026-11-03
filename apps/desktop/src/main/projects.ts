@@ -27,6 +27,7 @@ import { applyIntegration, planIntegration } from "./config-integration.ts";
 import { durableJson } from "./durable-json.ts";
 import { hash, LocalWorkspace, textOf } from "./local-workspace.ts";
 import { FileFailure } from "./native-files.ts";
+import { pruneThumbnailCache } from "./thumbnail-cache.ts";
 
 interface SavedProject extends RecentProject {
   dev: string;
@@ -77,6 +78,7 @@ export class Projects {
   private preview: Preview | null = null;
   private tail: Promise<unknown> = Promise.resolve();
   private thumbnailTail: Promise<boolean> = Promise.resolve(false);
+  private thumbnailCacheDisabled = false;
   private disposed = false;
   constructor(
     private data: string,
@@ -120,14 +122,32 @@ export class Projects {
     }
   }
   async recent(): Promise<RecentProject[]> {
+    const projects = await this.saved();
+    await this.pruneThumbnails(projects);
     return Promise.all(
-      (await this.saved()).map(async ({ id, name, path }, index) => ({
+      projects.map(async ({ id, name, path }, index) => ({
         id,
         name,
         path,
         ...(index < 24 ? { thumbnail: await this.readThumbnail(id) } : {}),
       })),
     );
+  }
+  private async pruneThumbnails(projects: readonly SavedProject[]) {
+    this.thumbnailCacheDisabled = true;
+    try {
+      await this.thumbnailTail.catch(() => false);
+      // shortcut: the 100-project and 96 KiB image limits bound retained cache size; keep them aligned.
+      await pruneThumbnailCache(
+        this.data,
+        new Set(projects.map((project) => project.id)),
+      );
+      this.thumbnailCacheDisabled = false;
+    } catch {
+      this.notify(
+        "Project preview thumbnails are paused because the local cache could not be cleaned.",
+      );
+    }
   }
   private async readThumbnail(id: string): Promise<string | undefined> {
     if (!/^[a-f0-9]{64}$/.test(id)) return undefined;
@@ -168,6 +188,7 @@ export class Projects {
     bounds: PreviewBounds,
   ): Promise<boolean> {
     if (
+      this.thumbnailCacheDisabled ||
       !this.current ||
       this.current.info.id !== id ||
       !/^[a-f0-9]{64}$/.test(id)
@@ -400,12 +421,13 @@ export class Projects {
         if (this.current?.workspace === workspace) this.notify(message);
       });
       if (this.disposed) throw new Error("Desktop is closing.");
+      const nextProjects = [
+        entry,
+        ...saved.filter((item) => item.id !== id),
+      ].slice(0, 100);
       await durableJson(join(this.data, "projects.json"), {
         schema: 1,
-        projects: [entry, ...saved.filter((item) => item.id !== id)].slice(
-          0,
-          100,
-        ),
+        projects: nextProjects,
       });
       const basePreviewUrl = `http://127.0.0.1:${candidate.port}/`;
       const routeSnapshot = await workspace.discoverRoutes();
@@ -428,6 +450,7 @@ export class Projects {
       await this.closeCurrent();
       this.preview = candidate;
       this.current = { info, workspace, basePreviewUrl };
+      await this.pruneThumbnails(nextProjects);
       return { ok: true, project: info };
     } catch (error) {
       await this.stopPreview(candidate);

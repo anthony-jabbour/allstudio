@@ -10,6 +10,7 @@ import {
   type SourceElementInfo,
   sourceEditFailure,
 } from "../src/index.ts";
+import { listProjectAssets } from "../src/shell/editor-shell.tsx";
 import { LayoutInspector } from "../src/shell/layout-inspector.tsx";
 
 const unusedWorkspace: SourceEditWorkspace = {
@@ -21,6 +22,21 @@ const unusedWorkspace: SourceEditWorkspace = {
 };
 
 describe("EditorShell", () => {
+  it("reports an asset-list failure instead of treating it as an empty folder", async () => {
+    const result = await listProjectAssets({
+      ...unusedWorkspace,
+      listAssets: async () => {
+        throw new Error("Unsafe project asset directory");
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      assets: [],
+      error: "Project assets could not be listed. No source was changed.",
+    });
+  });
+
   it("states the slice scope and needs a workspace to edit", () => {
     expect(EDITOR_STATUS).toBe("text-and-class-edit-slice");
     const html = renderToStaticMarkup(createElement(EditorShell));

@@ -123,6 +123,20 @@ function unsupportedReasonBadge(reason: UnsupportedRouteReason): string {
 
 type Status = { kind: "info" | "success" | "error"; text: string } | null;
 
+const ASSET_LIST_ERROR =
+  "Project assets could not be listed. No source was changed.";
+
+export async function listProjectAssets(workspace: SourceEditWorkspace) {
+  if (!workspace.listAssets) return { ok: true as const, assets: [] };
+  try {
+    const assets = await workspace.listAssets();
+    if (!Array.isArray(assets)) throw new Error("Asset list unavailable");
+    return { ok: true as const, assets };
+  } catch {
+    return { ok: false as const, assets: [], error: ASSET_LIST_ERROR };
+  }
+}
+
 type EditKind = "text" | "className";
 
 interface PendingRefresh {
@@ -382,6 +396,7 @@ function SourceElementEditor({
   const [pending, setPending] = useState<PendingRefresh | null>(null);
   const [moveDraft, setMoveDraft] = useState<ReorderEditRequest | null>(null);
   const [assets, setAssets] = useState<ProjectAsset[]>([]);
+  const [assetError, setAssetError] = useState<string | null>(null);
   const [assetChoice, setAssetChoice] = useState("");
   const [assetDraft, setAssetDraft] = useState<AssetEditRequest | null>(null);
   const request = useRef(0);
@@ -413,14 +428,11 @@ function SourceElementEditor({
   }, [workspace, scope]);
   useEffect(() => {
     let active = true;
-    void workspace
-      .listAssets?.()
-      .then((items) => {
-        if (active && Array.isArray(items)) setAssets(items);
-      })
-      .catch(() => {
-        if (active) setAssets([]);
-      });
+    void listProjectAssets(workspace).then((result) => {
+      if (!active) return;
+      setAssets(result.assets);
+      setAssetError(result.ok ? null : result.error);
+    });
     return () => {
       active = false;
     };
@@ -1038,21 +1050,18 @@ function SourceElementEditor({
   };
 
   const refreshAssets = async () => {
-    if (!workspace.listAssets) return;
-    try {
-      const items = await workspace.listAssets();
-      if (!Array.isArray(items)) throw new Error("Asset list unavailable");
-      setAssets(items);
-      if (!items.some((asset) => asset.path === assetChoice))
-        setAssetChoice("");
-    } catch {
+    const result = await listProjectAssets(workspace);
+    if (!result.ok) {
       setAssets([]);
       setAssetChoice("");
-      setStatus({
-        kind: "error",
-        text: "Project assets could not be listed. No source was changed.",
-      });
+      setAssetError(result.error);
+      setStatus({ kind: "error", text: result.error });
+      return;
     }
+    setAssets(result.assets);
+    setAssetError(null);
+    if (!result.assets.some((asset) => asset.path === assetChoice))
+      setAssetChoice("");
   };
   const previewAsset = async () => {
     if (
@@ -1615,7 +1624,11 @@ function SourceElementEditor({
             >
               Refresh assets
             </button>
-            {assets.length ? (
+            {assetError ? (
+              <p className="field-note" role="alert">
+                {assetError}
+              </p>
+            ) : assets.length ? (
               <label className="text-field">
                 Project image
                 <select
