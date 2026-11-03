@@ -23,7 +23,13 @@ declare global {
   }
 }
 
-function WebsiteEditorApp({ onBackToStudio }: { onBackToStudio: () => void }) {
+function WebsiteEditorApp({
+  active,
+  onBackToStudio,
+}: {
+  active: boolean;
+  onBackToStudio: () => void;
+}) {
   const [desktopStatus, setDesktopStatus] = useState<
     "connecting" | "ready" | "error"
   >("connecting");
@@ -156,6 +162,7 @@ function WebsiteEditorApp({ onBackToStudio }: { onBackToStudio: () => void }) {
     <div className="desktop-app">
       <EditorShell
         disabled={busy}
+        themeActive={active}
         key={`${project?.id ?? "closed"}:${session}`}
         projectControls={
           project ? (
@@ -339,10 +346,16 @@ function App() {
   return (
     <div className="desktop-surfaces">
       <div className="desktop-surface" hidden={surface !== "studio"}>
-        <StudioApp onOpenWebsiteEditor={() => setSurface("websites")} />
+        <StudioApp
+          active={surface === "studio"}
+          onOpenWebsiteEditor={() => setSurface("websites")}
+        />
       </div>
       <div className="desktop-surface" hidden={surface !== "websites"}>
-        <WebsiteEditorApp onBackToStudio={() => setSurface("studio")} />
+        <WebsiteEditorApp
+          active={surface === "websites"}
+          onBackToStudio={() => setSurface("studio")}
+        />
       </div>
     </div>
   );

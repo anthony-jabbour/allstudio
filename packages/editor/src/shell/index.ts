@@ -52,6 +52,14 @@ export {
   EditorShell,
   hasUnsavedInspectorDraft,
 } from "./editor-shell.tsx";
+export type { StudioThemePreference } from "./theme.ts";
+export {
+  applyStudioTheme,
+  broadcastStudioTheme,
+  listenForStudioTheme,
+  readStudioTheme,
+  writeStudioTheme,
+} from "./theme.ts";
 export type {
   WorkspaceHomeNavigationItem,
   WorkspaceHomeProject,

@@ -10,12 +10,14 @@ import { WorkspaceDashboard } from "./workspace/workspace-dashboard.tsx";
 
 export function App({
   onOpenWebsiteEditor,
+  active = true,
 }: {
   onOpenWebsiteEditor?: () => void;
+  active?: boolean;
 } = {}) {
   const store = useMemo(() => new FileStore(browserStorage()), []);
   const route = useRoute();
-  const theme = useTheme();
+  const theme = useTheme(active);
   return (
     <FileStoreContext.Provider value={store}>
       <ToastProvider>

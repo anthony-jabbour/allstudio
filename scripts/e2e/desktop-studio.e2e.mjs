@@ -42,6 +42,9 @@ try {
   await expect(
     page.getByRole("button", { name: "Website projects", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Account and appearance" }).click();
+  await page.getByRole("menuitem", { name: "Dark theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await shot("home-paper");
   pass("Electron starts in the shared Paper-style Studio Home");
 
@@ -90,6 +93,11 @@ try {
   await expect(
     page.getByRole("button", { name: "Open project", exact: true }),
   ).toBeVisible();
+  await expect(page.getByLabel("Appearance", { exact: true })).toHaveValue(
+    "dark",
+  );
+  await page.getByLabel("Appearance", { exact: true }).selectOption("light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await shot("website-projects");
   pass(
     "the shared Electron shell enters the existing source-backed website editor",
@@ -97,6 +105,7 @@ try {
 
   await page.getByRole("button", { name: "Back to Studio" }).click();
   await expect(canvas).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(headline).toHaveCSS("font-size", "72px");
   assert.deepEqual(errors, [], `renderer errors: ${errors.join("\n")}`);
   pass("switching back preserves the board editor state without remounting it");
