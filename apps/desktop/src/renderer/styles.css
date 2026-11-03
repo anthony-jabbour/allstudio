@@ -36,13 +36,10 @@
   line-height: 1.5;
 }
 .desktop-status {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 5px 12px;
+  padding: 4px 12px;
   color: var(--studio-muted);
   font-size: 10px;
+  text-align: right;
 }
 @media (max-width: 760px) {
   .project-toolbar label {

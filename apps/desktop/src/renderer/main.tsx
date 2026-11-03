@@ -10,7 +10,6 @@ import type {
   OpenProject,
   ProjectResult,
   RecentProject,
-  RuntimeInfo,
 } from "../shared/desktop-api.ts";
 import "@allstudio/editor/studio.css";
 import "./styles.css";
@@ -22,8 +21,9 @@ declare global {
 }
 
 function App() {
-  const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
-  const [error, setError] = useState(false);
+  const [desktopStatus, setDesktopStatus] = useState<
+    "connecting" | "ready" | "error"
+  >("connecting");
   const [project, setProject] = useState<OpenProject | null>(null);
   const [recent, setRecent] = useState<RecentProject[]>([]);
   const [search, setSearch] = useState("");
@@ -58,8 +58,8 @@ function App() {
   useEffect(() => {
     window.allstudio
       .runtime()
-      .then(setRuntime)
-      .catch(() => setError(true));
+      .then(() => setDesktopStatus("ready"))
+      .catch(() => setDesktopStatus("error"));
     window.allstudio
       .recent()
       .then((items) => {
@@ -314,18 +314,13 @@ function App() {
         activeRoute={project?.activeRoute}
         workspace={workspace}
       />
-      <footer className="desktop-status">
-        <output>
-          {error
+      {desktopStatus !== "ready" ? (
+        <output className="desktop-status">
+          {desktopStatus === "error"
             ? "Desktop connection failed."
-            : runtime
-              ? `Electron ${runtime.electron} · ${runtime.packaged ? "Packaged" : "Development"} · Local editor`
-              : "Connecting to desktop…"}
+            : "Connecting to desktop…"}
         </output>
-        <span>
-          Manual editing is local. BYOK model requests require internet.
-        </span>
-      </footer>
+      ) : null}
     </div>
   );
 }
