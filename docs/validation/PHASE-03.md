@@ -683,13 +683,13 @@ Phase 3 remains **IN PROGRESS**; no merge or phase PASS is recorded.
 
 ## PR #30 final Electron verification — 2026-11-03
 
-Draft PR #30 is at `b7b5542e3e8b51ee45ff1b79beaa3ac5ec33ddc1` on `feat/desktop-pr27-chat`, based on PR #29 `feat/desktop-pr25-26`. This final verification supersedes the earlier “CI pending” checkpoints above.
+Draft PR #30 is currently at docs-only head `34f5f1679aa2398a9f91b2e7ccfb5a3d83219914` on `feat/desktop-pr27-chat`, based on PR #29 `feat/desktop-pr25-26`. The latest product-code commit is `b7b5542e3e8b51ee45ff1b79beaa3ac5ec33ddc1`; no product code changed in the docs follow-up. These final checks supersede the earlier “CI pending” checkpoints above.
 
-- Quality run [41714295952](https://github.com/anthony-jabbour/allstudio/actions/runs/41714295952) passed.
-- Electron run [41714295949](https://github.com/anthony-jabbour/allstudio/actions/runs/41714295949) passed in GitHub Xvfb. It built and packaged Electron; passed 6 shell/security checks; passed all 10 Studio checks in both development and packaged builds; and passed all 39 local-workflow source-edit/recovery/security checks in both builds.
+- Final-head quality run [41715410156](https://github.com/anthony-jabbour/allstudio/actions/runs/41715410156) passed.
+- Final-head Electron run [41715410107](https://github.com/anthony-jabbour/allstudio/actions/runs/41715410107) passed in GitHub Xvfb. It built and packaged Electron; passed 6 shell/security checks; passed all 10 Studio checks in both development and packaged builds; and passed all 39 local-workflow source-edit/recovery/security checks in both builds.
 - The 10 Studio checks verify the shared Paper-style Home, a real board inspector edit, save/reload, Website projects switching, shared state retention, Chat generation/refinement, the local free/Pro gate, prompt retention after quota rejection, transcript and board restart persistence, no off-origin requests, damaged scratchpad preservation, and corrupt-index preservation with original board bytes unchanged.
 - Uploaded `desktop-evidence` artifact contains Studio screenshots for review. The native workflow evidence and existing [PR #29 integration evidence](evidence/phase-03-electron-pr25-26/README.md) remain available.
-- Fresh independent read-only review on exact head `b7b5542` found no Critical or Important issues. Review did not run tests; GitHub CI supplies the development/packaged runtime evidence.
+- Fresh independent read-only review on exact product-code head `b7b5542` found no Critical or Important issues; only the manual corrupt-index restoration limit below remains. Review did not run tests; GitHub CI supplies the development/packaged runtime evidence.
 
 Local verification on the same source head passed `bun run test` (51 files / 975 tests), all eight workspace typechecks, `bun run lint` (four existing `!important` CSS warnings), `bun run build`, `bun run build:desktop`, `bun run validate:public-boundary` (634 files), and `node --check scripts/e2e/desktop-studio.e2e.mjs`. Headless Chromium separately verified the error rows and unchanged browser-storage bytes. No Electron window was opened locally.
 
