@@ -170,7 +170,7 @@ try {
   );
   await chatBox.press("Enter");
   await expect(page).toHaveURL(/#\/chat\/c_/);
-  await expect(page.locator(".ch-preview-card")).toBeVisible({
+  await expect(page.locator(".ch-preview-card").last()).toBeVisible({
     timeout: 15_000,
   });
   await expect(page.locator(".ch-panel")).toContainText("Lumen — Landing page");
@@ -191,7 +191,7 @@ try {
   await expect(page.locator(".ch-msg.user").first()).toContainText(
     "I want to create a homepage",
   );
-  await expect(page.locator(".ch-preview-card")).toBeVisible();
+  await expect(page.locator(".ch-preview-card").last()).toBeVisible();
   await page
     .locator(".ch-topbar")
     .getByRole("button", { name: /Open in Studio/ })
@@ -216,7 +216,7 @@ try {
   await expect(page.locator(".ch-msg.user").first()).toContainText(
     "I want to create a homepage",
   );
-  await expect(page.locator(".ch-preview-card")).toBeVisible();
+  await expect(page.locator(".ch-preview-card").last()).toBeVisible();
   await page
     .locator(".ch-topbar")
     .getByRole("button", { name: /Open in Studio/ })
