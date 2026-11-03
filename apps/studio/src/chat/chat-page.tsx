@@ -599,27 +599,31 @@ export function ChatPage({
   const send = async (text: string) => {
     if (running || !pro) return;
     const prompt = text.slice(0, CHAT_LIMITS.promptLength);
-    let current = conversation ?? chats.create(titleFromPrompt(prompt));
-    if (!conversation) navigate({ name: "chat", id: current.id });
-    if (current.messages.length === 0) {
-      current = { ...current, title: titleFromPrompt(prompt) };
-    }
-    const userMessage: ChatMessage = {
-      id: createChatId("m"),
-      role: "user",
-      createdAt: new Date().toISOString(),
-      parts: [{ kind: "text", text: prompt }],
-      status: "done",
-    };
-    current = chats.save({
-      ...current,
-      updatedAt: userMessage.createdAt,
-      messages: [...current.messages, userMessage],
-    });
-    const id = current.id;
     const controller = new AbortController();
     setRunning(controller);
     try {
+      const createdAt = new Date();
+      const at = createdAt.toISOString();
+      const userMessage: ChatMessage = {
+        id: createChatId("m"),
+        role: "user",
+        createdAt: at,
+        parts: [{ kind: "text", text: prompt }],
+        status: "done",
+      };
+      const current = conversation
+        ? chats.save({
+            ...conversation,
+            title:
+              conversation.messages.length === 0
+                ? titleFromPrompt(prompt)
+                : conversation.title,
+            updatedAt: at,
+            messages: [...conversation.messages, userMessage],
+          })
+        : chats.create(titleFromPrompt(prompt), createdAt, [userMessage]);
+      if (!conversation) navigate({ name: "chat", id: current.id });
+      const id = current.id;
       await agent.run({
         prompt,
         conversation: current,
@@ -627,14 +631,14 @@ export function ChatPage({
         emit: (event) => {
           const latest = chats.get(id);
           if (!latest) return;
-          const at = new Date().toISOString();
+          const eventAt = new Date().toISOString();
           if (event.type === "message") {
             const exists = latest.messages.some(
               (message) => message.id === event.message.id,
             );
             chats.save({
               ...latest,
-              updatedAt: at,
+              updatedAt: eventAt,
               messages: exists
                 ? latest.messages.map((message) =>
                     message.id === event.message.id ? event.message : message,
@@ -644,11 +648,11 @@ export function ChatPage({
           } else if (event.type === "activity") {
             chats.save({
               ...latest,
-              updatedAt: at,
+              updatedAt: eventAt,
               activity: [event.item, ...latest.activity].slice(0, 50),
             });
           } else {
-            chats.save({ ...latest, updatedAt: at, fileId: event.fileId });
+            chats.save({ ...latest, updatedAt: eventAt, fileId: event.fileId });
           }
         },
       });
@@ -837,9 +841,18 @@ export function ChatPage({
                         `Delete “${conversation.title}”? The board it made is kept.`,
                       )
                     ) {
-                      running?.abort();
-                      chats.remove(conversation.id);
-                      navigate({ name: "chat" });
+                      try {
+                        chats.remove(conversation.id);
+                        running?.abort();
+                        navigate({ name: "chat" });
+                      } catch (error) {
+                        toast(
+                          error instanceof Error
+                            ? error.message
+                            : "Chat failed.",
+                          "error",
+                        );
+                      }
                     }
                   },
                 },
@@ -964,8 +977,15 @@ export function ChatPage({
           confirm="Rename"
           onCancel={() => setRenaming(null)}
           onSubmit={(value) => {
-            chats.rename(renaming.id, value);
-            setRenaming(null);
+            try {
+              chats.rename(renaming.id, value);
+              setRenaming(null);
+            } catch (error) {
+              toast(
+                error instanceof Error ? error.message : "Chat failed.",
+                "error",
+              );
+            }
           }}
         />
       ) : null}

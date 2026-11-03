@@ -59,9 +59,12 @@ export const CHAT_LIMITS = {
   messagesPerConversation: 400,
   promptLength: 4000,
   titleLength: 80,
+  storageBytes: 1_000_000,
 } as const;
 
 const KEY = "allstudio.chats.v1";
+const CHAT_STORAGE_ERROR =
+  "Chat storage is full or unavailable. Delete older chats or boards, then try again.";
 
 export function createChatId(prefix = "c"): string {
   const random =
@@ -216,9 +219,12 @@ export function parseConversations(text: string | null): Conversation[] {
 export class ChatStore {
   private cache: Conversation[];
   private listeners = new Set<() => void>();
+  private persistedBytes: number;
 
   constructor(private readonly storage: StorageLike) {
-    this.cache = parseConversations(storage.getItem(KEY));
+    const raw = storage.getItem(KEY);
+    this.cache = parseConversations(raw);
+    this.persistedBytes = new TextEncoder().encode(raw ?? "").byteLength;
   }
 
   subscribe(listener: () => void): () => void {
@@ -235,14 +241,18 @@ export class ChatStore {
     return this.cache.find((conversation) => conversation.id === id);
   }
 
-  create(title = "New chat", now = new Date()): Conversation {
+  create(
+    title = "New chat",
+    now = new Date(),
+    initialMessages: ChatMessage[] = [],
+  ): Conversation {
     const at = now.toISOString();
     const conversation: Conversation = {
       id: createChatId(),
       title: title.slice(0, CHAT_LIMITS.titleLength),
       createdAt: at,
       updatedAt: at,
-      messages: [],
+      messages: initialMessages.slice(-CHAT_LIMITS.messagesPerConversation),
       activity: [],
     };
     this.write([conversation, ...this.cache]);
@@ -277,8 +287,18 @@ export class ChatStore {
 
   private write(conversations: Conversation[]) {
     const bounded = conversations.slice(0, CHAT_LIMITS.conversations);
-    this.storage.setItem(KEY, JSON.stringify(bounded));
+    const serialized = JSON.stringify(bounded);
+    const bytes = new TextEncoder().encode(serialized).byteLength;
+    if (bytes > CHAT_LIMITS.storageBytes && bytes > this.persistedBytes) {
+      throw new Error(CHAT_STORAGE_ERROR);
+    }
+    try {
+      this.storage.setItem(KEY, serialized);
+    } catch {
+      throw new Error(CHAT_STORAGE_ERROR);
+    }
     this.cache = bounded;
+    this.persistedBytes = bytes;
     for (const listener of this.listeners) listener();
   }
 }

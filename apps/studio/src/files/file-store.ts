@@ -114,6 +114,29 @@ export class FileStore {
     this.emit();
   }
 
+  private writeNewDocument(
+    document: BoardDocumentV1,
+    file: StudioFile,
+    files: StudioFile[],
+  ) {
+    const key = DOC_PREFIX + document.id;
+    const next = [...files, file];
+    this.write(key, JSON.stringify(document));
+    try {
+      this.write(INDEX_KEY, JSON.stringify(next));
+    } catch (error) {
+      try {
+        this.storage.removeItem(key);
+      } catch {
+        throw new FileStoreError(
+          "The file list could not be saved and the new board could not be rolled back. Restart AllStudio before retrying.",
+        );
+      }
+      throw error;
+    }
+    this.cache = next;
+  }
+
   /** All files, most recently edited first. Ensures the scratchpad exists. */
   list(): StudioFile[] {
     this.ensureScratchpad();
@@ -147,9 +170,8 @@ export class FileStore {
     const stamp = new Date(0).toISOString();
     const doc = createBoardDocument("Scratchpad", undefined, stamp);
     doc.id = SCRATCHPAD_ID;
-    this.write(DOC_PREFIX + SCRATCHPAD_ID, JSON.stringify(doc));
-    this.cache = [
-      ...files,
+    this.writeNewDocument(
+      doc,
       {
         id: SCRATCHPAD_ID,
         name: "Scratchpad",
@@ -158,8 +180,8 @@ export class FileStore {
         archived: false,
         permanent: true,
       },
-    ];
-    this.write(INDEX_KEY, JSON.stringify(this.cache));
+      files,
+    );
   }
 
   create(document: BoardDocumentV1): StudioFile {
@@ -176,8 +198,8 @@ export class FileStore {
       updatedAt: stamp,
       archived: false,
     };
-    this.write(DOC_PREFIX + doc.id, JSON.stringify(doc));
-    this.writeIndex([...files, file]);
+    this.writeNewDocument(doc, file, files);
+    this.emit();
     return file;
   }
 
@@ -295,10 +317,9 @@ export function memoryStorage(): StorageLike {
 
 export function browserStorage(): StorageLike {
   try {
-    const probe = "allstudio.probe";
-    window.localStorage.setItem(probe, "1");
-    window.localStorage.removeItem(probe);
-    return window.localStorage;
+    const storage = window.localStorage;
+    storage.getItem("allstudio.probe");
+    return storage;
   } catch {
     return memoryStorage();
   }

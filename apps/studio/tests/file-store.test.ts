@@ -134,6 +134,29 @@ describe("FileStore", () => {
     expect(removed).toEqual([documentKey]);
     expect(backing.getItem(documentKey ?? "")).toBeNull();
   });
+
+  it("rolls back the scratchpad document when its index write fails", () => {
+    const backing = memoryStorage();
+    const writes: string[] = [];
+    const removed: string[] = [];
+    const storage = {
+      getItem: (key: string) => backing.getItem(key),
+      setItem: (key: string, value: string) => {
+        writes.push(key);
+        if (key === "allstudio.files.v1") throw new Error("QuotaExceededError");
+        backing.setItem(key, value);
+      },
+      removeItem: (key: string) => {
+        removed.push(key);
+        backing.removeItem(key);
+      },
+    };
+
+    expect(() => new FileStore(storage).list()).toThrow(/storage is full/);
+    expect(writes).toHaveLength(2);
+    expect(removed).toEqual([writes[0]]);
+    expect(backing.getItem(writes[0] ?? "")).toBeNull();
+  });
 });
 
 describe("templates", () => {
