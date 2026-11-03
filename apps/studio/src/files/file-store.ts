@@ -139,10 +139,9 @@ export class FileStore {
 
   /** All files, most recently edited first. Ensures the scratchpad exists. */
   list(): StudioFile[] {
-    this.ensureScratchpad();
-    return [...this.readIndex()].sort((a, b) =>
-      b.updatedAt.localeCompare(a.updatedAt),
-    );
+    const recovery = this.ensureScratchpad();
+    const files = [...this.readIndex(), ...(recovery ? [recovery] : [])];
+    return files.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   get(id: string): StudioFile | undefined {
@@ -153,8 +152,9 @@ export class FileStore {
   read(id: string): BoardDocumentV1 {
     const raw = this.storage.getItem(DOC_PREFIX + id);
     if (raw === null) throw new FileStoreError("This file no longer exists.");
+    let document: BoardDocumentV1;
     try {
-      return parseBoardDocument(JSON.parse(raw));
+      document = parseBoardDocument(JSON.parse(raw));
     } catch (error) {
       throw new FileStoreError(
         error instanceof BoardDocumentError
@@ -162,11 +162,26 @@ export class FileStore {
           : "This file is damaged and was not opened.",
       );
     }
+    if (document.id !== id) {
+      throw new FileStoreError(
+        "This file is damaged and was not opened because its ID does not match its storage key.",
+      );
+    }
+    return document;
   }
 
-  private ensureScratchpad() {
+  private ensureScratchpad(): StudioFile | undefined {
     const files = this.readIndex();
     if (files.some((file) => file.id === SCRATCHPAD_ID)) return;
+    const stamp = new Date(0).toISOString();
+    const damaged: StudioFile = {
+      id: SCRATCHPAD_ID,
+      name: "Scratchpad (damaged)",
+      createdAt: stamp,
+      updatedAt: stamp,
+      archived: false,
+      permanent: true,
+    };
     const key = DOC_PREFIX + SCRATCHPAD_ID;
     const raw = this.storage.getItem(key);
     if (raw !== null) {
@@ -174,43 +189,50 @@ export class FileStore {
       try {
         document = parseBoardDocument(JSON.parse(raw));
       } catch {
-        throw new FileStoreError(
-          "The scratchpad is damaged and its contents were preserved.",
-        );
+        return damaged;
       }
-      if (document.id !== SCRATCHPAD_ID) {
-        throw new FileStoreError(
-          "The scratchpad is damaged and its contents were preserved.",
-        );
-      }
+      if (document.id !== SCRATCHPAD_ID) return damaged;
       const file: StudioFile = {
-        id: SCRATCHPAD_ID,
+        ...damaged,
         name: document.name,
         createdAt: document.createdAt,
         updatedAt: document.updatedAt,
-        archived: false,
-        permanent: true,
       };
       const next = [...files, file];
-      this.write(INDEX_KEY, JSON.stringify(next));
-      this.cache = next;
+      try {
+        this.write(INDEX_KEY, JSON.stringify(next));
+        this.cache = next;
+      } catch {
+        return { ...file, name: `${file.name} (not indexed)` };
+      }
       return;
     }
-    const stamp = new Date(0).toISOString();
     const doc = createBoardDocument("Scratchpad", undefined, stamp);
     doc.id = SCRATCHPAD_ID;
-    this.writeNewDocument(
-      doc,
-      {
-        id: SCRATCHPAD_ID,
-        name: "Scratchpad",
-        createdAt: stamp,
-        updatedAt: stamp,
-        archived: false,
-        permanent: true,
-      },
-      files,
-    );
+    const file: StudioFile = {
+      id: SCRATCHPAD_ID,
+      name: "Scratchpad (not saved)",
+      createdAt: stamp,
+      updatedAt: stamp,
+      archived: false,
+      permanent: true,
+    };
+    try {
+      this.writeNewDocument(
+        doc,
+        {
+          id: SCRATCHPAD_ID,
+          name: "Scratchpad",
+          createdAt: stamp,
+          updatedAt: stamp,
+          archived: false,
+          permanent: true,
+        },
+        files,
+      );
+    } catch {
+      return file;
+    }
   }
 
   create(document: BoardDocumentV1): StudioFile {

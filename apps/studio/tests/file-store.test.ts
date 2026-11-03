@@ -83,7 +83,9 @@ describe("FileStore", () => {
       },
       removeItem: () => {},
     });
-    expect(() => s.list()).toThrow(/storage is full/);
+    expect(s.list().find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Scratchpad (not saved)",
+    );
   });
 
   it("keeps readable persistent storage when writes are quota-blocked", () => {
@@ -152,7 +154,10 @@ describe("FileStore", () => {
       },
     };
 
-    expect(() => new FileStore(storage).list()).toThrow(/storage is full/);
+    expect(
+      new FileStore(storage).list().find((file) => file.id === SCRATCHPAD_ID)
+        ?.name,
+    ).toBe("Scratchpad (not saved)");
     expect(writes).toHaveLength(2);
     expect(removed).toEqual([writes[0]]);
     expect(backing.getItem(writes[0] ?? "")).toBeNull();
@@ -175,7 +180,7 @@ describe("FileStore", () => {
     expect(storage.getItem(key)).toBe(original);
   });
 
-  it("preserves an existing scratchpad when its missing index cannot be restored", () => {
+  it("lists an existing scratchpad as not indexed when recovery is blocked", () => {
     const backing = memoryStorage();
     const document = createFromTemplate("blank");
     document.id = SCRATCHPAD_ID;
@@ -192,28 +197,40 @@ describe("FileStore", () => {
       removeItem: (name: string) => backing.removeItem(name),
     };
 
-    expect(() => new FileStore(storage).list()).toThrow(/storage is full/);
+    const files = new FileStore(storage).list();
+
+    expect(files.find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Untitled (not indexed)",
+    );
     expect(backing.getItem(key)).toBe(original);
   });
 
-  it("refuses an invalid unindexed scratchpad without removing its contents", () => {
+  it("shows a damaged scratchpad and preserves its contents", () => {
     const storage = memoryStorage();
     const key = `allstudio.board.${SCRATCHPAD_ID}`;
     const original = "not a board document";
     storage.setItem(key, original);
+    const files = new FileStore(storage);
 
-    expect(() => new FileStore(storage).list()).toThrow(/scratchpad.*damaged/i);
+    expect(files.list().find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Scratchpad (damaged)",
+    );
+    expect(() => files.read(SCRATCHPAD_ID)).toThrow(/damaged/i);
     expect(storage.getItem(key)).toBe(original);
   });
 
-  it("refuses a mismatched unindexed scratchpad without removing its contents", () => {
+  it("shows a mismatched scratchpad as damaged and preserves its contents", () => {
     const storage = memoryStorage();
     const document = createFromTemplate("blank");
     const key = `allstudio.board.${SCRATCHPAD_ID}`;
     const original = JSON.stringify(document);
     storage.setItem(key, original);
+    const files = new FileStore(storage);
 
-    expect(() => new FileStore(storage).list()).toThrow(/scratchpad.*damaged/i);
+    expect(files.list().find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Scratchpad (damaged)",
+    );
+    expect(() => files.read(SCRATCHPAD_ID)).toThrow(/damaged/i);
     expect(storage.getItem(key)).toBe(original);
   });
 });

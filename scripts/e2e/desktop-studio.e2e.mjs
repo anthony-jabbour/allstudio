@@ -250,6 +250,37 @@ try {
   pass(
     "Chat transcript and board survive Electron restart with no external requests",
   );
+
+  await page.evaluate(() => {
+    const index = JSON.parse(
+      localStorage.getItem("allstudio.files.v1") ?? "[]",
+    );
+    localStorage.setItem(
+      "allstudio.files.v1",
+      JSON.stringify(index.filter((file) => file.id !== "scratchpad")),
+    );
+    localStorage.setItem("allstudio.board.scratchpad", "not a board document");
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "App menu" }).click();
+  await page.getByRole("menuitem", { name: "Studio home" }).click();
+  const damagedScratchpad = page.getByRole("link", {
+    name: "Scratchpad (damaged)",
+    exact: true,
+  });
+  await expect(damagedScratchpad).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Website projects", exact: true }),
+  ).toBeVisible();
+  await damagedScratchpad.click();
+  await expect(
+    page.getByRole("heading", { name: "This file can’t be opened" }),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(/damaged/i);
+  assert.deepEqual(errors, [], `renderer errors: ${errors.join("\n")}`);
+  pass(
+    "damaged scratchpad data remains preserved and opens a recovery message",
+  );
 } finally {
   await application?.close().catch((error) => {
     console.error(`Could not close Electron: ${error.message}`);
