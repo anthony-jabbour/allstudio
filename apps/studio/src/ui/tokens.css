@@ -1,0 +1,87 @@
+/* Original allstudio chrome tokens (approximate, not exported competitor values). */
+:root {
+  --font-ui:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  color-scheme: light;
+  --bg: #f7f7f5;
+  --sidebar: #fbfbfa;
+  --surface: #ffffff;
+  --surface-2: #f2f2f0;
+  --surface-3: #e9e9e6;
+  --border: #e4e4e0;
+  --border-strong: #d2d2cd;
+  --text: #1b1b1b;
+  --text-2: #5d5d5a;
+  --text-3: #8c8c88;
+  --hover: rgba(0, 0, 0, 0.045);
+  --active: rgba(0, 0, 0, 0.075);
+  --accent: #2f6bff;
+  --accent-soft: rgba(47, 107, 255, 0.12);
+  --primary-bg: #161616;
+  --primary-fg: #ffffff;
+  --danger: #c4321f;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --thumb: #e8e8e5;
+  --canvas: #ececea;
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1d1d1d;
+  --sidebar: #212121;
+  --surface: #232323;
+  --surface-2: #2a2a2a;
+  --surface-3: #333333;
+  --border: #2f2f2f;
+  --border-strong: #3c3c3c;
+  --text: #ececec;
+  --text-2: #a9a9a9;
+  --text-3: #7d7d7d;
+  --hover: rgba(255, 255, 255, 0.05);
+  --active: rgba(255, 255, 255, 0.085);
+  --accent: #5b8cff;
+  --accent-soft: rgba(91, 140, 255, 0.18);
+  --primary-bg: #f4f4f4;
+  --primary-fg: #141414;
+  --danger: #ff8f80;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --thumb: #2b2b2b;
+  --canvas: #161616;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #1d1d1d;
+    --sidebar: #212121;
+    --surface: #232323;
+    --surface-2: #2a2a2a;
+    --surface-3: #333333;
+    --border: #2f2f2f;
+    --border-strong: #3c3c3c;
+    --text: #ececec;
+    --text-2: #a9a9a9;
+    --text-3: #7d7d7d;
+    --hover: rgba(255, 255, 255, 0.05);
+    --active: rgba(255, 255, 255, 0.085);
+    --accent: #5b8cff;
+    --accent-soft: rgba(91, 140, 255, 0.18);
+    --primary-bg: #f4f4f4;
+    --primary-fg: #141414;
+    --danger: #ff8f80;
+    --shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+    --thumb: #2b2b2b;
+    --canvas: #161616;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
