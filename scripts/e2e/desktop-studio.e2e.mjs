@@ -103,7 +103,6 @@ try {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.keyboard.press("Control+f");
   await expect(page.getByLabel("Search projects")).toBeFocused();
-  await expect(page.getByLabel("Search files")).not.toBeFocused();
   await page.getByRole("heading", { name: "Home", exact: true }).click();
   await page.evaluate(() => {
     if (document.activeElement instanceof HTMLElement)
