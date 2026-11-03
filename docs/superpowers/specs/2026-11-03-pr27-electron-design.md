@@ -1,0 +1,31 @@
+# PR #27 Chat surface in Electron
+
+## Goal
+
+Expose the PR #27 chat workspace in the Electron desktop app using the same `apps/studio` React implementation as the web build. Keep the experience local-first and preserve the existing Phase 3 website editor and Phase 4 board editor.
+
+## Approaches
+
+1. **Reuse PR #27's shared route and components — selected.** Merge the existing `ChatPage`, `ChatStore`, `LocalStudioAgent`, and `#/chat` route into the shared Studio app that Electron already hosts. This keeps web and desktop on one UI and one board model.
+2. **Build a separate Electron chat screen.** Rejected because it duplicates the UI and would diverge from the web source the founder asked us to reuse.
+3. **Leave chat inaccessible on desktop.** Rejected because it does not satisfy the active goal's PR #25–27 shared-UI requirement.
+
+## Boundaries
+
+- Preserve PR #27 behavior: local deterministic board generation, local conversation storage, the current free gate, and the locally labeled Pro preview.
+- Do not add model/provider calls, cloud behavior, billing, filesystem access, or Electron IPC for chat. Chat stays in renderer `localStorage`; board documents use the existing `FileStore` and schema validation.
+- Keep Electron's shared Studio app and website editor as separate surfaces. Hidden surfaces must not capture active keyboard input.
+- Keep DiceBear/Open Peeps usage and attribution as declared by PR #27. `dicebear/dicebear` was observed at 10,004 GitHub stars on 2026-11-03, MIT, with the PR pinning 9.4.2; the PR `NOTICE` records Open Peeps artwork as CC0 1.0.
+
+## Acceptance
+
+- Electron can reach `#/chat` through the shared Studio navigation.
+- A local prompt creates a schema-valid board, shows the real board preview, and opens that document in Studio.
+- Chat history and generated board persist through renderer reload and app restart.
+- Browser and packaged Electron workflows produce no model/provider or external-network request.
+- No new native capability is exposed to the renderer or preview.
+- The desktop workflow is run only in GitHub Xvfb; no local Electron window is opened.
+
+## Implementation
+
+Add an Electron behavior test first, then merge the PR #27 shared implementation, reconcile it with the PR #26 board/editor props, and run browser/unit plus GitHub development and packaged desktop checks. Document any necessary host-specific adaptation separately from shared chat behavior.

@@ -13,15 +13,17 @@ await mkdir(evidence, { recursive: true });
 const userData = await mkdtemp(join(tmpdir(), "allstudio-studio-"));
 let application;
 let checks = 0;
+let page;
+const errors = [];
+const externalRequests = [];
+let observeExternalRequests = false;
 const pass = (message) => {
   checks++;
   console.log(`PASS ${message}`);
 };
 const shot = (name) => page.screenshot({ path: join(evidence, `${name}.png`) });
-
-let page;
-try {
-  application = await _electron.launch({
+const launch = () =>
+  _electron.launch({
     ...(executablePath ? { executablePath } : {}),
     args: [
       ...(executablePath ? [] : [desktop]),
@@ -31,12 +33,23 @@ try {
     env: { ...process.env, ELECTRON_ENABLE_LOGGING: "1" },
     timeout: 30_000,
   });
-  page = await application.firstWindow();
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
+const observePage = (target) => {
+  target.on("pageerror", (error) => errors.push(error.message));
+  target.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
   });
+  target.on("request", (request) => {
+    if (!observeExternalRequests) return;
+    const url = new URL(request.url());
+    if (url.protocol === "http:" || url.protocol === "https:")
+      externalRequests.push(url.href);
+  });
+};
+
+try {
+  application = await launch();
+  page = await application.firstWindow();
+  observePage(page);
 
   await expect(page.getByRole("heading", { name: "Recents" })).toBeVisible();
   await expect(
@@ -132,6 +145,93 @@ try {
   await expect(x).toHaveValue(savedX);
   assert.deepEqual(errors, [], `renderer errors: ${errors.join("\n")}`);
   pass("switching back preserves the board editor state without remounting it");
+
+  await page.getByRole("button", { name: "App menu" }).click();
+  await page.getByRole("menuitem", { name: "Studio home" }).click();
+  await expect(
+    page.getByRole("link", { name: "Chat", exact: true }),
+  ).toBeVisible();
+  observeExternalRequests = true;
+  await page.getByRole("link", { name: "Chat", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Chat is part of allstudio Pro" }),
+  ).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /Message Alli/ })).toHaveCount(
+    0,
+  );
+  await expect(page.locator(".chat-app")).toHaveCSS("display", "grid");
+  await page.getByRole("button", { name: "Preview Pro locally" }).click();
+  await expect(
+    page.getByRole("textbox", { name: /Message Alli/ }),
+  ).toBeVisible();
+  const chatBox = page.getByRole("textbox", { name: /Message Alli/ });
+  await chatBox.fill(
+    "I want to create a homepage for a creative studio called “Lumen”. It should feel modern, bold, and minimal. Include a hero, some work sections, and a simple navigation.",
+  );
+  await chatBox.press("Enter");
+  await expect(page).toHaveURL(/#\/chat\/c_/);
+  await expect(page.locator(".ch-preview-card")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.locator(".ch-panel")).toContainText("Lumen — Landing page");
+  await page.getByRole("button", { name: "Refine" }).click();
+  await expect(page.locator(".ch-msg.agent").last()).toContainText(
+    "dark palette",
+    { timeout: 10_000 },
+  );
+  await page.getByRole("button", { name: "Add section" }).click();
+  await expect(page.locator(".ch-msg.agent").last()).toContainText(
+    "Selected work",
+    { timeout: 10_000 },
+  );
+  await shot("chat-generated");
+  pass("Electron hosts the shared local Chat UI and generates a real board");
+
+  await page.reload();
+  await expect(page.locator(".ch-msg.user")).toContainText(
+    "I want to create a homepage",
+  );
+  await expect(page.locator(".ch-preview-card")).toBeVisible();
+  await page
+    .locator(".ch-topbar")
+    .getByRole("button", { name: /Open in Studio/ })
+    .click();
+  await expect(page).toHaveURL(/#\/file\//);
+  await expect(page.locator(".bx-editor")).toBeVisible();
+  await expect(page.getByText("Selected work").first()).toBeVisible();
+  pass(
+    "chat board opens in the shared Studio editor and survives renderer reload",
+  );
+
+  await application.close();
+  application = await launch();
+  page = await application.firstWindow();
+  observePage(page);
+  await expect(page.getByRole("heading", { name: "Recents" })).toBeVisible();
+  await page.getByRole("link", { name: "Studio home" }).click();
+  await page.getByRole("link", { name: "Chat", exact: true }).click();
+  const recentChat = page.locator(".ch-recents").getByRole("link").first();
+  await expect(recentChat).toContainText("I want to create a homepage");
+  await recentChat.click();
+  await expect(page.locator(".ch-msg.user")).toContainText(
+    "I want to create a homepage",
+  );
+  await expect(page.locator(".ch-preview-card")).toBeVisible();
+  await page
+    .locator(".ch-topbar")
+    .getByRole("button", { name: /Open in Studio/ })
+    .click();
+  await expect(page.locator(".bx-editor")).toBeVisible();
+  await expect(page.getByText("Selected work").first()).toBeVisible();
+  assert.deepEqual(
+    externalRequests,
+    [],
+    `off-origin requests: ${externalRequests.join("\n")}`,
+  );
+  assert.deepEqual(errors, [], `renderer errors: ${errors.join("\n")}`);
+  pass(
+    "Chat transcript and board survive Electron restart with no external requests",
+  );
 } finally {
   await application?.close().catch((error) => {
     console.error(`Could not close Electron: ${error.message}`);
