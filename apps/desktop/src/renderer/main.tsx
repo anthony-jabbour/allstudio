@@ -221,6 +221,7 @@ function WebsiteEditorApp({
         }
         homeContent={
           <WorkspaceHome
+            active={active}
             sidebarLabel="Workspace navigation"
             sidebarHeader={
               <div className="home-workspace-name">Local workspace</div>

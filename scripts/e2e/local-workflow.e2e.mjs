@@ -102,7 +102,10 @@ function pass(message) {
 }
 
 async function toolbar(page, name) {
-  const button = page.getByRole("button", { name, exact: true });
+  const button =
+    name === "Open project"
+      ? page.locator(".home-open-button")
+      : page.getByRole("button", { name, exact: true });
   await expect(button).toBeEnabled();
   await button.press("Enter");
 }
@@ -241,9 +244,7 @@ async function launch() {
     }
   }, process.env.CI !== "true");
   await page.getByRole("button", { name: "Website projects" }).click();
-  await page
-    .getByRole("button", { name: "Open project", exact: true })
-    .waitFor();
+  await page.locator(".home-open-button").waitFor();
   return page;
 }
 
@@ -1062,9 +1063,7 @@ try {
     globalThis.cancelPicker = true;
   });
   await toolbar(page, "Open project");
-  await expect(
-    page.getByRole("button", { name: "Open project", exact: true }),
-  ).toBeEnabled();
+  await expect(page.locator(".home-open-button")).toBeEnabled();
   await page
     .getByText("Current project kept.", {
       exact: true,
