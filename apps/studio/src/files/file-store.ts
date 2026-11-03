@@ -167,6 +167,35 @@ export class FileStore {
   private ensureScratchpad() {
     const files = this.readIndex();
     if (files.some((file) => file.id === SCRATCHPAD_ID)) return;
+    const key = DOC_PREFIX + SCRATCHPAD_ID;
+    const raw = this.storage.getItem(key);
+    if (raw !== null) {
+      let document: BoardDocumentV1;
+      try {
+        document = parseBoardDocument(JSON.parse(raw));
+      } catch {
+        throw new FileStoreError(
+          "The scratchpad is damaged and its contents were preserved.",
+        );
+      }
+      if (document.id !== SCRATCHPAD_ID) {
+        throw new FileStoreError(
+          "The scratchpad is damaged and its contents were preserved.",
+        );
+      }
+      const file: StudioFile = {
+        id: SCRATCHPAD_ID,
+        name: document.name,
+        createdAt: document.createdAt,
+        updatedAt: document.updatedAt,
+        archived: false,
+        permanent: true,
+      };
+      const next = [...files, file];
+      this.write(INDEX_KEY, JSON.stringify(next));
+      this.cache = next;
+      return;
+    }
     const stamp = new Date(0).toISOString();
     const doc = createBoardDocument("Scratchpad", undefined, stamp);
     doc.id = SCRATCHPAD_ID;

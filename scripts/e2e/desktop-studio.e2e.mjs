@@ -178,6 +178,9 @@ try {
   await chatBox.fill("This message should show a storage error.");
   await chatBox.press("Enter");
   await expect(page.getByText(/Chat storage is full/i)).toBeVisible();
+  await expect(chatBox).toHaveValue(
+    "This message should show a storage error.",
+  );
   await expect(page.locator(".ch-msg.user")).toHaveCount(0);
   await expect(page.locator(".ch-recents a")).toHaveCount(0);
   await chatBox.fill(

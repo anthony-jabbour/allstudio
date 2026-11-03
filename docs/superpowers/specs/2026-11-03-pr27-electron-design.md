@@ -14,9 +14,11 @@ Expose the PR #27 chat workspace in the Electron desktop app using the same `app
 
 - Preserve PR #27 behavior: local deterministic board generation, local conversation storage, the current free gate, and the locally labeled Pro preview.
 - Do not add model/provider calls, cloud behavior, billing, filesystem access, or Electron IPC for chat. Chat stays in renderer `localStorage`; board documents use the existing `FileStore` and schema validation.
-- Keep serialized chat history under a 1,000,000-byte safety budget and retain PR #27's 200-conversation / 400-message limits as visible rejection thresholds. Never silently delete or truncate conversation history; users can remove older chats to free space. Do not replace readable `localStorage` with memory storage just because a write fails.
+- Restrict new Chat storage growth to a 1,000,000-byte budget and retain PR #27's 200-conversation / 400-message limits as visible rejection thresholds. Preserve existing over-budget legacy history, permit shrink/delete operations, and never silently delete or truncate conversation history. Do not replace readable `localStorage` with memory storage just because a write fails.
 - If a new board document is written but its index update fails, remove that newly written document and preserve the prior index.
+- If an existing scratchpad document is unindexed, restore its index without rewriting its contents; refuse invalid collisions without discarding bytes.
 - New conversations persist their first user message as one storage write, so a quota failure cannot leave an empty chat behind.
+- Clear the composer draft only after the first user-message write succeeds; a failed write leaves the prompt available to retry.
 - Keep Electron's shared Studio app and website editor as separate surfaces. Hidden surfaces must not capture active keyboard input.
 - Keep DiceBear/Open Peeps usage and attribution as declared by PR #27. `dicebear/dicebear` was observed at 10,004 GitHub stars on 2026-11-03, MIT, with the PR pinning 9.4.2; the PR `NOTICE` records Open Peeps artwork as CC0 1.0.
 

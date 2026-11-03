@@ -157,6 +157,65 @@ describe("FileStore", () => {
     expect(removed).toEqual([writes[0]]);
     expect(backing.getItem(writes[0] ?? "")).toBeNull();
   });
+
+  it("reindexes an existing scratchpad without overwriting its document", () => {
+    const storage = memoryStorage();
+    const document = createFromTemplate("blank");
+    document.id = SCRATCHPAD_ID;
+    document.name = "Recovered scratchpad";
+    const key = `allstudio.board.${SCRATCHPAD_ID}`;
+    const original = JSON.stringify(document);
+    storage.setItem(key, original);
+
+    const files = new FileStore(storage).list();
+
+    expect(files.find((file) => file.id === SCRATCHPAD_ID)?.name).toBe(
+      "Recovered scratchpad",
+    );
+    expect(storage.getItem(key)).toBe(original);
+  });
+
+  it("preserves an existing scratchpad when its missing index cannot be restored", () => {
+    const backing = memoryStorage();
+    const document = createFromTemplate("blank");
+    document.id = SCRATCHPAD_ID;
+    const key = `allstudio.board.${SCRATCHPAD_ID}`;
+    const original = JSON.stringify(document);
+    backing.setItem(key, original);
+    const storage = {
+      getItem: (name: string) => backing.getItem(name),
+      setItem: (name: string, value: string) => {
+        if (name === "allstudio.files.v1")
+          throw new Error("QuotaExceededError");
+        backing.setItem(name, value);
+      },
+      removeItem: (name: string) => backing.removeItem(name),
+    };
+
+    expect(() => new FileStore(storage).list()).toThrow(/storage is full/);
+    expect(backing.getItem(key)).toBe(original);
+  });
+
+  it("refuses an invalid unindexed scratchpad without removing its contents", () => {
+    const storage = memoryStorage();
+    const key = `allstudio.board.${SCRATCHPAD_ID}`;
+    const original = "not a board document";
+    storage.setItem(key, original);
+
+    expect(() => new FileStore(storage).list()).toThrow(/scratchpad.*damaged/i);
+    expect(storage.getItem(key)).toBe(original);
+  });
+
+  it("refuses a mismatched unindexed scratchpad without removing its contents", () => {
+    const storage = memoryStorage();
+    const document = createFromTemplate("blank");
+    const key = `allstudio.board.${SCRATCHPAD_ID}`;
+    const original = JSON.stringify(document);
+    storage.setItem(key, original);
+
+    expect(() => new FileStore(storage).list()).toThrow(/scratchpad.*damaged/i);
+    expect(storage.getItem(key)).toBe(original);
+  });
 });
 
 describe("templates", () => {

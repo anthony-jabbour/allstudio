@@ -286,7 +286,7 @@ function Composer({
   running: boolean;
   context: string;
   agent: ChatAgent;
-  onSend: (text: string) => void;
+  onSend: (text: string) => boolean;
   onStop: () => void;
   autoFocus?: boolean;
 }) {
@@ -305,8 +305,7 @@ function Composer({
     event?.preventDefault();
     const clean = text.trim();
     if (!clean || running || disabled) return;
-    onSend(clean);
-    setText("");
+    if (onSend(clean)) setText("");
   };
   const onKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (
@@ -596,22 +595,21 @@ export function ChatPage({
 
   const open = (id: string) => navigate({ name: "file", id });
 
-  const send = async (text: string) => {
-    if (running || !pro) return;
+  const send = (text: string): boolean => {
+    if (running || !pro) return false;
     const prompt = text.slice(0, CHAT_LIMITS.promptLength);
-    const controller = new AbortController();
-    setRunning(controller);
+    const createdAt = new Date();
+    const at = createdAt.toISOString();
+    const userMessage: ChatMessage = {
+      id: createChatId("m"),
+      role: "user",
+      createdAt: at,
+      parts: [{ kind: "text", text: prompt }],
+      status: "done",
+    };
+    let current: ReturnType<typeof chats.get>;
     try {
-      const createdAt = new Date();
-      const at = createdAt.toISOString();
-      const userMessage: ChatMessage = {
-        id: createChatId("m"),
-        role: "user",
-        createdAt: at,
-        parts: [{ kind: "text", text: prompt }],
-        status: "done",
-      };
-      const current = conversation
+      current = conversation
         ? chats.save({
             ...conversation,
             title:
@@ -622,45 +620,59 @@ export function ChatPage({
             messages: [...conversation.messages, userMessage],
           })
         : chats.create(titleFromPrompt(prompt), createdAt, [userMessage]);
-      if (!conversation) navigate({ name: "chat", id: current.id });
-      const id = current.id;
-      await agent.run({
-        prompt,
-        conversation: current,
-        signal: controller.signal,
-        emit: (event) => {
-          const latest = chats.get(id);
-          if (!latest) return;
-          const eventAt = new Date().toISOString();
-          if (event.type === "message") {
-            const exists = latest.messages.some(
-              (message) => message.id === event.message.id,
-            );
-            chats.save({
-              ...latest,
-              updatedAt: eventAt,
-              messages: exists
-                ? latest.messages.map((message) =>
-                    message.id === event.message.id ? event.message : message,
-                  )
-                : [...latest.messages, event.message],
-            });
-          } else if (event.type === "activity") {
-            chats.save({
-              ...latest,
-              updatedAt: eventAt,
-              activity: [event.item, ...latest.activity].slice(0, 50),
-            });
-          } else {
-            chats.save({ ...latest, updatedAt: eventAt, fileId: event.fileId });
-          }
-        },
-      });
     } catch (error) {
       toast(error instanceof Error ? error.message : "Chat failed.", "error");
-    } finally {
-      setRunning(null);
+      return false;
     }
+    if (!current) return false;
+    if (!conversation) navigate({ name: "chat", id: current.id });
+    const id = current.id;
+    const controller = new AbortController();
+    setRunning(controller);
+    void Promise.resolve()
+      .then(() =>
+        agent.run({
+          prompt,
+          conversation: current,
+          signal: controller.signal,
+          emit: (event) => {
+            const latest = chats.get(id);
+            if (!latest) return;
+            const eventAt = new Date().toISOString();
+            if (event.type === "message") {
+              const exists = latest.messages.some(
+                (message) => message.id === event.message.id,
+              );
+              chats.save({
+                ...latest,
+                updatedAt: eventAt,
+                messages: exists
+                  ? latest.messages.map((message) =>
+                      message.id === event.message.id ? event.message : message,
+                    )
+                  : [...latest.messages, event.message],
+              });
+            } else if (event.type === "activity") {
+              chats.save({
+                ...latest,
+                updatedAt: eventAt,
+                activity: [event.item, ...latest.activity].slice(0, 50),
+              });
+            } else {
+              chats.save({
+                ...latest,
+                updatedAt: eventAt,
+                fileId: event.fileId,
+              });
+            }
+          },
+        }),
+      )
+      .catch((error) => {
+        toast(error instanceof Error ? error.message : "Chat failed.", "error");
+      })
+      .finally(() => setRunning(null));
+    return true;
   };
 
   const nav = (
@@ -950,7 +962,7 @@ export function ChatPage({
               running={Boolean(running)}
               context={boardName}
               agent={agent}
-              onSend={(text) => void send(text)}
+              onSend={send}
               onStop={() => running?.abort()}
               autoFocus={!hasThread}
             />
