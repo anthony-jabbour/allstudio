@@ -108,6 +108,69 @@ describe("chat store", () => {
     expect(store.list()).toEqual([]);
   });
 
+  it("preserves legacy messages above the limit and refuses to append more", () => {
+    const storage = memoryStorage();
+    const at = "2026-11-03T00:00:00.000Z";
+    const message = (id: string) => ({
+      id,
+      role: "user" as const,
+      createdAt: at,
+      parts: [{ kind: "text" as const, text: "message" }],
+      status: "done" as const,
+    });
+    const messages = Array.from(
+      { length: CHAT_LIMITS.messagesPerConversation + 1 },
+      (_, index) => message(`m_${index}`),
+    );
+    const conversation = {
+      id: "c_legacy",
+      title: "Legacy chat",
+      createdAt: at,
+      updatedAt: at,
+      messages,
+      activity: [],
+    };
+    storage.setItem("allstudio.chats.v1", JSON.stringify([conversation]));
+
+    const store = new ChatStore(storage);
+    expect(store.get(conversation.id)?.messages).toHaveLength(
+      CHAT_LIMITS.messagesPerConversation + 1,
+    );
+    expect(() =>
+      store.save({
+        ...conversation,
+        messages: [...messages, message("m_extra")],
+      }),
+    ).toThrow(/message limit/i);
+    expect(new ChatStore(storage).get(conversation.id)?.messages).toHaveLength(
+      CHAT_LIMITS.messagesPerConversation + 1,
+    );
+  });
+
+  it("refuses to create a chat beyond the count limit without evicting old chats", () => {
+    const storage = memoryStorage();
+    const at = "2026-11-03T00:00:00.000Z";
+    const conversations = Array.from(
+      { length: CHAT_LIMITS.conversations + 1 },
+      (_, index) => ({
+        id: `c_${index}`,
+        title: `Saved chat ${index}`,
+        createdAt: at,
+        updatedAt: at,
+        messages: [],
+        activity: [],
+      }),
+    );
+    storage.setItem("allstudio.chats.v1", JSON.stringify(conversations));
+
+    const store = new ChatStore(storage);
+    expect(store.list()).toHaveLength(CHAT_LIMITS.conversations + 1);
+    expect(() => store.create("New chat")).toThrow(/chat limit/i);
+    expect(new ChatStore(storage).list()).toHaveLength(
+      CHAT_LIMITS.conversations + 1,
+    );
+  });
+
   it("is lenient with corrupt storage and marks interrupted replies stopped", () => {
     expect(parseConversations("{nope")).toEqual([]);
     const parsed = parseConversations(

@@ -65,6 +65,10 @@ export const CHAT_LIMITS = {
 const KEY = "allstudio.chats.v1";
 const CHAT_STORAGE_ERROR =
   "Chat storage is full or unavailable. Delete older chats or boards, then try again.";
+const CHAT_CONVERSATION_LIMIT_ERROR =
+  "Chat limit reached. Delete an older chat before starting another; no chats were removed.";
+const CHAT_MESSAGE_LIMIT_ERROR =
+  "This chat reached its message limit. Start a new chat to continue; existing messages were kept.";
 
 export function createChatId(prefix = "c"): string {
   const random =
@@ -206,7 +210,6 @@ export function parseConversations(text: string | null): Conversation[] {
           ? value.messages
               .map(parseMessage)
               .filter((message) => message !== null)
-              .slice(-CHAT_LIMITS.messagesPerConversation)
           : [],
         activity: Array.isArray(value.activity)
           ? value.activity.map(parseActivity).filter((item) => item !== null)
@@ -246,13 +249,16 @@ export class ChatStore {
     now = new Date(),
     initialMessages: ChatMessage[] = [],
   ): Conversation {
+    if (initialMessages.length > CHAT_LIMITS.messagesPerConversation) {
+      throw new Error(CHAT_MESSAGE_LIMIT_ERROR);
+    }
     const at = now.toISOString();
     const conversation: Conversation = {
       id: createChatId(),
       title: title.slice(0, CHAT_LIMITS.titleLength),
       createdAt: at,
       updatedAt: at,
-      messages: initialMessages.slice(-CHAT_LIMITS.messagesPerConversation),
+      messages: initialMessages,
       activity: [],
     };
     this.write([conversation, ...this.cache]);
@@ -260,12 +266,16 @@ export class ChatStore {
   }
 
   save(conversation: Conversation): Conversation {
+    const previous = this.get(conversation.id);
+    if (
+      conversation.messages.length > CHAT_LIMITS.messagesPerConversation &&
+      conversation.messages.length > (previous?.messages.length ?? 0)
+    ) {
+      throw new Error(CHAT_MESSAGE_LIMIT_ERROR);
+    }
     const next: Conversation = {
       ...conversation,
       title: conversation.title.slice(0, CHAT_LIMITS.titleLength),
-      messages: conversation.messages.slice(
-        -CHAT_LIMITS.messagesPerConversation,
-      ),
     };
     this.write([
       next,
@@ -286,8 +296,13 @@ export class ChatStore {
   }
 
   private write(conversations: Conversation[]) {
-    const bounded = conversations.slice(0, CHAT_LIMITS.conversations);
-    const serialized = JSON.stringify(bounded);
+    if (
+      conversations.length > CHAT_LIMITS.conversations &&
+      conversations.length > this.cache.length
+    ) {
+      throw new Error(CHAT_CONVERSATION_LIMIT_ERROR);
+    }
+    const serialized = JSON.stringify(conversations);
     const bytes = new TextEncoder().encode(serialized).byteLength;
     if (bytes > CHAT_LIMITS.storageBytes && bytes > this.persistedBytes) {
       throw new Error(CHAT_STORAGE_ERROR);
@@ -297,7 +312,7 @@ export class ChatStore {
     } catch {
       throw new Error(CHAT_STORAGE_ERROR);
     }
-    this.cache = bounded;
+    this.cache = conversations;
     this.persistedBytes = bytes;
     for (const listener of this.listeners) listener();
   }

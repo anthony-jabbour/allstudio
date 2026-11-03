@@ -14,7 +14,7 @@ Expose the PR #27 chat workspace in the Electron desktop app using the same `app
 
 - Preserve PR #27 behavior: local deterministic board generation, local conversation storage, the current free gate, and the locally labeled Pro preview.
 - Do not add model/provider calls, cloud behavior, billing, filesystem access, or Electron IPC for chat. Chat stays in renderer `localStorage`; board documents use the existing `FileStore` and schema validation.
-- Keep serialized chat history under a 1,000,000-byte safety budget, reject writes that exceed it without silently deleting conversations, and show a clear storage error. Do not replace readable `localStorage` with memory storage just because a write fails.
+- Keep serialized chat history under a 1,000,000-byte safety budget and retain PR #27's 200-conversation / 400-message limits as visible rejection thresholds. Never silently delete or truncate conversation history; users can remove older chats to free space. Do not replace readable `localStorage` with memory storage just because a write fails.
 - If a new board document is written but its index update fails, remove that newly written document and preserve the prior index.
 - New conversations persist their first user message as one storage write, so a quota failure cannot leave an empty chat behind.
 - Keep Electron's shared Studio app and website editor as separate surfaces. Hidden surfaces must not capture active keyboard input.
