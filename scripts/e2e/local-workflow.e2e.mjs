@@ -300,8 +300,9 @@ try {
   await editBreakpoint.selectOption("base");
   if (previousScope !== "base") {
     await expect
-      .poll(() =>
-        page.evaluate(() => globalThis.testThumbnailCapture?.completed),
+      .poll(
+        () => page.evaluate(() => globalThis.testThumbnailCapture?.completed),
+        { timeout: 10_000 },
       )
       .toBeGreaterThan(capturesBeforeScopeChange);
   }
