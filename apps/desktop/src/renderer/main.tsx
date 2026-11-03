@@ -5,6 +5,7 @@ import {
 } from "@allstudio/editor/shell";
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { App as StudioApp } from "../../../studio/src/app.tsx";
 import type {
   DesktopApi,
   OpenProject,
@@ -12,6 +13,9 @@ import type {
   RecentProject,
 } from "../shared/desktop-api.ts";
 import "@allstudio/editor/studio.css";
+import "../../../studio/src/ui/tokens.css";
+import "../../../studio/src/ui/app.css";
+import "@allstudio/editor/board.css";
 import "./styles.css";
 
 declare global {
@@ -20,7 +24,13 @@ declare global {
   }
 }
 
-function App() {
+function WebsiteEditorApp({
+  active,
+  onBackToStudio,
+}: {
+  active: boolean;
+  onBackToStudio: () => void;
+}) {
   const [desktopStatus, setDesktopStatus] = useState<
     "connecting" | "ready" | "error"
   >("connecting");
@@ -153,11 +163,15 @@ function App() {
     <div className="desktop-app">
       <EditorShell
         disabled={busy}
+        themeActive={active}
         key={`${project?.id ?? "closed"}:${session}`}
         projectControls={
           project ? (
             <>
               <nav className="project-toolbar" aria-label="Local project">
+                <button type="button" disabled={busy} onClick={onBackToStudio}>
+                  Back to Studio
+                </button>
                 <button
                   type="button"
                   disabled={busy}
@@ -208,6 +222,7 @@ function App() {
         }
         homeContent={
           <WorkspaceHome
+            active={active}
             sidebarLabel="Workspace navigation"
             sidebarHeader={
               <div className="home-workspace-name">Local workspace</div>
@@ -237,6 +252,9 @@ function App() {
             regionLabel="Recent local projects"
             actions={
               <>
+                <button type="button" disabled={busy} onClick={onBackToStudio}>
+                  Back to Studio
+                </button>
                 <button
                   type="button"
                   disabled={busy || !recent[0]}
@@ -321,6 +339,26 @@ function App() {
             : "Connecting to desktop…"}
         </output>
       ) : null}
+    </div>
+  );
+}
+
+function App() {
+  const [surface, setSurface] = useState<"studio" | "websites">("studio");
+  return (
+    <div className="desktop-surfaces">
+      <div className="desktop-surface" hidden={surface !== "studio"}>
+        <StudioApp
+          active={surface === "studio"}
+          onOpenWebsiteEditor={() => setSurface("websites")}
+        />
+      </div>
+      <div className="desktop-surface" hidden={surface !== "websites"}>
+        <WebsiteEditorApp
+          active={surface === "websites"}
+          onBackToStudio={() => setSurface("studio")}
+        />
+      </div>
     </div>
   );
 }

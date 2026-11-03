@@ -10,7 +10,9 @@
     "./shell": "./src/shell/index.ts",
     "./source-mapper": "./src/source-mapper/index.ts",
     "./site": "./src/site/source-edit-workspace.ts",
-    "./preview-bridge": "./src/preview-bridge/protocol.ts"
+    "./preview-bridge": "./src/preview-bridge/protocol.ts",
+    "./board": "./src/board/index.ts",
+    "./board.css": "./src/board/editor/board-editor.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
@@ -19,6 +21,7 @@
     "@allstudio/project": "workspace:*",
     "@babel/standalone": "^7.27.0",
     "@babel/types": "^7.27.0",
+    "lucide-react": "1.58.0",
     "tailwind-merge": "^3.2.0"
   },
   "peerDependencies": {

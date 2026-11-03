@@ -1,3 +1,14 @@
+.desktop-surfaces {
+  height: 100dvh;
+  min-width: 0;
+}
+.desktop-surface {
+  height: 100%;
+  min-width: 0;
+}
+.desktop-surface[hidden] {
+  display: none;
+}
 .desktop-app {
   display: flex;
   flex-direction: column;

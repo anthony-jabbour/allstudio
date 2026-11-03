@@ -39,6 +39,14 @@ import {
 } from "./spacing-confirmation.ts";
 import { SpacingInspector } from "./spacing-inspector.tsx";
 import {
+  applyStudioTheme,
+  broadcastStudioTheme,
+  listenForStudioTheme,
+  readStudioTheme,
+  type StudioThemePreference,
+  writeStudioTheme,
+} from "./theme.ts";
+import {
   observesTypography,
   type TypographyTarget,
   typographyTargets,
@@ -64,6 +72,7 @@ export interface EditorShellProps {
   projectControls?: import("react").ReactNode;
   homeContent?: import("react").ReactNode;
   onPreviewCapture?: () => void;
+  themeActive?: boolean;
   disabled?: boolean;
 }
 
@@ -213,26 +222,19 @@ export function EditorShell({
   projectControls,
   homeContent,
   disabled,
+  themeActive = true,
   onPreviewCapture,
 }: EditorShellProps) {
-  const [appearance, setAppearance] = useState(() => {
-    try {
-      const saved = localStorage.getItem("allstudio:appearance:v1");
-      return saved === "light" || saved === "dark" ? saved : "system";
-    } catch {
-      return "system";
-    }
-  });
+  const [appearance, setAppearance] =
+    useState<StudioThemePreference>(readStudioTheme);
   const [navigatorOpen, setNavigatorOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   useEffect(() => {
-    document.documentElement.dataset.theme = appearance;
-    try {
-      localStorage.setItem("allstudio:appearance:v1", appearance);
-    } catch {
-      // Appearance storage is optional; editing must remain available.
-    }
-  }, [appearance]);
+    if (!themeActive) return;
+    applyStudioTheme(document.documentElement, appearance);
+    writeStudioTheme(appearance);
+  }, [appearance, themeActive]);
+  useEffect(() => listenForStudioTheme(window, setAppearance), []);
   const connected = Boolean(previewUrl && workspace);
   return (
     <main
@@ -270,7 +272,11 @@ export function EditorShell({
             <select
               aria-label="Appearance"
               value={appearance}
-              onChange={(event) => setAppearance(event.target.value)}
+              onChange={(event) => {
+                const next = event.target.value as StudioThemePreference;
+                setAppearance(next);
+                broadcastStudioTheme(window, next);
+              }}
             >
               <option value="system">System</option>
               <option value="light">Light</option>

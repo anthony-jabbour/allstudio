@@ -102,7 +102,11 @@ function pass(message) {
 }
 
 async function toolbar(page, name) {
-  const button = page.getByRole("button", { name, exact: true });
+  const homeOpen = page.locator(".home-open-button");
+  const button =
+    name === "Open project" && (await homeOpen.count())
+      ? homeOpen
+      : page.getByRole("button", { name, exact: true });
   await expect(button).toBeEnabled();
   await button.press("Enter");
 }
@@ -240,6 +244,8 @@ async function launch() {
       }
     }
   }, process.env.CI !== "true");
+  await page.getByRole("button", { name: "Website projects" }).click();
+  await page.locator(".home-open-button").waitFor();
   return page;
 }
 
@@ -286,7 +292,7 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
-  await expect(page.locator(".desktop-status")).toHaveCount(0);
+  await expect(page.locator(".desktop-status:visible")).toHaveCount(0);
   await expect
     .poll(
       () => page.evaluate(() => globalThis.testThumbnailCapture?.completed),
@@ -1981,6 +1987,12 @@ try {
   }
   if (fixtureName === "nextjs-site-fixture") {
     const live = () => page.frameLocator('iframe[title="Project preview"]');
+    const renderedOrder = () =>
+      live()
+        .locator("main")
+        .evaluate((el) =>
+          [...el.children].slice(0, 2).map((child) => child.tagName),
+        );
     await clickInPreview(live().locator("h1"));
     await expect(
       page.getByRole("button", { name: "Move layer up", exact: true }),
@@ -2010,15 +2022,7 @@ try {
     };
     await performMove("up");
     assert.equal(await readFile(sourceFile, "utf8"), afterMove);
-    await expect
-      .poll(() =>
-        live()
-          .locator("main")
-          .evaluate((el) =>
-            [...el.children].slice(0, 2).map((child) => child.tagName),
-          ),
-      )
-      .toEqual(["H1", "P"]);
+    await expect.poll(renderedOrder, { timeout: 30_000 }).toEqual(["H1", "P"]);
     await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
       "Recovered local edit",
     );
@@ -2026,6 +2030,8 @@ try {
     await expect.poll(() => readFile(sourceFile, "utf8")).toBe(beforeMove);
     await toolbar(page, "Redo saved edit");
     await expect.poll(() => readFile(sourceFile, "utf8")).toBe(afterMove);
+    await expect.poll(renderedOrder, { timeout: 30_000 }).toEqual(["H1", "P"]);
+    await expect(live().locator("h1")).toHaveText("Recovered local edit");
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
