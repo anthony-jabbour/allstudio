@@ -52,6 +52,7 @@ try {
   await page.getByRole("menuitem", { name: "Responsive set" }).click();
   const canvas = page.getByTestId("board-canvas");
   await expect(canvas).toBeVisible();
+  await expect(page.locator(".bx-editor")).toHaveCSS("display", "grid");
   const layers = page.getByRole("tree", { name: "Layers" });
   const headline = canvas
     .locator('[data-node-type="text"]', {
