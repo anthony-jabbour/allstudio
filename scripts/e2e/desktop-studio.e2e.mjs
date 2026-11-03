@@ -165,6 +165,20 @@ try {
     page.getByRole("textbox", { name: /Message Alli/ }),
   ).toBeVisible();
   const chatBox = page.getByRole("textbox", { name: /Message Alli/ });
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "allstudio.chats.v1") {
+        Storage.prototype.setItem = original;
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      }
+      return original.call(this, key, value);
+    };
+  });
+  await chatBox.fill("This message should show a storage error.");
+  await chatBox.press("Enter");
+  await expect(page.getByText(/Local chat storage is full/i)).toBeVisible();
+  await expect(page.locator(".ch-msg.user")).toHaveCount(0);
   await chatBox.fill(
     "I want to create a homepage for a creative studio called “Lumen”. It should feel modern, bold, and minimal. Include a hero, some work sections, and a simple navigation.",
   );

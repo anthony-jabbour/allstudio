@@ -1,7 +1,8 @@
 import { BOARD_TEMPLATES, createFromTemplate } from "@allstudio/editor/board";
 import { parseBoardDocument } from "@allstudio/project";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  browserStorage,
   FileStore,
   FileStoreError,
   formatEdited,
@@ -83,6 +84,55 @@ describe("FileStore", () => {
       removeItem: () => {},
     });
     expect(() => s.list()).toThrow(/storage is full/);
+  });
+
+  it("keeps readable persistent storage when writes are quota-blocked", () => {
+    const values = new Map([["existing-board", "persisted"]]);
+    const persistentStorage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+      removeItem: (key: string) => values.delete(key),
+    };
+    vi.stubGlobal("window", { localStorage: persistentStorage });
+
+    try {
+      const storage = browserStorage();
+      expect(storage.getItem("existing-board")).toBe("persisted");
+      expect(() => storage.setItem("new-board", "data")).toThrow(
+        "QuotaExceededError",
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("removes a new board document when the index write fails", () => {
+    const backing = memoryStorage();
+    const writes: string[] = [];
+    const removed: string[] = [];
+    const storage = {
+      getItem: (key: string) => backing.getItem(key),
+      setItem: (key: string, value: string) => {
+        writes.push(key);
+        if (key === "allstudio.files.v1") throw new Error("QuotaExceededError");
+        backing.setItem(key, value);
+      },
+      removeItem: (key: string) => {
+        removed.push(key);
+        backing.removeItem(key);
+      },
+    };
+    const s = new FileStore(storage);
+
+    expect(() => s.create(createFromTemplate("blank"))).toThrow(
+      /storage is full/,
+    );
+    expect(writes).toHaveLength(2);
+    const documentKey = writes[0];
+    expect(removed).toEqual([documentKey]);
+    expect(backing.getItem(documentKey ?? "")).toBeNull();
   });
 });
 

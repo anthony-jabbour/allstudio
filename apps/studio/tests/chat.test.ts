@@ -13,6 +13,7 @@ import {
   personalize,
 } from "../src/chat/agent.ts";
 import {
+  CHAT_LIMITS,
   ChatStore,
   type Conversation,
   parseConversations,
@@ -71,6 +72,40 @@ describe("chat store", () => {
     expect(new ChatStore(storage).list()).toHaveLength(2);
     store.remove(a.id);
     expect(store.list().map((c) => c.id)).toEqual([b.id]);
+  });
+
+  it("rejects oversized chat history without discarding the saved conversation", () => {
+    const storage = memoryStorage();
+    const store = new ChatStore(storage);
+    const saved = store.create("Saved chat");
+    const messages = Array.from({ length: 300 }, (_, index) => ({
+      id: `m_${index}`,
+      role: "user" as const,
+      createdAt: "2026-11-03T00:00:00.000Z",
+      parts: [
+        { kind: "text" as const, text: "x".repeat(CHAT_LIMITS.promptLength) },
+      ],
+      status: "done" as const,
+    }));
+
+    expect(() => store.save({ ...saved, messages })).toThrow(
+      /chat storage is full/i,
+    );
+    expect(store.get(saved.id)?.messages).toEqual([]);
+    expect(new ChatStore(storage).get(saved.id)?.messages).toEqual([]);
+  });
+
+  it("turns storage quota errors into a visible chat save error", () => {
+    const storage = {
+      ...memoryStorage(),
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+    };
+    const store = new ChatStore(storage);
+
+    expect(() => store.create("Unsaved chat")).toThrow(/chat storage is full/i);
+    expect(store.list()).toEqual([]);
   });
 
   it("is lenient with corrupt storage and marks interrupted replies stopped", () => {
