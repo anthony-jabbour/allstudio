@@ -262,6 +262,11 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
+  await expect(page.locator("html")).not.toHaveAttribute(
+    "data-allstudio-thumbnail",
+    "true",
+    { timeout: 10_000 },
+  );
   await page
     .getByLabel("Edit breakpoint", { exact: true })
     .selectOption("base");
