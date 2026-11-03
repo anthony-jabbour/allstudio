@@ -1987,6 +1987,12 @@ try {
   }
   if (fixtureName === "nextjs-site-fixture") {
     const live = () => page.frameLocator('iframe[title="Project preview"]');
+    const renderedOrder = () =>
+      live()
+        .locator("main")
+        .evaluate((el) =>
+          [...el.children].slice(0, 2).map((child) => child.tagName),
+        );
     await clickInPreview(live().locator("h1"));
     await expect(
       page.getByRole("button", { name: "Move layer up", exact: true }),
@@ -2016,15 +2022,7 @@ try {
     };
     await performMove("up");
     assert.equal(await readFile(sourceFile, "utf8"), afterMove);
-    await expect
-      .poll(() =>
-        live()
-          .locator("main")
-          .evaluate((el) =>
-            [...el.children].slice(0, 2).map((child) => child.tagName),
-          ),
-      )
-      .toEqual(["H1", "P"]);
+    await expect.poll(renderedOrder, { timeout: 30_000 }).toEqual(["H1", "P"]);
     await expect(page.getByLabel("Text", { exact: true })).toHaveValue(
       "Recovered local edit",
     );
@@ -2032,6 +2030,8 @@ try {
     await expect.poll(() => readFile(sourceFile, "utf8")).toBe(beforeMove);
     await toolbar(page, "Redo saved edit");
     await expect.poll(() => readFile(sourceFile, "utf8")).toBe(afterMove);
+    await expect.poll(renderedOrder, { timeout: 30_000 }).toEqual(["H1", "P"]);
+    await expect(live().locator("h1")).toHaveText("Recovered local edit");
     await page
       .getByText("Preview bridge: connected", { exact: false })
       .waitFor({ timeout: 60000 });
