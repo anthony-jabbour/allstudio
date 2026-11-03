@@ -102,9 +102,10 @@ function pass(message) {
 }
 
 async function toolbar(page, name) {
+  const homeOpen = page.locator(".home-open-button");
   const button =
-    name === "Open project"
-      ? page.locator(".home-open-button")
+    name === "Open project" && (await homeOpen.count())
+      ? homeOpen
       : page.getByRole("button", { name, exact: true });
   await expect(button).toBeEnabled();
   await button.press("Enter");
@@ -1063,7 +1064,9 @@ try {
     globalThis.cancelPicker = true;
   });
   await toolbar(page, "Open project");
-  await expect(page.locator(".home-open-button")).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Open project", exact: true }),
+  ).toBeEnabled();
   await page
     .getByText("Current project kept.", {
       exact: true,
