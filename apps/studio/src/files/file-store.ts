@@ -44,6 +44,9 @@ export class FileStoreError extends Error {
 
 const INDEX_KEY = "allstudio.files.v1";
 const SETTINGS_KEY = "allstudio.settings.v1";
+const INDEX_RECOVERY_ID = "__allstudio_index_unavailable__";
+const INDEX_DAMAGED_MESSAGE =
+  "The board list could not be read. Existing board documents were left untouched.";
 const DOC_PREFIX = "allstudio.board.";
 export const SCRATCHPAD_ID = "scratchpad";
 const MAX_IMPORT_BYTES = 24 * 1024 * 1024;
@@ -63,6 +66,7 @@ function isFile(value: unknown): value is StudioFile {
 export class FileStore {
   private listeners = new Set<() => void>();
   private cache: StudioFile[] | null = null;
+  private indexDamaged = false;
 
   constructor(
     private readonly storage: StorageLike,
@@ -77,6 +81,7 @@ export class FileStore {
   /** Re-read storage (e.g. after another tab changed it) and notify. */
   refresh(): void {
     this.cache = null;
+    this.indexDamaged = false;
     this.emit();
   }
 
@@ -96,19 +101,33 @@ export class FileStore {
 
   private readIndex(): StudioFile[] {
     if (this.cache) return this.cache;
-    let files: StudioFile[] = [];
+    let raw: string | null;
     try {
-      const raw = this.storage.getItem(INDEX_KEY);
-      const parsed: unknown = raw ? JSON.parse(raw) : [];
-      files = Array.isArray(parsed) ? parsed.filter(isFile) : [];
+      raw = this.storage.getItem(INDEX_KEY);
     } catch {
-      files = [];
+      this.indexDamaged = true;
+      this.cache = [];
+      return this.cache;
     }
-    this.cache = files;
-    return files;
+    if (raw === null) {
+      this.cache = [];
+      return this.cache;
+    }
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed) || !parsed.every(isFile)) {
+        throw new Error("Invalid board list.");
+      }
+      this.cache = parsed;
+    } catch {
+      this.indexDamaged = true;
+      this.cache = [];
+    }
+    return this.cache;
   }
 
   private writeIndex(files: StudioFile[]) {
+    if (this.indexDamaged) throw new FileStoreError(INDEX_DAMAGED_MESSAGE);
     this.write(INDEX_KEY, JSON.stringify(files));
     this.cache = files;
     this.emit();
@@ -119,6 +138,7 @@ export class FileStore {
     file: StudioFile,
     files: StudioFile[],
   ) {
+    if (this.indexDamaged) throw new FileStoreError(INDEX_DAMAGED_MESSAGE);
     const key = DOC_PREFIX + document.id;
     const next = [...files, file];
     this.write(key, JSON.stringify(document));
@@ -150,6 +170,11 @@ export class FileStore {
 
   /** Validated document, or a FileStoreError describing why it cannot open. */
   read(id: string): BoardDocumentV1 {
+    if (id === INDEX_RECOVERY_ID) {
+      throw new FileStoreError(
+        `${INDEX_DAMAGED_MESSAGE} Restore the list before opening board files.`,
+      );
+    }
     const raw = this.storage.getItem(DOC_PREFIX + id);
     if (raw === null) throw new FileStoreError("This file no longer exists.");
     let document: BoardDocumentV1;
@@ -172,8 +197,18 @@ export class FileStore {
 
   private ensureScratchpad(): StudioFile | undefined {
     const files = this.readIndex();
-    if (files.some((file) => file.id === SCRATCHPAD_ID)) return;
     const stamp = new Date(0).toISOString();
+    if (this.indexDamaged) {
+      return {
+        id: INDEX_RECOVERY_ID,
+        name: "Board list unavailable (files preserved)",
+        createdAt: stamp,
+        updatedAt: stamp,
+        archived: false,
+        permanent: true,
+      };
+    }
+    if (files.some((file) => file.id === SCRATCHPAD_ID)) return;
     const damaged: StudioFile = {
       id: SCRATCHPAD_ID,
       name: "Scratchpad (damaged)",

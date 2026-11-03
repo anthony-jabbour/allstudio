@@ -233,6 +233,55 @@ describe("FileStore", () => {
     expect(() => files.read(SCRATCHPAD_ID)).toThrow(/damaged/i);
     expect(storage.getItem(key)).toBe(original);
   });
+
+  it("preserves a corrupt file index and every stored board during scratchpad recovery", () => {
+    const storage = memoryStorage();
+    const scratchpad = createFromTemplate("blank");
+    scratchpad.id = SCRATCHPAD_ID;
+    const other = createFromTemplate("landing");
+    const indexKey = "allstudio.files.v1";
+    const index = "{corrupt index";
+    const scratchpadKey = `allstudio.board.${SCRATCHPAD_ID}`;
+    const otherKey = `allstudio.board.${other.id}`;
+    const scratchpadContents = JSON.stringify(scratchpad);
+    const otherContents = JSON.stringify(other);
+    storage.setItem(indexKey, index);
+    storage.setItem(scratchpadKey, scratchpadContents);
+    storage.setItem(otherKey, otherContents);
+    const files = new FileStore(storage);
+
+    const recovery = files.list();
+
+    expect(recovery).toHaveLength(1);
+    expect(recovery[0]?.name).toBe("Board list unavailable (files preserved)");
+    expect(() => files.read(recovery[0]?.id ?? "")).toThrow(
+      /board list could not be read/i,
+    );
+    const newDocument = createFromTemplate("blank");
+    expect(() => files.create(newDocument)).toThrow(
+      /board list could not be read/i,
+    );
+    expect(storage.getItem(indexKey)).toBe(index);
+    expect(storage.getItem(scratchpadKey)).toBe(scratchpadContents);
+    expect(storage.getItem(otherKey)).toBe(otherContents);
+    expect(storage.getItem(`allstudio.board.${newDocument.id}`)).toBeNull();
+  });
+
+  it("does not silently filter invalid entries from a board index", () => {
+    const storage = memoryStorage();
+    const indexKey = "allstudio.files.v1";
+    const index = JSON.stringify([
+      { id: "one-valid-looking-entry" },
+      { id: "bad" },
+    ]);
+    storage.setItem(indexKey, index);
+    const files = new FileStore(storage).list();
+
+    expect(files.map((file) => file.name)).toEqual([
+      "Board list unavailable (files preserved)",
+    ]);
+    expect(storage.getItem(indexKey)).toBe(index);
+  });
 });
 
 describe("templates", () => {

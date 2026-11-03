@@ -17,6 +17,7 @@ Expose the PR #27 chat workspace in the Electron desktop app using the same `app
 - Restrict new Chat storage growth to a 1,000,000-byte budget and retain PR #27's 200-conversation / 400-message limits as visible rejection thresholds. Preserve existing over-budget legacy history, permit shrink/delete operations, and never silently delete or truncate conversation history. Do not replace readable `localStorage` with memory storage just because a write fails.
 - If a new board document is written but its index update fails, remove that newly written document and preserve the prior index.
 - If an existing scratchpad document is unindexed, restore its index without rewriting its contents; preserve invalid collisions, show a marked recovery row, and surface a clear error when opened instead of crashing the Home view.
+- Treat a corrupt or partially invalid board index as unavailable, never as an empty list to overwrite; show a recovery row and block board mutations while preserving both the index bytes and all stored documents.
 - New conversations persist their first user message as one storage write, so a quota failure cannot leave an empty chat behind.
 - Clear the composer draft only after the first user-message write succeeds; a failed write leaves the prompt available to retry.
 - Keep Electron's shared Studio app and website editor as separate surfaces. Hidden surfaces must not capture active keyboard input.

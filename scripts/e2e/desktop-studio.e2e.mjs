@@ -281,6 +281,52 @@ try {
   pass(
     "damaged scratchpad data remains preserved and opens a recovery message",
   );
+
+  await page.getByRole("link", { name: "Back to files" }).click();
+  const corruptIndexState = await page.evaluate(() => {
+    const index = JSON.parse(
+      localStorage.getItem("allstudio.files.v1") ?? "[]",
+    );
+    const documents = Object.fromEntries(
+      index.map((file) => {
+        const key = `allstudio.board.${file.id}`;
+        return [key, localStorage.getItem(key)];
+      }),
+    );
+    localStorage.setItem("allstudio.files.v1", "{corrupt index");
+    return { documents };
+  });
+  await page.reload();
+  const damagedFileList = page.getByRole("button", {
+    name: /Board list unavailable \(files preserved\).*Your permanent draft/,
+  });
+  await expect(damagedFileList).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Website projects", exact: true }),
+  ).toBeVisible();
+  await damagedFileList.click();
+  await expect(
+    page.getByRole("heading", { name: "This file can’t be opened" }),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(
+    /board list could not be read/i,
+  );
+  const preserved = await page.evaluate(
+    (documents) => ({
+      index: localStorage.getItem("allstudio.files.v1"),
+      documents: Object.fromEntries(
+        Object.entries(documents).map(([key]) => [
+          key,
+          localStorage.getItem(key),
+        ]),
+      ),
+    }),
+    corruptIndexState.documents,
+  );
+  assert.equal(preserved.index, "{corrupt index");
+  assert.deepEqual(preserved.documents, corruptIndexState.documents);
+  assert.deepEqual(errors, [], `renderer errors: ${errors.join("\n")}`);
+  pass("corrupt board indexes stay untouched and remain visibly recoverable");
 } finally {
   await application?.close().catch((error) => {
     console.error(`Could not close Electron: ${error.message}`);
