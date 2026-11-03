@@ -13,6 +13,7 @@ import type {
   RecentProject,
 } from "../shared/desktop-api.ts";
 import "@allstudio/editor/studio.css";
+import "../../../studio/src/chat/chat.css";
 import "../../../studio/src/ui/tokens.css";
 import "../../../studio/src/ui/app.css";
 import "@allstudio/editor/board.css";
