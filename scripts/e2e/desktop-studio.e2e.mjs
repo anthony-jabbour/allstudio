@@ -188,7 +188,7 @@ try {
   pass("Electron hosts the shared local Chat UI and generates a real board");
 
   await page.reload();
-  await expect(page.locator(".ch-msg.user")).toContainText(
+  await expect(page.locator(".ch-msg.user").first()).toContainText(
     "I want to create a homepage",
   );
   await expect(page.locator(".ch-preview-card")).toBeVisible();
@@ -213,7 +213,7 @@ try {
   const recentChat = page.locator(".ch-recents").getByRole("link").first();
   await expect(recentChat).toContainText("I want to create a homepage");
   await recentChat.click();
-  await expect(page.locator(".ch-msg.user")).toContainText(
+  await expect(page.locator(".ch-msg.user").first()).toContainText(
     "I want to create a homepage",
   );
   await expect(page.locator(".ch-preview-card")).toBeVisible();
