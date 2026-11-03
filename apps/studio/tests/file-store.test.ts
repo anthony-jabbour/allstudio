@@ -254,6 +254,18 @@ describe("FileStore", () => {
 
     expect(recovery).toHaveLength(1);
     expect(recovery[0]?.name).toBe("Board list unavailable (files preserved)");
+    const recoveryDocument = createFromTemplate("blank");
+    recoveryDocument.id = recovery[0]?.id ?? "";
+    expect(() => parseBoardDocument(recoveryDocument)).toThrow(
+      /1-64 characters/,
+    );
+    const recoveryRouteId = recovery[0]?.id ?? "";
+    expect(parseRoute(`#/file/${encodeURIComponent(recoveryRouteId)}`)).toEqual(
+      {
+        name: "file",
+        id: recoveryRouteId,
+      },
+    );
     expect(() => files.read(recovery[0]?.id ?? "")).toThrow(
       /board list could not be read/i,
     );
@@ -281,6 +293,17 @@ describe("FileStore", () => {
       "Board list unavailable (files preserved)",
     ]);
     expect(storage.getItem(indexKey)).toBe(index);
+  });
+
+  it("does not reserve a valid board ID for the index recovery row", () => {
+    const s = store();
+    const document = createFromTemplate("blank");
+    document.id = "__allstudio_index_unavailable__";
+
+    const imported = s.importJson(JSON.stringify(document));
+
+    expect(imported.id).toBe(document.id);
+    expect(s.read(imported.id).id).toBe(document.id);
   });
 });
 

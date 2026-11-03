@@ -44,7 +44,7 @@ export class FileStoreError extends Error {
 
 const INDEX_KEY = "allstudio.files.v1";
 const SETTINGS_KEY = "allstudio.settings.v1";
-const INDEX_RECOVERY_ID = "__allstudio_index_unavailable__";
+const INDEX_RECOVERY_ID = "!allstudio_index_unavailable!";
 const INDEX_DAMAGED_MESSAGE =
   "The board list could not be read. Existing board documents were left untouched.";
 const DOC_PREFIX = "allstudio.board.";
