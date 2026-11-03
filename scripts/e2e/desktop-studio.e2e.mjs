@@ -65,6 +65,14 @@ try {
   await size.fill("72");
   await size.press("Enter");
   await expect(headline).toHaveCSS("font-size", "72px");
+  await expect(page.locator(".bx-editor")).toHaveAttribute(
+    "data-save-state",
+    "saving",
+  );
+  await expect(page.locator(".bx-editor")).toHaveAttribute(
+    "data-save-state",
+    "saved",
+  );
   await expect(
     layers.getByRole("treeitem").filter({ hasText: "Ideas that" }).first(),
   ).toHaveAttribute("aria-selected", "true");
