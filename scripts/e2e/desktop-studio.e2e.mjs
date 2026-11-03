@@ -75,17 +75,8 @@ try {
 
   await page.reload();
   await expect(canvas).toBeVisible();
-  await page
-    .getByRole("tree", { name: "Layers" })
-    .getByRole("treeitem")
-    .filter({ hasText: "Ideas that" })
-    .first()
-    .click();
-  await expect(
-    page
-      .getByRole("complementary", { name: "Inspector" })
-      .getByRole("textbox", { name: "Size", exact: true }),
-  ).toHaveValue("72");
+  await headline.click();
+  await expect(size).toHaveValue("72");
   pass("board edits persist through an Electron renderer reload");
 
   await page.getByRole("button", { name: "App menu" }).click();
