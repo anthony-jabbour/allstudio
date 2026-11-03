@@ -96,6 +96,13 @@ try {
   await expect(
     page.getByRole("button", { name: "Open project", exact: true }),
   ).toBeVisible();
+  const runtime = await page.evaluate(() => window.allstudio.runtime());
+  assert.equal(runtime.electron, "45.0.0");
+  await page.evaluate(() => window.allstudio.recent());
+  await expect(page.locator(".desktop-status:visible")).toHaveCount(0);
+  await expect(
+    page.getByText("Recent projects could not be read", { exact: false }),
+  ).toHaveCount(0);
   await expect(page.getByLabel("Appearance", { exact: true })).toHaveValue(
     "dark",
   );
