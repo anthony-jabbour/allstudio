@@ -13,11 +13,13 @@ export function FileEditor({
   resolvedTheme,
   onTheme,
   onOpenWebsiteEditor,
+  active = true,
 }: {
   id: string;
   resolvedTheme: "light" | "dark";
   onTheme: (theme: ThemePreference) => void;
   onOpenWebsiteEditor?: () => void;
+  active?: boolean;
 }) {
   const store = useFileStore();
   // Read once per file id: the editor owns the document while open.
@@ -49,6 +51,7 @@ export function FileEditor({
       key={id}
       document={loaded}
       appearance={resolvedTheme}
+      active={active}
       onToggleAppearance={() =>
         onTheme(resolvedTheme === "dark" ? "light" : "dark")
       }

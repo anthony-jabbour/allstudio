@@ -165,9 +165,11 @@ function TextEditor({
 
 export function BoardCanvas({
   editor,
+  active = true,
   onContextMenu,
 }: {
   editor: BoardEditorState;
+  active?: boolean;
   onContextMenu?: (at: { x: number; y: number }) => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -219,6 +221,11 @@ export function BoardCanvas({
 
   // Space-to-pan, released anywhere.
   useEffect(() => {
+    if (!active) {
+      setAlt(false);
+      setSpace(false);
+      return;
+    }
     const isTyping = (target: EventTarget | null) => {
       const el = target as HTMLElement | null;
       return (
@@ -250,7 +257,7 @@ export function BoardCanvas({
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", reset);
     };
-  }, []);
+  }, [active]);
 
   const toLocal = useCallback((event: { clientX: number; clientY: number }) => {
     const rect = root.current?.getBoundingClientRect();

@@ -65,11 +65,13 @@ export function Home({
   theme,
   onTheme,
   onOpenWebsiteEditor,
+  active = true,
 }: {
   section: Section;
   theme: ThemePreference;
   onTheme: (theme: ThemePreference) => void;
   onOpenWebsiteEditor?: () => void;
+  active?: boolean;
 }) {
   const files = useFiles();
   const store = useFileStore();
@@ -83,6 +85,7 @@ export function Home({
   const owner = settings.displayName || "Local studio";
 
   useEffect(() => {
+    if (!active) return;
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
         event.preventDefault();
@@ -91,7 +94,7 @@ export function Home({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [active]);
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();

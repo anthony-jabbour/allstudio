@@ -85,6 +85,10 @@ try {
   await expect(canvas).toBeVisible();
   await headline.click();
   await expect(size).toHaveValue("72");
+  const x = page
+    .getByRole("complementary", { name: "Inspector" })
+    .getByRole("textbox", { name: "X", exact: true });
+  const savedX = await x.inputValue();
   pass("board edits persist through an Electron renderer reload");
 
   await page.getByRole("button", { name: "App menu" }).click();
@@ -97,6 +101,15 @@ try {
   );
   await page.getByLabel("Appearance", { exact: true }).selectOption("light");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.keyboard.press("Control+f");
+  await expect(page.getByLabel("Search projects")).toBeFocused();
+  await expect(page.getByLabel("Search files")).not.toBeFocused();
+  await page.getByRole("heading", { name: "Home", exact: true }).click();
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement)
+      document.activeElement.blur();
+  });
+  await page.keyboard.press("ArrowRight");
   await shot("website-projects");
   pass(
     "the shared Electron shell enters the existing source-backed website editor",
@@ -106,6 +119,10 @@ try {
   await expect(canvas).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(headline).toHaveCSS("font-size", "72px");
+  await expect(
+    layers.getByRole("treeitem").filter({ hasText: "Ideas that" }).first(),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(x).toHaveValue(savedX);
   assert.deepEqual(errors, [], `renderer errors: ${errors.join("\n")}`);
   pass("switching back preserves the board editor state without remounting it");
 } finally {

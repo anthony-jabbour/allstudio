@@ -27,6 +27,7 @@ export function App({
             resolvedTheme={theme.resolved}
             onTheme={theme.set}
             onOpenWebsiteEditor={onOpenWebsiteEditor}
+            active={active}
           />
         ) : route.name === "studio" ? (
           <WorkspaceDashboard
@@ -41,6 +42,7 @@ export function App({
             theme={theme.preference}
             onTheme={theme.set}
             onOpenWebsiteEditor={onOpenWebsiteEditor}
+            active={active}
           />
         )}
       </ToastProvider>

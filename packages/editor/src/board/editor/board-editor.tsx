@@ -19,6 +19,7 @@ export interface BoardEditorProps {
   onToggleAppearance: () => void;
   /** Extra items for the app menu (host navigation). */
   menu?: { label: string; onSelect: () => void }[];
+  active?: boolean;
 }
 
 function isTyping(target: EventTarget | null) {
@@ -145,6 +146,7 @@ export function BoardEditor({
   appearance,
   onToggleAppearance,
   menu = [],
+  active = true,
 }: BoardEditorProps) {
   const editor = useBoardEditor({ document, onSave, appearance });
   const [leftTab, setLeftTab] = useState<"pages" | "layers" | "assets">(
@@ -184,6 +186,7 @@ export function BoardEditor({
 
   // Keyboard shortcuts (ignored while typing in inputs or editing text).
   useEffect(() => {
+    if (!active) return;
     const onKey = (event: KeyboardEvent) => {
       const ed = editorRef.current;
       if (isTyping(event.target) || paletteOpenRef.current) return;
@@ -270,7 +273,7 @@ export function BoardEditor({
       window.removeEventListener("cut", onCut);
       window.removeEventListener("paste", onPaste);
     };
-  }, []);
+  }, [active]);
 
   const zoomPct = Math.round(editor.viewport.zoom * 100);
   const saveLabel =
@@ -536,6 +539,7 @@ export function BoardEditor({
       <main className="bx-main">
         <BoardCanvas
           editor={editor}
+          active={active}
           onContextMenu={(at) => setContextMenu(at)}
         />
         <div className="bx-dock" role="toolbar" aria-label="Canvas tools">

@@ -28,6 +28,7 @@ export interface WorkspaceHomeProject {
 }
 
 export interface WorkspaceHomeProps {
+  active?: boolean;
   sidebarLabel: string;
   sidebarHeader: ReactNode;
   sidebarNote?: ReactNode;
@@ -49,6 +50,7 @@ export interface WorkspaceHomeProps {
 }
 
 export function WorkspaceHome({
+  active = true,
   sidebarLabel,
   sidebarHeader,
   sidebarNote,
@@ -71,6 +73,7 @@ export function WorkspaceHome({
   const searchInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!active) return;
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
         event.preventDefault();
@@ -79,7 +82,7 @@ export function WorkspaceHome({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [active]);
 
   const needle = search.trim().toLowerCase();
   const visibleItems = items.filter(
