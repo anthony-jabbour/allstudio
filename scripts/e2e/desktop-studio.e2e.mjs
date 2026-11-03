@@ -177,8 +177,9 @@ try {
   });
   await chatBox.fill("This message should show a storage error.");
   await chatBox.press("Enter");
-  await expect(page.getByText(/Local chat storage is full/i)).toBeVisible();
+  await expect(page.getByText(/Chat storage is full/i)).toBeVisible();
   await expect(page.locator(".ch-msg.user")).toHaveCount(0);
+  await expect(page.locator(".ch-recents a")).toHaveCount(0);
   await chatBox.fill(
     "I want to create a homepage for a creative studio called “Lumen”. It should feel modern, bold, and minimal. Include a hero, some work sections, and a simple navigation.",
   );
