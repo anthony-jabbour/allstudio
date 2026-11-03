@@ -258,10 +258,32 @@ try {
   let page = await launch();
   const clickInPreview = (target, position) =>
     clickPreview(page, target, position);
+  await page.evaluate(() => {
+    const capture = { started: false, completed: false };
+    globalThis.testThumbnailCapture = capture;
+    const observer = new MutationObserver(() => {
+      if (document.documentElement.dataset.allstudioThumbnail === "true") {
+        capture.started = true;
+      } else if (capture.started) {
+        capture.completed = true;
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-allstudio-thumbnail"],
+    });
+  });
   await toolbar(page, "Open project");
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
+  await expect
+    .poll(
+      () => page.evaluate(() => globalThis.testThumbnailCapture?.completed),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
   await expect(page.locator("html")).not.toHaveAttribute(
     "data-allstudio-thumbnail",
     "true",
