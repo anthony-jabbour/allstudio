@@ -625,6 +625,12 @@ The shared Home slice is followed by a small shell cleanup. The old native workf
 
 GitHub run [41584535869](https://github.com/anthony-jabbour/allstudio/actions/runs/41584535869) passed quality on head `20ad19f`. Desktop run [41584536003](https://github.com/anthony-jabbour/allstudio/actions/runs/41584536003) passed the Electron build, 6 desktop isolation/security checks, and 39 `test:local` scenarios in both development and packaged Linux builds. The scenarios include actual source diffs, rendered updates, undo/redo, restart persistence, both supported image-source edits, project-grant confinement and preview isolation. The subframe IPC probe reports unavailable. CI ran under GitHub's Xvfb; no Electron app was opened locally.
 
+### Thumbnail cache path hardening — 2026-11-03 (IN PROGRESS)
+
+The independent PR #28 review found that the cache code followed a symlinked `thumbnails/` parent during reads and pruning. The cache now uses the existing descriptor-relative native helper for listing/pruning, reading, atomic replacement and deletion under a held app-data root. Its C operations open `thumbnails/` with `O_NOFOLLOW`, use `openat`/`unlinkat`, and accept only hashed JPEG or generated temporary names; the renderer and preview gain no capability. The regression test creates the cache-directory symlink after opening the root grant and verifies pruning/read/write/delete reject it while outside bytes remain intact. It also verifies bounded cleanup and create/update/read/delete through the native wrapper.
+
+Local verification after this fix: `bun run test` passed 44 files / 898 tests; `bun run typecheck`, `bun run build:desktop`, `bun run validate:public-boundary` (539 files), `bun run lint` (191 files), and `git diff --check` passed. GitHub quality and Electron jobs passed on head `19a3825`; the Electron job passed 6 packaged desktop security checks and all 39 local-workflow checks in both development and packaged builds, including source diffs, preview confirmation, undo/redo, restart persistence, IPC confinement, and preview isolation. A fresh independent review of `fd535ca..19a3825` found no Critical or Important issues in the cache hardening. The subframe IPC probe remains unavailable. Phase 3 remains **IN PROGRESS**; no merge or phase PASS is recorded.
+
 ### PR #25/#26 Electron surface integration — 2026-11-03 (READY FOR REVIEW)
 
 This supersedes the earlier shared-Home checkpoint above: desktop now imports the same PR #25 `App` used by the web build, rather than relying only on a separate desktop presentation component.
@@ -637,4 +643,4 @@ Verification on head `2bd0576` before this documentation-only update: `bun run t
 
 The trusted IPC sender check now permits only the exact `app://editor/index.html` document with a hash route; it continues to reject query strings, alternate paths, other senders/frames, and extra arguments. A regression test covers valid hashes and rejected path/query changes.
 
-Phase 3 remains **IN PROGRESS**; no Phase 3 or Phase 4 `PASS` is recorded. Founder product review and unfamiliar-user/accessibility validation remain pending. PR #27 chat/AI is not included in this desktop slice. The thumbnail-cache symlink-parent issue identified in review of the parent PR #28 is still unresolved and must be fixed before that parent branch is merge-ready.
+Phase 3 remains **IN PROGRESS**; no Phase 3 or Phase 4 `PASS` is recorded. Founder product review and unfamiliar-user/accessibility validation remain pending. PR #27 chat/AI is not included in this desktop slice. The thumbnail-cache symlink-parent issue found in review of parent PR #28 is fixed and independently reviewed on the parent branch. PR #29 still needs final CI on the combined head and founder product review.

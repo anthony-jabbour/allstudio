@@ -1,15 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { constants } from "node:fs";
-import {
-  type FileHandle,
-  mkdir,
-  open,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import {
@@ -26,8 +16,7 @@ import type {
 import { applyIntegration, planIntegration } from "./config-integration.ts";
 import { durableJson } from "./durable-json.ts";
 import { hash, LocalWorkspace, textOf } from "./local-workspace.ts";
-import { FileFailure } from "./native-files.ts";
-import { pruneThumbnailCache } from "./thumbnail-cache.ts";
+import { FileFailure, NativeFiles } from "./native-files.ts";
 
 interface SavedProject extends RecentProject {
   dev: string;
@@ -124,55 +113,56 @@ export class Projects {
   async recent(): Promise<RecentProject[]> {
     const projects = await this.saved();
     await this.pruneThumbnails(projects);
-    return Promise.all(
-      projects.map(async ({ id, name, path }, index) => ({
-        id,
-        name,
-        path,
-        ...(index < 24 ? { thumbnail: await this.readThumbnail(id) } : {}),
-      })),
-    );
+    const files = await NativeFiles.open(
+      this.data,
+      join(this.runtime, "files"),
+    ).catch(() => undefined);
+    try {
+      return Promise.all(
+        projects.map(async ({ id, name, path }, index) => ({
+          id,
+          name,
+          path,
+          ...(index < 24 && files
+            ? { thumbnail: await this.readThumbnail(files, id) }
+            : {}),
+        })),
+      );
+    } finally {
+      await files?.close().catch(() => {});
+    }
   }
   private async pruneThumbnails(projects: readonly SavedProject[]) {
     this.thumbnailCacheDisabled = true;
+    let files: NativeFiles | undefined;
+    let cleaned = false;
     try {
       await this.thumbnailTail.catch(() => false);
+      files = await NativeFiles.open(this.data, join(this.runtime, "files"));
       // shortcut: the 100-project and 96 KiB image limits bound retained cache size; keep them aligned.
-      await pruneThumbnailCache(
-        this.data,
+      await files.pruneThumbnails(
         new Set(projects.map((project) => project.id)),
       );
-      this.thumbnailCacheDisabled = false;
+      cleaned = true;
     } catch {
       this.notify(
         "Project preview thumbnails are paused because the local cache could not be cleaned.",
       );
+    } finally {
+      await files?.close().catch(() => {});
+      this.thumbnailCacheDisabled = !cleaned;
     }
   }
-  private async readThumbnail(id: string): Promise<string | undefined> {
+  private async readThumbnail(
+    files: NativeFiles,
+    id: string,
+  ): Promise<string | undefined> {
     if (!/^[a-f0-9]{64}$/.test(id)) return undefined;
-    const file = join(this.data, "thumbnails", `${id}.jpg`);
-    let handle: FileHandle | undefined;
     try {
-      handle = await open(
-        file,
-        constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
-      );
-      const info = await handle.stat();
-      if (
-        !info.isFile() ||
-        info.nlink !== 1 ||
-        info.size < 4 ||
-        info.size > 96 * 1024
-      )
-        return undefined;
-      const bytes = await handle.readFile();
-      if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
+      const bytes = await files.readThumbnail(id);
       return `data:image/jpeg;base64,${bytes.toString("base64")}`;
     } catch {
       return undefined;
-    } finally {
-      await handle?.close().catch(() => {});
     }
   }
   async captureThumbnail(id: string, bounds: PreviewBounds): Promise<boolean> {
@@ -232,18 +222,22 @@ export class Projects {
         .resize({ width: 420, quality: "good" })
         .toJPEG(68);
       if (bytes.length > 96 * 1024) return false;
-      const directory = join(this.data, "thumbnails");
-      await mkdir(directory, { recursive: true, mode: 0o700 });
-      const target = join(directory, `${id}.jpg`);
-      const temporary = `${target}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
-      await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
+      const files = await NativeFiles.open(
+        this.data,
+        join(this.runtime, "files"),
+      );
       try {
-        await rename(temporary, target);
-      } catch (error) {
-        await rm(temporary, { force: true });
-        throw error;
+        let before: Buffer | null = null;
+        try {
+          before = await files.readThumbnail(id);
+        } catch {
+          await files.removeThumbnail(`${id}.jpg`).catch(() => {});
+        }
+        await files.writeThumbnail(id, before, bytes);
+        return true;
+      } finally {
+        await files.close().catch(() => {});
       }
-      return true;
     } catch {
       return false;
     } finally {
