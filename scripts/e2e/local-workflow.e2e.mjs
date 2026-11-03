@@ -286,6 +286,7 @@ try {
   await page
     .getByText("Preview bridge: connected", { exact: false })
     .waitFor({ timeout: 60_000 });
+  await expect(page.locator(".desktop-status")).toHaveCount(0);
   await expect
     .poll(
       () => page.evaluate(() => globalThis.testThumbnailCapture?.completed),
