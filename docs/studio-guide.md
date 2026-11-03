@@ -2,6 +2,10 @@
 
 Open an approved local Next.js/React project. Pages lists discovered static App Router routes; dynamic routes remain labelled unsupported. Layers represents rendered source elements. Canvas and Layers select the same source-backed element; repeated instances can be inspected but cannot be edited individually.
 
+## Electron Studio surfaces
+
+Desktop opens the shared Studio Home used by the web app. Board files open the shared board editor and stay in the local Electron profile; export a `.board.json` file to move or share one. Choose **Website projects** in the sidebar to open a local Next.js project in the source-backed website editor. **Back to Studio** returns to the board workspace without closing the active website session. Theme selection and keyboard commands follow the active surface. No account or cloud connection is required.
+
 ## Responsive preview and editing
 
 Mobile390, Tablet768, Laptop1024 and Desktop1440 change the actual preview width and automatically choose Base, md, lg and xl respectively. A whole custom width from320 to2560px chooses the largest default breakpoint at or below that width. The Edit menu supports Base/sm/md/lg/xl/2xl and lets you override that choice. Width changes restore automatic selection. Zoom affects only the canvas; Fit,50%,75% and100% do not change source styling.
