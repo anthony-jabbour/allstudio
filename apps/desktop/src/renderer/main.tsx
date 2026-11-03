@@ -15,6 +15,7 @@ import type {
 import "@allstudio/editor/studio.css";
 import "../../../studio/src/ui/tokens.css";
 import "../../../studio/src/ui/app.css";
+import "@allstudio/editor/board.css";
 import "./styles.css";
 
 declare global {
