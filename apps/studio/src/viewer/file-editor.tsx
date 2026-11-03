@@ -12,10 +12,12 @@ export function FileEditor({
   id,
   resolvedTheme,
   onTheme,
+  onOpenWebsiteEditor,
 }: {
   id: string;
   resolvedTheme: "light" | "dark";
   onTheme: (theme: ThemePreference) => void;
+  onOpenWebsiteEditor?: () => void;
 }) {
   const store = useFileStore();
   // Read once per file id: the editor owns the document while open.
@@ -65,6 +67,9 @@ export function FileEditor({
           label: "Studio home",
           onSelect: () => navigate({ name: "studio", section: "home" }),
         },
+        ...(onOpenWebsiteEditor
+          ? [{ label: "Website projects", onSelect: onOpenWebsiteEditor }]
+          : []),
       ]}
     />
   );

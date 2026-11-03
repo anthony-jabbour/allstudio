@@ -5,6 +5,7 @@ import {
 } from "@allstudio/editor/shell";
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { App as StudioApp } from "../../../studio/src/app.tsx";
 import type {
   DesktopApi,
   OpenProject,
@@ -12,6 +13,8 @@ import type {
   RecentProject,
 } from "../shared/desktop-api.ts";
 import "@allstudio/editor/studio.css";
+import "../../../studio/src/ui/tokens.css";
+import "../../../studio/src/ui/app.css";
 import "./styles.css";
 
 declare global {
@@ -20,7 +23,7 @@ declare global {
   }
 }
 
-function App() {
+function WebsiteEditorApp({ onBackToStudio }: { onBackToStudio: () => void }) {
   const [desktopStatus, setDesktopStatus] = useState<
     "connecting" | "ready" | "error"
   >("connecting");
@@ -158,6 +161,9 @@ function App() {
           project ? (
             <>
               <nav className="project-toolbar" aria-label="Local project">
+                <button type="button" disabled={busy} onClick={onBackToStudio}>
+                  Back to Studio
+                </button>
                 <button
                   type="button"
                   disabled={busy}
@@ -237,6 +243,9 @@ function App() {
             regionLabel="Recent local projects"
             actions={
               <>
+                <button type="button" disabled={busy} onClick={onBackToStudio}>
+                  Back to Studio
+                </button>
                 <button
                   type="button"
                   disabled={busy || !recent[0]}
@@ -321,6 +330,20 @@ function App() {
             : "Connecting to desktop…"}
         </output>
       ) : null}
+    </div>
+  );
+}
+
+function App() {
+  const [surface, setSurface] = useState<"studio" | "websites">("studio");
+  return (
+    <div className="desktop-surfaces">
+      <div className="desktop-surface" hidden={surface !== "studio"}>
+        <StudioApp onOpenWebsiteEditor={() => setSurface("websites")} />
+      </div>
+      <div className="desktop-surface" hidden={surface !== "websites"}>
+        <WebsiteEditorApp onBackToStudio={() => setSurface("studio")} />
+      </div>
     </div>
   );
 }

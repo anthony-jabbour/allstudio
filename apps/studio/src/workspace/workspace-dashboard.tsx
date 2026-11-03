@@ -4,6 +4,7 @@ import { useFileActions } from "../files/file-actions.tsx";
 import { FileThumbnail, useElementSize } from "../files/file-card.tsx";
 import { formatEdited, type StudioFile } from "../files/file-store.ts";
 import { useFileStore, useFiles } from "../files/use-files.ts";
+import { WebsiteEditorEntry } from "../home/home.tsx";
 import { href, navigate, type Route } from "../router.ts";
 import { Menu } from "../ui/controls.tsx";
 import { Icon } from "../ui/icons.tsx";
@@ -100,10 +101,12 @@ export function WorkspaceDashboard({
   section,
   theme,
   onTheme,
+  onOpenWebsiteEditor,
 }: {
   section: Section;
   theme: ThemePreference;
   onTheme: (theme: ThemePreference) => void;
+  onOpenWebsiteEditor?: () => void;
 }) {
   const files = useFiles();
   const store = useFileStore();
@@ -169,6 +172,12 @@ export function WorkspaceDashboard({
             href({ name: "home", section: "recents" }),
             false,
           )}
+          {onOpenWebsiteEditor ? (
+            <WebsiteEditorEntry
+              className="ws-nav"
+              onOpen={onOpenWebsiteEditor}
+            />
+          ) : null}
           <span
             className="ws-nav disabled"
             aria-disabled="true"

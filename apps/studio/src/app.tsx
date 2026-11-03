@@ -8,7 +8,11 @@ import { useTheme } from "./ui/theme.ts";
 import { FileEditor } from "./viewer/file-editor.tsx";
 import { WorkspaceDashboard } from "./workspace/workspace-dashboard.tsx";
 
-export function App() {
+export function App({
+  onOpenWebsiteEditor,
+}: {
+  onOpenWebsiteEditor?: () => void;
+} = {}) {
   const store = useMemo(() => new FileStore(browserStorage()), []);
   const route = useRoute();
   const theme = useTheme();
@@ -20,18 +24,21 @@ export function App() {
             id={route.id}
             resolvedTheme={theme.resolved}
             onTheme={theme.set}
+            onOpenWebsiteEditor={onOpenWebsiteEditor}
           />
         ) : route.name === "studio" ? (
           <WorkspaceDashboard
             section={route.section}
             theme={theme.preference}
             onTheme={theme.set}
+            onOpenWebsiteEditor={onOpenWebsiteEditor}
           />
         ) : (
           <Home
             section={route.section}
             theme={theme.preference}
             onTheme={theme.set}
+            onOpenWebsiteEditor={onOpenWebsiteEditor}
           />
         )}
       </ToastProvider>

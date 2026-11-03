@@ -49,18 +49,20 @@ try {
     .tracing.start({ screenshots: true, snapshots: true });
   tracingStarted = true;
   const page = await application.firstWindow();
-  await page.getByRole("heading", { name: "Home", exact: true }).waitFor();
-  await expect(page.locator(".desktop-status")).toHaveCount(0);
+  await page.getByRole("heading", { name: "Recents", exact: true }).waitFor();
   await expect(
-    page.getByText("Source-backed design editing", { exact: true }),
+    page.getByRole("button", { name: "Website projects", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
+  await expect(page.locator(".desktop-status:visible")).toHaveCount(0);
+  await page.getByRole("button", { name: "Account and appearance" }).click();
+  await page.getByRole("menuitem", { name: "Dark theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
   await page.reload();
-  await expect(page.getByLabel("Appearance", { exact: true })).toHaveValue(
-    "dark",
-  );
-  await page.getByLabel("Appearance", { exact: true }).selectOption("light");
+  await expect(page.getByRole("heading", { name: "Recents" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.getByRole("button", { name: "Account and appearance" }).click();
+  await page.getByRole("menuitem", { name: "Light theme" }).click();
   assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
   await page.emulateMedia({ colorScheme: "dark" });
   assert.equal(
@@ -69,7 +71,8 @@ try {
     ),
     "light",
   );
-  await page.getByLabel("Appearance", { exact: true }).selectOption("system");
+  await page.getByRole("button", { name: "Account and appearance" }).click();
+  await page.getByRole("menuitem", { name: "System theme" }).click();
   assert.equal(
     await page.evaluate(
       () => getComputedStyle(document.documentElement).colorScheme,

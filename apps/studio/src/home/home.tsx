@@ -39,15 +39,37 @@ function initials(name: string) {
   );
 }
 
+export function WebsiteEditorEntry({
+  onOpen,
+  className = "nav-item",
+}: {
+  onOpen: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={className}
+      aria-label="Website projects"
+      onClick={onOpen}
+    >
+      <Icon.Studio />
+      <span>Website projects</span>
+    </button>
+  );
+}
+
 /** Paper-inspired file home: quiet sidebar, large title, real file cards. */
 export function Home({
   section,
   theme,
   onTheme,
+  onOpenWebsiteEditor,
 }: {
   section: Section;
   theme: ThemePreference;
   onTheme: (theme: ThemePreference) => void;
+  onOpenWebsiteEditor?: () => void;
 }) {
   const files = useFiles();
   const store = useFileStore();
@@ -195,6 +217,9 @@ export function Home({
             <span>Studio home</span>
             <span className="dot" aria-hidden="true" />
           </a>
+          {onOpenWebsiteEditor ? (
+            <WebsiteEditorEntry onOpen={onOpenWebsiteEditor} />
+          ) : null}
         </nav>
         <div className="sidebar-divider" />
         <nav className="nav-group" aria-label="Local workspace">

@@ -21,6 +21,7 @@
     "build:desktop": "bun --filter @allstudio/desktop build",
     "package:desktop": "bun run build:desktop && bun --filter @allstudio/desktop package",
     "test:desktop": "node scripts/e2e/desktop.e2e.mjs",
+    "test:desktop-studio": "node scripts/e2e/desktop-studio.e2e.mjs",
     "test:local": "node scripts/e2e/local-workflow.e2e.mjs",
     "dev:studio": "bun --filter @allstudio/studio dev"
   },
