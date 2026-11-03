@@ -259,14 +259,17 @@ try {
   const clickInPreview = (target, position) =>
     clickPreview(page, target, position);
   await page.evaluate(() => {
-    const capture = { started: false, completed: false };
+    const capture = { active: false, started: 0, completed: 0 };
     globalThis.testThumbnailCapture = capture;
     const observer = new MutationObserver(() => {
-      if (document.documentElement.dataset.allstudioThumbnail === "true") {
-        capture.started = true;
-      } else if (capture.started) {
-        capture.completed = true;
-        observer.disconnect();
+      const active =
+        document.documentElement.dataset.allstudioThumbnail === "true";
+      if (active && !capture.active) {
+        capture.active = true;
+        capture.started += 1;
+      } else if (!active && capture.active) {
+        capture.active = false;
+        capture.completed += 1;
       }
     });
     observer.observe(document.documentElement, {
@@ -283,15 +286,25 @@ try {
       () => page.evaluate(() => globalThis.testThumbnailCapture?.completed),
       { timeout: 10_000 },
     )
-    .toBe(true);
+    .toBeGreaterThan(0);
   await expect(page.locator("html")).not.toHaveAttribute(
     "data-allstudio-thumbnail",
     "true",
     { timeout: 10_000 },
   );
-  await page
-    .getByLabel("Edit breakpoint", { exact: true })
-    .selectOption("base");
+  const editBreakpoint = page.getByLabel("Edit breakpoint", { exact: true });
+  const previousScope = await editBreakpoint.inputValue();
+  const capturesBeforeScopeChange = await page.evaluate(
+    () => globalThis.testThumbnailCapture?.completed ?? 0,
+  );
+  await editBreakpoint.selectOption("base");
+  if (previousScope !== "base") {
+    await expect
+      .poll(() =>
+        page.evaluate(() => globalThis.testThumbnailCapture?.completed),
+      )
+      .toBeGreaterThan(capturesBeforeScopeChange);
+  }
   const preview = page.frameLocator('iframe[title="Project preview"]');
   await preview.locator("h1").evaluate((heading) => {
     window.__allstudioE2ePointerHit = false;
